@@ -218,7 +218,7 @@ const stats = reactive({
     grid-template-columns: 1.3fr 0.9fr;
     gap: 24px;
     min-height: 0;
-    overflow: hidden;
+    overflow: auto;
 }
 
 .hero-copy {
