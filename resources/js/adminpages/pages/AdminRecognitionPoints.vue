@@ -1,22 +1,18 @@
 <template>
-    <section class="admin-page-shell">
-        <header class="page-header">
-            <p class="page-kicker">Points and Fines</p>
-            <h1>Recognition Points</h1>
-            <p class="page-copy">Manage the recognition points program and reward students for positive behavior.</p>
-        </header>
+    <main class="admin-page-body">
 
         <div class="page-card">
-            <p class="placeholder-text">This page will show student point balances and controls to award or adjust recognition points.</p>
+            <p class="placeholder-text">This page will show student point balances and controls to award or adjust
+                recognition points.</p>
         </div>
-    </section>
+    </main>
 </template>
 
 <script setup>
 </script>
 
 <style scoped>
-.admin-page-shell {
+.admin-page-body {
     padding: 24px;
     color: #f8f4ea;
     min-height: calc(100vh - 60px);

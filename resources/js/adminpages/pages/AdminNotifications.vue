@@ -1,22 +1,18 @@
 <template>
-    <section class="admin-page-shell">
-        <header class="page-header">
-            <p class="page-kicker">Communication</p>
-            <h1>Notifications</h1>
-            <p class="page-copy">Create and manage system notifications sent to students and administrators.</p>
-        </header>
+    <main class="admin-page-body">
 
         <div class="page-card">
-            <p class="placeholder-text">This page will include notification history, creation tools, and channel settings for alerts.</p>
+            <p class="placeholder-text">This page will include notification history, creation tools, and channel
+                settings for alerts.</p>
         </div>
-    </section>
+    </main>
 </template>
 
 <script setup>
 </script>
 
 <style scoped>
-.admin-page-shell {
+.admin-page-body {
     padding: 24px;
     color: #f8f4ea;
     min-height: calc(100vh - 60px);

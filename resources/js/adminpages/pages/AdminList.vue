@@ -2,7 +2,6 @@
     <section class="student-management-page">
         <header class="page-header">
             <div class="header-copy">
-                <p class="page-kicker">Student Management</p>
                 <h1>Manage student accounts and directory records</h1>
             </div>
 
@@ -339,7 +338,7 @@
                         <div class="detail-row"><span>Email</span><strong>{{ selectedStudent.email || '—' }}</strong>
                         </div>
                         <div class="detail-row"><span>Status</span><strong>{{ capitalize(selectedStudent.account_status
-                                || 'active') }}</strong></div>
+                            || 'active') }}</strong></div>
                         <div class="detail-row"><span>Created</span><strong>{{ formatDate(selectedStudent.created_at)
                                 }}</strong></div>
                         <div class="detail-row"><span>Updated</span><strong>{{ formatDate(selectedStudent.updated_at)

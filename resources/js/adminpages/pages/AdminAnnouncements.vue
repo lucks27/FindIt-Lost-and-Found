@@ -1,22 +1,18 @@
 <template>
-    <section class="admin-page-shell">
-        <header class="page-header">
-            <p class="page-kicker">Communication</p>
-            <h1>Announcements</h1>
-            <p class="page-copy">Publish announcements and updates for all students and staff from the admin portal.</p>
-        </header>
+    <main class="admin-page-body">
 
         <div class="page-card">
-            <p class="placeholder-text">This page will display announcement history and allow quick publishing of new notices.</p>
+            <p class="placeholder-text">This page will display announcement history and allow quick publishing of new
+                notices.</p>
         </div>
-    </section>
+    </main>
 </template>
 
 <script setup>
 </script>
 
 <style scoped>
-.admin-page-shell {
+.admin-page-body {
     padding: 24px;
     color: #f8f4ea;
     min-height: calc(100vh - 60px);

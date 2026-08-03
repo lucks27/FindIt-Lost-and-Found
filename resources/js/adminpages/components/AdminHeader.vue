@@ -57,7 +57,7 @@ import api from '@/bootstrap'
 
 const props = defineProps({
     pageTitle: { type: String, default: 'Dashboard' },
-    title: { type: String, default: 'Dashboard' },
+    title: { type: String, default: 'Home' },
     notificationCount: { type: Number, default: 3 },
 })
 

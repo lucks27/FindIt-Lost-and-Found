@@ -10,21 +10,13 @@
 
         <nav class="sidebar-menu" aria-label="Admin navigation">
             <div class="nav-section">
-                <button class="section-toggle" type="button" @click="toggleSection('dashboard')">
-                    <span>Dashboard</span>
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M7 10l5 5 5-5" />
-                    </svg>
-                </button>
-                <div v-show="openSection === 'dashboard'" class="section-links">
-                    <router-link :to="{ name: 'superadmin.dashboard' }" class="menu-link"
-                        :class="{ active: currentPage === 'dashboard' }">
-                        <span class="menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-4v-6H8v6H4a1 1 0 0 1-1-1z" />
-                            </svg></span>
-                        <span class="menu-text">Dashboard</span>
-                    </router-link>
-                </div>
+                <router-link :to="{ name: 'superadmin.dashboard' }" class="menu-link"
+                    :class="{ active: currentPage === 'dashboard' }">
+                    <span class="menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-4v-6H8v6H4a1 1 0 0 1-1-1z" />
+                        </svg></span>
+                    <span class="menu-text">Dashboard</span>
+                </router-link>
             </div>
 
             <div v-for="section in sections" :key="section.id" class="nav-section">
@@ -111,8 +103,8 @@ const sections = [
         label: 'Users and Records',
         items: [
             { label: 'Student Management', page: 'list', to: { name: 'superadmin.list' }, icon: 'M5 5h14v4H5V5zm0 6h10v4H5v-4zm0 6h14v2H5v-2z' },
-            { label: 'Analytics & Reports', page: 'reports', to: { name: 'superadmin.dashboard' }, icon: 'M4 4h16v16H4zM7 15h2v-4H7zm4 0h2V7h-2zm4 0h2v-8h-2z' },
-            { label: 'Audit Logs', page: 'audit', to: { name: 'superadmin.dashboard' }, icon: 'M4 4h16v2H4V4zm0 4h16v2H4V8zm0 4h12v2H4v-2zm0 4h8v2H4v-2z' },
+            { label: 'Analytics & Reports', page: 'reports', to: { name: 'superadmin.reports' }, icon: 'M4 4h16v16H4zM7 15h2v-4H7zm4 0h2V7h-2zm4 0h2v-8h-2z' },
+            { label: 'Audit Logs', page: 'audit', to: { name: 'superadmin.audit' }, icon: 'M4 4h16v2H4V4zm0 4h16v2H4V8zm0 4h12v2H4v-2zm0 4h8v2H4v-2z' },
         ],
     },
     {

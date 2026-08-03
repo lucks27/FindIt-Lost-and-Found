@@ -28,6 +28,7 @@ const AdminNotificationsPage = () => import("@/adminpages/pages/AdminNotificatio
 const AdminAnnouncementsPage = () => import("@/adminpages/pages/AdminAnnouncements.vue");
 const AdminAuditLogsPage = () => import("@/adminpages/pages/AdminAuditLogs.vue");
 const AdminSettingsPage = () => import("@/adminpages/pages/AdminSettings.vue");
+const AdminReportsPage = () => import("@/adminpages/pages/AdminReports.vue");
 const AdminReportsDashboard = () => import("@/adminpages/pages/AdminDashboard.vue");
 
 const routes = [
@@ -61,6 +62,7 @@ const routes = [
     children: [
       { path: "", redirect: { name: "superadmin.dashboard" } },
       { path: "dashboard", name: "superadmin.dashboard", component: AdminReportsDashboard },
+      { path: "reports", name: "superadmin.reports", component: AdminReportsPage },
       { path: "profile", name: "superadmin.profile", component: AdminProfilePage },
       { path: "list", name: "superadmin.list", component: AdminStudentManagementPage },
       { path: "pending-surrender", name: "superadmin.pending-surrender", component: AdminPendingSurrenderPage },

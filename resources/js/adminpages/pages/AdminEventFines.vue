@@ -1,22 +1,18 @@
 <template>
-    <section class="admin-page-shell">
-        <header class="page-header">
-            <p class="page-kicker">Points and Fines</p>
-            <h1>Event Fine Management</h1>
-            <p class="page-copy">Manage event-related fines and keep track of penalties issued to students.</p>
-        </header>
+    <main class="admin-page-body">
 
         <div class="page-card">
-            <p class="placeholder-text">This page will list fines by event, status, and student for convenient review and administration.</p>
+            <p class="placeholder-text">This page will list fines by event, status, and student for convenient review
+                and administration.</p>
         </div>
-    </section>
+    </main>
 </template>
 
 <script setup>
 </script>
 
 <style scoped>
-.admin-page-shell {
+.admin-page-body {
     padding: 24px;
     color: #f8f4ea;
     min-height: calc(100vh - 60px);

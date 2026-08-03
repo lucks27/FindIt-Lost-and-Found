@@ -1,22 +1,18 @@
 <template>
-    <section class="admin-page-shell">
-        <header class="page-header">
-            <p class="page-kicker">Lost and Found</p>
-            <h1>Potential Match</h1>
-            <p class="page-copy">Evaluate items that may belong to reported claims and confirm matches with owners.</p>
-        </header>
+    <main class="admin-page-body">
 
         <div class="page-card">
-            <p class="placeholder-text">This page will list suggested matches between lost items and claimant submissions for review.</p>
+            <p class="placeholder-text">This page will list suggested matches between lost items and claimant
+                submissions for review.</p>
         </div>
-    </section>
+    </main>
 </template>
 
 <script setup>
 </script>
 
 <style scoped>
-.admin-page-shell {
+.admin-page-body {
     padding: 24px;
     color: #f8f4ea;
     min-height: calc(100vh - 60px);

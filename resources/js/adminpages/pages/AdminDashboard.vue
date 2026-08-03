@@ -7,7 +7,8 @@
                 <div class="hero-copy">
                     <p class="page-label">Home Overview</p>
                     <h1>Super Admin Home</h1>
-                    <p class="page-description">A quick summary of the portal areas you can navigate to, excluding account management.</p>
+                    <p class="page-description">A quick summary of the portal areas you can navigate to, excluding
+                        account management.</p>
                 </div>
             </header>
 
@@ -18,8 +19,10 @@
                         <strong>Workflow, verification, inventory, claims, and release.</strong>
                     </div>
                     <ul class="card-links">
-                        <li><router-link :to="{ name: 'superadmin.pending-surrender' }">Pending Surrender</router-link></li>
-                        <li><router-link :to="{ name: 'superadmin.item-verification' }">Item Verification</router-link></li>
+                        <li><router-link :to="{ name: 'superadmin.pending-surrender' }">Pending Surrender</router-link>
+                        </li>
+                        <li><router-link :to="{ name: 'superadmin.item-verification' }">Item Verification</router-link>
+                        </li>
                         <li><router-link :to="{ name: 'superadmin.items' }">Lost &amp; Found Items</router-link></li>
                         <li><router-link :to="{ name: 'superadmin.matches' }">Potential Match</router-link></li>
                         <li><router-link :to="{ name: 'superadmin.claims' }">Claims Review</router-link></li>
@@ -70,7 +73,9 @@
                         </div>
                     </div>
                     <div class="summary-copy">
-                        <p>Use this page to get a brief view of the main portal categories. Each card above links directly to the important sections for managing lost & found, points and fines, communication, and user records.</p>
+                        <p>Use this page to get a brief view of the main portal categories. Each card above links
+                            directly to the important sections for managing lost & found, points and fines,
+                            communication, and user records.</p>
                     </div>
                 </div>
 
@@ -82,12 +87,17 @@
                         </div>
                     </div>
                     <div class="quick-actions-grid">
-                        <router-link class="action-card" :to="{ name: 'superadmin.pending-surrender' }">Review Surrenders</router-link>
-                        <router-link class="action-card" :to="{ name: 'superadmin.item-verification' }">Verify Items</router-link>
+                        <router-link class="action-card" :to="{ name: 'superadmin.pending-surrender' }">Review
+                            Surrenders</router-link>
+                        <router-link class="action-card" :to="{ name: 'superadmin.item-verification' }">Verify
+                            Items</router-link>
                         <router-link class="action-card" :to="{ name: 'superadmin.list' }">Manage Students</router-link>
-                        <router-link class="action-card" :to="{ name: 'superadmin.notifications' }">Send Notification</router-link>
-                        <router-link class="action-card" :to="{ name: 'superadmin.recognition' }">Award Points</router-link>
-                        <router-link class="action-card" :to="{ name: 'superadmin.audit' }">View Audit Logs</router-link>
+                        <router-link class="action-card" :to="{ name: 'superadmin.notifications' }">Send
+                            Notification</router-link>
+                        <router-link class="action-card" :to="{ name: 'superadmin.recognition' }">Award
+                            Points</router-link>
+                        <router-link class="action-card" :to="{ name: 'superadmin.audit' }">View Audit
+                            Logs</router-link>
                     </div>
                 </div>
             </section>
