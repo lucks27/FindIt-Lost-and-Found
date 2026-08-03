@@ -179,7 +179,7 @@ defineProps({
     background: rgba(247, 242, 230, 0.08);
     border: 1px solid rgba(247, 242, 230, 0.12);
     backdrop-filter: blur(14px);
-    overflow: hidden;
+    overflow: auto;
     min-height: 420px;
 }
 
