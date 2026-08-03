@@ -1,0 +1,73 @@
+<template>
+    <div class="admin-layout">
+        <AdminSidebar :current-page="currentPage" />
+        <AdminHeader :page-title="pageTitle" :title="pageTitle" @toggle-mobile-menu="toggleMobileMenu" />
+        <main class="admin-main">
+            <router-view />
+        </main>
+    </div>
+</template>
+
+<script setup>
+import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import AdminSidebar from '@/adminpages/components/AdminSidebar.vue'
+import AdminHeader from '@/adminpages/components/AdminHeader.vue'
+
+const route = useRoute()
+const mobileSidebarOpen = ref(false)
+
+const currentPage = computed(() => {
+    if (!route.name) return 'dashboard'
+    return String(route.name).replace(/^superadmin\./, '')
+})
+
+const pageTitle = computed(() => {
+    switch (currentPage.value) {
+        case 'profile':
+            return 'Profile'
+        case 'list':
+            return 'Student Management'
+        default:
+            return 'Dashboard'
+    }
+})
+
+function toggleMobileMenu() {
+    mobileSidebarOpen.value = !mobileSidebarOpen.value
+}
+</script>
+
+<style scoped>
+.admin-layout {
+    width: 100vw;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 230px minmax(0, 1fr);
+    grid-template-rows: 60px minmax(0, 1fr);
+    overflow: hidden;
+    background: radial-gradient(circle at 12% 8%, rgba(217, 185, 104, 0.15), transparent 34%),
+        radial-gradient(circle at 84% 6%, rgba(247, 242, 230, 0.1), transparent 24%),
+        linear-gradient(180deg, rgba(7, 23, 12, 0.96) 0%, rgba(11, 33, 17, 0.96) 46%, rgba(8, 24, 13, 0.98) 100%);
+}
+
+.admin-main {
+    grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    background: linear-gradient(180deg, rgba(10, 21, 12, 0.9), rgba(5, 14, 7, 0.96));
+}
+
+@media (max-width: 1024px) {
+    .admin-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: 60px minmax(0, 1fr);
+    }
+
+    .admin-main {
+        grid-column: 1;
+    }
+}
+</style>

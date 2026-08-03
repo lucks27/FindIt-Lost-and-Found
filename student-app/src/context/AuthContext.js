@@ -1,0 +1,140 @@
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Alert } from 'react-native';
+import * as api from '../api/api';
+import EventBus from '../utils/EventBus';
+import RealtimeSync from '../utils/RealtimeSync';
+import { registerSavedPushToken } from '../utils/PushTokenManager';
+import { registerPushToken, unregisterPushToken } from '../utils/NotificationService';
+
+const AuthContext = createContext({
+  user: null,
+  loading: true,
+  error: null,
+  login: async () => {},
+  logout: async () => {},
+});
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    restoreSession();
+  }, []);
+
+  async function restoreSession() {
+    setLoading(true);
+    try {
+      // When the app starts, restore the saved auth token (if any).
+      // This keeps the mobile user logged in across app restarts.
+      const hasToken = await api.initializeApiClient();
+      if (hasToken) {
+        const userResponse = await api.fetchUser();
+        setUser(userResponse.data);
+        // Start real-time sync when user is authenticated
+        RealtimeSync.startRealtimeSync();
+        await registerSavedPushToken();
+      } else {
+        setUser(null);
+      }
+    } catch (err) {
+      console.error('Error restoring session:', err);
+      await api.setSavedToken(null);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function login(email, password) {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Send credentials to Laravel API.
+      // The backend must return a token for the mobile app to store.
+      const response = await api.loginRequest(email, password);
+      const token = response.data?.token || null;
+
+      if (token) {
+        await api.setSavedToken(token);
+      }
+
+      // Once token is saved, fetch the current user profile and store it globally.
+      const userResponse = await api.fetchUser();
+      setUser(userResponse.data);
+
+      // Start real-time sync when user logs in
+      RealtimeSync.startRealtimeSync();
+
+      // Register or renew the push notification token after login
+      await registerPushToken();
+
+      return true;
+    } catch (err) {
+      console.error('Login request failed:', err.response?.data || err.message || err);
+
+      const serverMessage = err.response?.data?.message;
+      const validationErrors = err.response?.data?.errors
+        ? Object.values(err.response.data.errors).flat().join('\n')
+        : null;
+      const message =
+        serverMessage ||
+        validationErrors ||
+        (err.request ? 'Network error: Unable to reach the backend server. Check the API URL and your internet connection.' : null) ||
+        err.message ||
+        'Login failed. Check your credentials.';
+
+      setError(message);
+      Alert.alert('Login Error', message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function logout() {
+    setLoading(true);
+    // Stop real-time sync before logout
+    RealtimeSync.stopRealtimeSync();
+    RealtimeSync.clearSyncCache();
+
+    try {
+      await api.logoutRequest();
+    } catch (err) {
+      console.warn('Logout request failed:', err);
+    } finally {
+      try {
+        await unregisterPushToken();
+      } catch (cleanupError) {
+        console.warn('Failed to unregister push token on logout:', cleanupError);
+      }
+
+      // Always remove the local token and clear user state, even if logout fails.
+      await api.setSavedToken(null);
+      setUser(null);
+      setLoading(false);
+    }
+  }
+
+  // Allow other components to update the global user object
+  function updateUser(newUser) {
+    setUser(newUser);
+    try {
+      EventBus.emit('profileUpdated', newUser);
+    } catch (e) {
+      console.warn('Failed to emit profileUpdated:', e);
+    }
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, loading, error, login, logout, updateUser }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  return useContext(AuthContext);
+}
