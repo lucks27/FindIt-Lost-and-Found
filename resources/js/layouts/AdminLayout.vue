@@ -28,6 +28,32 @@ const pageTitle = computed(() => {
             return 'Profile'
         case 'list':
             return 'Student Management'
+        case 'pending-surrender':
+            return 'Pending Surrender'
+        case 'item-verification':
+            return 'Item Verification'
+        case 'items':
+            return 'Lost & Found Items'
+        case 'matches':
+            return 'Potential Match'
+        case 'claims':
+            return 'Claims Review'
+        case 'inventory':
+            return 'Item Inventory'
+        case 'release':
+            return 'Item Release'
+        case 'recognition':
+            return 'Recognition Points'
+        case 'fines':
+            return 'Event Fine Management'
+        case 'notifications':
+            return 'Notifications'
+        case 'announcements':
+            return 'Announcements'
+        case 'audit':
+            return 'Audit Logs'
+        case 'settings':
+            return 'Settings'
         default:
             return 'Dashboard'
     }

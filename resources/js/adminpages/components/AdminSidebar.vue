@@ -81,29 +81,29 @@ const sections = [
         id: 'lost-found',
         label: 'Lost and Found',
         items: [
-            { label: 'Pending Surrender', page: 'pending-surrender', to: { name: 'superadmin.dashboard' }, icon: 'M4 5h16v4H4V5zm0 6h16v8H4v-8z' },
-            { label: 'Item Verification', page: 'item-verification', to: { name: 'superadmin.dashboard' }, icon: 'M12 2l-7 6v14h14V8l-7-6zM7 18v-6.5l5-2.5 5 2.5V18H7z' },
-            { label: 'Lost & Found Items', page: 'items', to: { name: 'superadmin.dashboard' }, icon: 'M20 4H4v16h16V4zm-2 14H6V6h12v12z' },
-            { label: 'Potential Match', page: 'matches', to: { name: 'superadmin.dashboard' }, icon: 'M7 4h10l-1 4H8L7 4zm-2 6h14v2H5v-2zm0 4h14v6H5v-6z' },
-            { label: 'Claims Review', page: 'claims', to: { name: 'superadmin.dashboard' }, icon: 'M5 4h14v2H5V4zm0 4h14v2H5V8zm0 4h14v6H5v-6z' },
-            { label: 'Item Inventory', page: 'inventory', to: { name: 'superadmin.dashboard' }, icon: 'M4 4h16v4H4V4zm0 6h10v10H4V10z' },
-            { label: 'Item Release', page: 'release', to: { name: 'superadmin.dashboard' }, icon: 'M3 7h18v4H3V7zm0 6h12v4H3v-4z' },
+            { label: 'Pending Surrender', page: 'pending-surrender', to: { name: 'superadmin.pending-surrender' }, icon: 'M4 5h16v4H4V5zm0 6h16v8H4v-8z' },
+            { label: 'Item Verification', page: 'item-verification', to: { name: 'superadmin.item-verification' }, icon: 'M12 2l-7 6v14h14V8l-7-6zM7 18v-6.5l5-2.5 5 2.5V18H7z' },
+            { label: 'Lost & Found Items', page: 'items', to: { name: 'superadmin.items' }, icon: 'M20 4H4v16h16V4zm-2 14H6V6h12v12z' },
+            { label: 'Potential Match', page: 'matches', to: { name: 'superadmin.matches' }, icon: 'M7 4h10l-1 4H8L7 4zm-2 6h14v2H5v-2zm0 4h14v6H5v-6z' },
+            { label: 'Claims Review', page: 'claims', to: { name: 'superadmin.claims' }, icon: 'M5 4h14v2H5V4zm0 4h14v2H5V8zm0 4h14v6H5v-6z' },
+            { label: 'Item Inventory', page: 'inventory', to: { name: 'superadmin.inventory' }, icon: 'M4 4h16v4H4V4zm0 6h10v10H4V10z' },
+            { label: 'Item Release', page: 'release', to: { name: 'superadmin.release' }, icon: 'M3 7h18v4H3V7zm0 6h12v4H3v-4z' },
         ],
     },
     {
         id: 'points',
         label: 'Points and Fines',
         items: [
-            { label: 'Recognition Points', page: 'recognition', to: { name: 'superadmin.dashboard' }, icon: 'M12 2l2.39 4.84L20 7.43l-3.5 3.41.82 4.79L12 14.77l-4.32 2.86.82-4.79L4 7.43l5.61-.59L12 2z' },
-            { label: 'Event Fine Management', page: 'fines', to: { name: 'superadmin.dashboard' }, icon: 'M6 2h12v2H6V2zm3 4h6v2H9V6zm-3 4h12v10H6V10z' },
+            { label: 'Recognition Points', page: 'recognition', to: { name: 'superadmin.recognition' }, icon: 'M12 2l2.39 4.84L20 7.43l-3.5 3.41.82 4.79L12 14.77l-4.32 2.86.82-4.79L4 7.43l5.61-.59L12 2z' },
+            { label: 'Event Fine Management', page: 'fines', to: { name: 'superadmin.fines' }, icon: 'M6 2h12v2H6V2zm3 4h6v2H9V6zm-3 4h12v10H6V10z' },
         ],
     },
     {
         id: 'communication',
         label: 'Communication',
         items: [
-            { label: 'Notifications', page: 'notifications', to: { name: 'superadmin.dashboard' }, icon: 'M4 4h16v12H4V4zm2 2v8h12V6H6zm1 10h10v2H7v-2z' },
-            { label: 'Announcements', page: 'announcements', to: { name: 'superadmin.dashboard' }, icon: 'M5 4h14v4H5V4zm0 6h10v10H5V10z' },
+            { label: 'Notifications', page: 'notifications', to: { name: 'superadmin.notifications' }, icon: 'M4 4h16v12H4V4zm2 2v8h12V6H6zm1 10h10v2H7v-2z' },
+            { label: 'Announcements', page: 'announcements', to: { name: 'superadmin.announcements' }, icon: 'M5 4h14v4H5V4zm0 6h10v10H5V10z' },
         ],
     },
     {
@@ -120,7 +120,7 @@ const sections = [
         label: 'Account',
         items: [
             { label: 'Admin Profile', page: 'profile', to: { name: 'superadmin.profile' }, icon: 'M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-3.31 0-6 1.79-6 4v1h12v-1c0-2.21-2.69-4-6-4z' },
-            { label: 'Settings', page: 'settings', to: { name: 'superadmin.dashboard' }, icon: 'M19.14 12.94a7.44 7.44 0 0 0 .05-.94 7.44 7.44 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.39 7.39 0 0 0-1.63-.94L14.4 2.5a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54a7.39 7.39 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.7 10.72a.5.5 0 0 0 .12.64l2.03 1.58a7.44 7.44 0 0 0-.05.94 7.44 7.44 0 0 0 .05.94L2.82 14.52a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.49.39 1.02.71 1.63.94l.36 2.54a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54c.61-.23 1.14-.55 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z' },
+            { label: 'Settings', page: 'settings', to: { name: 'superadmin.settings' }, icon: 'M19.14 12.94a7.44 7.44 0 0 0 .05-.94 7.44 7.44 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.39 7.39 0 0 0-1.63-.94L14.4 2.5a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54a7.39 7.39 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.7 10.72a.5.5 0 0 0 .12.64l2.03 1.58a7.44 7.44 0 0 0-.05.94 7.44 7.44 0 0 0 .05.94L2.82 14.52a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.49.39 1.02.71 1.63.94l.36 2.54a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54c.61-.23 1.14-.55 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z' },
             {
                 label: 'Logout',
                 page: 'logout',

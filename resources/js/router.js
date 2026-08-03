@@ -15,6 +15,19 @@ const AdminLoginPage = () => import("@/adminpages/pages/AdminLogin.vue");
 const AdminWelcomePage = () => import("@/adminpages/pages/AdminWelcome.vue");
 const AdminProfilePage = () => import("@/adminpages/pages/AdminProfile.vue");
 const AdminStudentManagementPage = () => import("@/adminpages/pages/AdminList.vue");
+const AdminPendingSurrenderPage = () => import("@/adminpages/pages/AdminPendingSurrender.vue");
+const AdminItemVerificationPage = () => import("@/adminpages/pages/AdminItemVerification.vue");
+const AdminLostFoundItemsPage = () => import("@/adminpages/pages/AdminLostFoundItems.vue");
+const AdminPotentialMatchesPage = () => import("@/adminpages/pages/AdminPotentialMatches.vue");
+const AdminClaimsReviewPage = () => import("@/adminpages/pages/AdminClaimsReview.vue");
+const AdminItemInventoryPage = () => import("@/adminpages/pages/AdminItemInventory.vue");
+const AdminItemReleasePage = () => import("@/adminpages/pages/AdminItemRelease.vue");
+const AdminRecognitionPointsPage = () => import("@/adminpages/pages/AdminRecognitionPoints.vue");
+const AdminEventFinesPage = () => import("@/adminpages/pages/AdminEventFines.vue");
+const AdminNotificationsPage = () => import("@/adminpages/pages/AdminNotifications.vue");
+const AdminAnnouncementsPage = () => import("@/adminpages/pages/AdminAnnouncements.vue");
+const AdminAuditLogsPage = () => import("@/adminpages/pages/AdminAuditLogs.vue");
+const AdminSettingsPage = () => import("@/adminpages/pages/AdminSettings.vue");
 const AdminReportsDashboard = () => import("@/adminpages/pages/AdminDashboard.vue");
 
 const routes = [
@@ -50,6 +63,19 @@ const routes = [
       { path: "dashboard", name: "superadmin.dashboard", component: AdminReportsDashboard },
       { path: "profile", name: "superadmin.profile", component: AdminProfilePage },
       { path: "list", name: "superadmin.list", component: AdminStudentManagementPage },
+      { path: "pending-surrender", name: "superadmin.pending-surrender", component: AdminPendingSurrenderPage },
+      { path: "item-verification", name: "superadmin.item-verification", component: AdminItemVerificationPage },
+      { path: "items", name: "superadmin.items", component: AdminLostFoundItemsPage },
+      { path: "matches", name: "superadmin.matches", component: AdminPotentialMatchesPage },
+      { path: "claims", name: "superadmin.claims", component: AdminClaimsReviewPage },
+      { path: "inventory", name: "superadmin.inventory", component: AdminItemInventoryPage },
+      { path: "release", name: "superadmin.release", component: AdminItemReleasePage },
+      { path: "recognition", name: "superadmin.recognition", component: AdminRecognitionPointsPage },
+      { path: "fines", name: "superadmin.fines", component: AdminEventFinesPage },
+      { path: "notifications", name: "superadmin.notifications", component: AdminNotificationsPage },
+      { path: "announcements", name: "superadmin.announcements", component: AdminAnnouncementsPage },
+      { path: "audit", name: "superadmin.audit", component: AdminAuditLogsPage },
+      { path: "settings", name: "superadmin.settings", component: AdminSettingsPage },
     ],
   },
   {

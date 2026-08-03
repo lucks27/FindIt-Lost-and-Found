@@ -3,153 +3,91 @@
         <div class="page-bg"></div>
 
         <div class="dashboard-content">
-            <header class="dashboard-topbar">
+            <header class="dashboard-topbar overview-topbar">
                 <div class="hero-copy">
-                    <p class="page-label">Dashboard</p>
-                    <h1>Welcome back, Super Admin! <span>👋</span></h1>
-                    <p class="page-description">Here’s what’s happening in the system today.</p>
+                    <p class="page-label">Home Overview</p>
+                    <h1>Super Admin Home</h1>
+                    <p class="page-description">A quick summary of the portal areas you can navigate to, excluding account management.</p>
                 </div>
             </header>
 
-            <section class="stats-grid">
-                <article class="stat-card accent-1">
-                    <p>Pending Surrender</p>
-                    <strong>{{ stats.pendingSurrender }}</strong>
-                    <small>View reports →</small>
+            <section class="overview-grid">
+                <article class="overview-card lost-found-card">
+                    <div class="card-head">
+                        <p>Lost &amp; Found</p>
+                        <strong>Workflow, verification, inventory, claims, and release.</strong>
+                    </div>
+                    <ul class="card-links">
+                        <li><router-link :to="{ name: 'superadmin.pending-surrender' }">Pending Surrender</router-link></li>
+                        <li><router-link :to="{ name: 'superadmin.item-verification' }">Item Verification</router-link></li>
+                        <li><router-link :to="{ name: 'superadmin.items' }">Lost &amp; Found Items</router-link></li>
+                        <li><router-link :to="{ name: 'superadmin.matches' }">Potential Match</router-link></li>
+                        <li><router-link :to="{ name: 'superadmin.claims' }">Claims Review</router-link></li>
+                        <li><router-link :to="{ name: 'superadmin.release' }">Item Release</router-link></li>
+                    </ul>
                 </article>
-                <article class="stat-card accent-2">
-                    <p>Items Received</p>
-                    <strong>{{ stats.itemsReceived }}</strong>
-                    <small>View items →</small>
+
+                <article class="overview-card points-card">
+                    <div class="card-head">
+                        <p>Points &amp; Fines</p>
+                        <strong>Recognition and penalty management for student activity.</strong>
+                    </div>
+                    <ul class="card-links">
+                        <li><router-link :to="{ name: 'superadmin.recognition' }">Recognition Points</router-link></li>
+                        <li><router-link :to="{ name: 'superadmin.fines' }">Event Fine Management</router-link></li>
+                    </ul>
                 </article>
-                <article class="stat-card accent-3">
-                    <p>Awaiting Verification</p>
-                    <strong>{{ stats.awaitingVerification }}</strong>
-                    <small>View items →</small>
+
+                <article class="overview-card communication-card">
+                    <div class="card-head">
+                        <p>Communication</p>
+                        <strong>Notifications and announcements for the student body.</strong>
+                    </div>
+                    <ul class="card-links">
+                        <li><router-link :to="{ name: 'superadmin.notifications' }">Notifications</router-link></li>
+                        <li><router-link :to="{ name: 'superadmin.announcements' }">Announcements</router-link></li>
+                    </ul>
                 </article>
-                <article class="stat-card accent-4">
-                    <p>Verified Items</p>
-                    <strong>{{ stats.verifiedItems }}</strong>
-                    <small>View items →</small>
-                </article>
-                <article class="stat-card accent-5">
-                    <p>Potential Matches</p>
-                    <strong>{{ stats.potentialMatches }}</strong>
-                    <small>View matches →</small>
-                </article>
-                <article class="stat-card accent-6">
-                    <p>Pending Claims</p>
-                    <strong>{{ stats.pendingClaims }}</strong>
-                    <small>Review claims →</small>
-                </article>
-                <article class="stat-card accent-7">
-                    <p>Ready for Release</p>
-                    <strong>{{ stats.readyForRelease }}</strong>
-                    <small>View items →</small>
-                </article>
-                <article class="stat-card accent-8">
-                    <p>Returned Items</p>
-                    <strong>{{ stats.returnedItems }}</strong>
-                    <small>View history →</small>
+
+                <article class="overview-card users-card">
+                    <div class="card-head">
+                        <p>Users &amp; Records</p>
+                        <strong>Manage student accounts and review system audit logs.</strong>
+                    </div>
+                    <ul class="card-links">
+                        <li><router-link :to="{ name: 'superadmin.list' }">Student Management</router-link></li>
+                        <li><router-link :to="{ name: 'superadmin.audit' }">Audit Logs</router-link></li>
+                    </ul>
                 </article>
             </section>
 
             <section class="dashboard-panels">
-                <div class="panel overview-panel">
+                <div class="panel summary-panel">
                     <div class="panel-header">
                         <div>
-                            <p class="panel-label">Reports Overview</p>
-                            <h2>128 Total Reports</h2>
-                        </div>
-                        <button class="panel-button">This Month</button>
-                    </div>
-                    <div class="overview-chart">
-                        <div class="donut" aria-label="Report distribution"></div>
-                        <div class="overview-metrics">
-                            <div><span class="metric-dot lost"></span>Lost Reports <strong>64 (50%)</strong></div>
-                            <div><span class="metric-dot found"></span>Found Reports <strong>54 (42%)</strong></div>
-                            <div><span class="metric-dot verified"></span>Verified Items <strong>45 (35%)</strong>
-                            </div>
-                            <div><span class="metric-dot returned"></span>Returned Items <strong>32 (25%)</strong>
-                            </div>
+                            <p class="panel-label">Portal Summary</p>
+                            <h2>Fast access to core workflows</h2>
                         </div>
                     </div>
-                </div>
-
-                <div class="panel activity-panel">
-                    <div class="panel-header">
-                        <div>
-                            <p class="panel-label">Recent Activity</p>
-                            <h2>Live updates</h2>
-                        </div>
-                        <button class="panel-button secondary">View All</button>
+                    <div class="summary-copy">
+                        <p>Use this page to get a brief view of the main portal categories. Each card above links directly to the important sections for managing lost & found, points and fines, communication, and user records.</p>
                     </div>
-                    <ul class="activity-list">
-                        <li>
-                            <span class="activity-badge blue"></span>
-                            <div>
-                                <p>Item received from Juan Dela Cruz</p>
-                                <small>Black Wallet • INV-2025-0056</small>
-                            </div>
-                            <span>10:24 AM</span>
-                        </li>
-                        <li>
-                            <span class="activity-badge orange"></span>
-                            <div>
-                                <p>New claim submitted by Maria Santos</p>
-                                <small>ITEM-2025-0045</small>
-                            </div>
-                            <span>09:15 AM</span>
-                        </li>
-                        <li>
-                            <span class="activity-badge green"></span>
-                            <div>
-                                <p>Claim approved for John Paul</p>
-                                <small>ITEM-2025-0032</small>
-                            </div>
-                            <span>Yesterday</span>
-                        </li>
-                        <li>
-                            <span class="activity-badge gold"></span>
-                            <div>
-                                <p>Points awarded to Ana Reyes</p>
-                                <small>+100 Points</small>
-                            </div>
-                            <span>Yesterday</span>
-                        </li>
-                        <li>
-                            <span class="activity-badge purple"></span>
-                            <div>
-                                <p>New potential match found</p>
-                                <small>ITEM-2025-0048</small>
-                            </div>
-                            <span>May 23</span>
-                        </li>
-                        <li>
-                            <span class="activity-badge teal"></span>
-                            <div>
-                                <p>Announcement sent to all students</p>
-                                <small>General Assembly Reminder</small>
-                            </div>
-                            <span>May 22</span>
-                        </li>
-                    </ul>
                 </div>
 
                 <div class="panel quick-actions-panel">
                     <div class="panel-header">
                         <div>
-                            <p class="panel-label">Quick Actions</p>
-                            <h2>Take action</h2>
+                            <p class="panel-label">Recommended actions</p>
+                            <h2>Jump to work</h2>
                         </div>
                     </div>
                     <div class="quick-actions-grid">
-                        <button type="button" class="action-card">Add Student</button>
-                        <button type="button" class="action-card">Verify Item</button>
-                        <button type="button" class="action-card">Review Claims</button>
-                        <button type="button" class="action-card">Send Announcement</button>
-                        <button type="button" class="action-card">Award Points</button>
-                        <button type="button" class="action-card">View Inventory</button>
+                        <router-link class="action-card" :to="{ name: 'superadmin.pending-surrender' }">Review Surrenders</router-link>
+                        <router-link class="action-card" :to="{ name: 'superadmin.item-verification' }">Verify Items</router-link>
+                        <router-link class="action-card" :to="{ name: 'superadmin.list' }">Manage Students</router-link>
+                        <router-link class="action-card" :to="{ name: 'superadmin.notifications' }">Send Notification</router-link>
+                        <router-link class="action-card" :to="{ name: 'superadmin.recognition' }">Award Points</router-link>
+                        <router-link class="action-card" :to="{ name: 'superadmin.audit' }">View Audit Logs</router-link>
                     </div>
                 </div>
             </section>
@@ -158,18 +96,6 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
-
-const stats = reactive({
-    pendingSurrender: 0,
-    itemsReceived: 0,
-    awaitingVerification: 0,
-    verifiedItems: 0,
-    potentialMatches: 0,
-    pendingClaims: 0,
-    readyForRelease: 0,
-    returnedItems: 0,
-})
 </script>
 
 <style scoped>
