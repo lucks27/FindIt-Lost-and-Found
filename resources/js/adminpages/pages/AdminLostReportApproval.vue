@@ -4,7 +4,8 @@
             <div>
                 <p class="page-kicker">Report approval</p>
                 <h1>Approve or reject intake reports</h1>
-                <p class="page-copy">The approval queue now follows the actual workflow statuses that the backend exposes for reported found items.</p>
+                <p class="page-copy">The approval queue now follows the actual workflow statuses that the backend
+                    exposes for reported found items.</p>
             </div>
             <button type="button" class="primary-button" @click="loadReports">Refresh</button>
         </header>
@@ -36,7 +37,8 @@
             <div class="toolbar-row">
                 <label class="search-field">
                     <span class="sr-only">Search reports</span>
-                    <input v-model.trim="query" type="search" placeholder="Search title, student, or status" aria-label="Search reports" />
+                    <input v-model.trim="query" type="search" placeholder="Search title, student, or status"
+                        aria-label="Search reports" />
                 </label>
             </div>
 
@@ -68,9 +70,12 @@
                             <td>{{ report.student?.name || 'Unknown' }}</td>
                             <td>{{ report.location || '—' }}</td>
                             <td class="action-cell">
-                                <button type="button" class="secondary-button" @click="approveReport(report.id)" :disabled="['approved', 'rejected'].includes(String(report.status || '').toLowerCase())">Approve</button>
-                                <button type="button" class="secondary-button" @click="rejectReport(report.id)" :disabled="['approved', 'rejected'].includes(String(report.status || '').toLowerCase())">Reject</button>
-                                <button type="button" class="secondary-button" @click="requestCorrection(report.id)">Request correction</button>
+                                <button type="button" class="secondary-button" @click="approveReport(report.id)"
+                                    :disabled="['approved', 'rejected'].includes(String(report.status || '').toLowerCase())">Approve</button>
+                                <button type="button" class="secondary-button" @click="rejectReport(report.id)"
+                                    :disabled="['approved', 'rejected'].includes(String(report.status || '').toLowerCase())">Reject</button>
+                                <button type="button" class="secondary-button"
+                                    @click="requestCorrection(report.id)">Request correction</button>
                             </td>
                         </tr>
                     </tbody>

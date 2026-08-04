@@ -4,7 +4,8 @@
             <div>
                 <p class="page-kicker">Pending surrender</p>
                 <h1>Track found-item surrender intake</h1>
-                <p class="page-copy">Use the real surrender queue to receive, reject, or escalate items based on the backend status flags and deadline fields.</p>
+                <p class="page-copy">Use the real surrender queue to receive, reject, or escalate items based on the
+                    backend status flags and deadline fields.</p>
             </div>
             <button type="button" class="primary-button" @click="loadSurrenders">Refresh queue</button>
         </header>
@@ -36,7 +37,8 @@
             <div class="toolbar-row">
                 <label class="search-field">
                     <span class="sr-only">Search surrender records</span>
-                    <input v-model.trim="query" type="search" placeholder="Search item, student, or deadline" aria-label="Search surrender records" />
+                    <input v-model.trim="query" type="search" placeholder="Search item, student, or deadline"
+                        aria-label="Search surrender records" />
                 </label>
             </div>
 
@@ -45,7 +47,8 @@
             <div v-else class="table-shell">
                 <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No surrender records to display</h2>
-                    <p>As pending surrenders arrive, the queue will show the report title, linked student, status, and deadline.</p>
+                    <p>As pending surrenders arrive, the queue will show the report title, linked student, status, and
+                        deadline.</p>
                 </div>
 
                 <table v-else class="admin-table">
@@ -67,9 +70,12 @@
                             <td>{{ item.deadline_at ? formatDate(item.deadline_at) : 'TBD' }}</td>
                             <td>{{ item.received_at ? formatDate(item.received_at) : 'Not yet' }}</td>
                             <td class="action-cell">
-                                <button type="button" class="secondary-button" @click="receiveRequest(item.id)" :disabled="String(item.status || '').toLowerCase() !== 'pending'">Receive</button>
-                                <button type="button" class="secondary-button" @click="rejectRequest(item.id)" :disabled="String(item.status || '').toLowerCase() !== 'pending'">Reject</button>
-                                <button type="button" class="secondary-button" @click="markOverdue(item.id)" :disabled="String(item.status || '').toLowerCase() !== 'pending'">Overdue</button>
+                                <button type="button" class="secondary-button" @click="receiveRequest(item.id)"
+                                    :disabled="String(item.status || '').toLowerCase() !== 'pending'">Receive</button>
+                                <button type="button" class="secondary-button" @click="rejectRequest(item.id)"
+                                    :disabled="String(item.status || '').toLowerCase() !== 'pending'">Reject</button>
+                                <button type="button" class="secondary-button" @click="markOverdue(item.id)"
+                                    :disabled="String(item.status || '').toLowerCase() !== 'pending'">Overdue</button>
                             </td>
                         </tr>
                     </tbody>

@@ -8,7 +8,8 @@
                     <p class="page-label">Analytics Dashboard</p>
                     <h1>Super Admin Insights</h1>
                     <p class="page-description">
-                        Monitor the live report flow, verification queue, release readiness, and recent admin activity from the verified backend summary endpoint.
+                        Monitor the live report flow, verification queue, release readiness, and recent admin activity
+                        from the verified backend summary endpoint.
                     </p>
                 </div>
 
@@ -25,18 +26,23 @@
                     <article class="count-card">
                         <div class="count-top">
                             <div class="icon-holder icon-gold">
-                                <svg viewBox="0 0 24 24"><path d="M12 2l3 3H9l3-3zm-3 7h6l-3 9-3-9z" /></svg>
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M12 2l3 3H9l3-3zm-3 7h6l-3 9-3-9z" />
+                                </svg>
                             </div>
                             <strong>{{ metrics.openReports }}</strong>
                         </div>
                         <p>Open workflow</p>
-                        <router-link class="count-link" :to="{ name: 'superadmin.pending-surrender' }">Go to queue</router-link>
+                        <router-link class="count-link" :to="{ name: 'superadmin.pending-surrender' }">Go to
+                            queue</router-link>
                     </article>
 
                     <article class="count-card">
                         <div class="count-top">
                             <div class="icon-holder icon-blue">
-                                <svg viewBox="0 0 24 24"><path d="M6 3l12 5v10l-12 5L4 17V7l2-4zm1.5 3.2v11.6L15 18V6L7.5 6.2z" /></svg>
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M6 3l12 5v10l-12 5L4 17V7l2-4zm1.5 3.2v11.6L15 18V6L7.5 6.2z" />
+                                </svg>
                             </div>
                             <strong>{{ metrics.foundReports }}</strong>
                         </div>
@@ -47,7 +53,10 @@
                     <article class="count-card">
                         <div class="count-top">
                             <div class="icon-holder icon-purple">
-                                <svg viewBox="0 0 24 24"><path d="M12 2l7 4v6c0 5-4 9-7 9s-7-4-7-9V6l7-4zm0 2.18L6 7.05V12c0 3.78 2.69 6.95 6 7.9 3.31-.95 6-4.12 6-7.9V7.05l-6-2.87z" /></svg>
+                                <svg viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 2l7 4v6c0 5-4 9-7 9s-7-4-7-9V6l7-4zm0 2.18L6 7.05V12c0 3.78 2.69 6.95 6 7.9 3.31-.95 6-4.12 6-7.9V7.05l-6-2.87z" />
+                                </svg>
                             </div>
                             <strong>{{ metrics.totalClaims }}</strong>
                         </div>
@@ -58,29 +67,37 @@
                     <article class="count-card">
                         <div class="count-top">
                             <div class="icon-holder icon-green">
-                                <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4M4 12a8 8 0 1 1 16 0 8 8 0 0 1-16 0z" /></svg>
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M9 12l2 2 4-4M4 12a8 8 0 1 1 16 0 8 8 0 0 1-16 0z" />
+                                </svg>
                             </div>
                             <strong>{{ metrics.totalReleases }}</strong>
                         </div>
                         <p>Completed releases</p>
-                        <router-link class="count-link" :to="{ name: 'superadmin.completed-returns' }">View returns</router-link>
+                        <router-link class="count-link" :to="{ name: 'superadmin.completed-returns' }">View
+                            returns</router-link>
                     </article>
 
                     <article class="count-card">
                         <div class="count-top">
                             <div class="icon-holder icon-teal">
-                                <svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10" /></svg>
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M5 12l4 4 10-10" />
+                                </svg>
                             </div>
                             <strong>{{ metrics.activeSurrenders }}</strong>
                         </div>
                         <p>Active surrenders</p>
-                        <router-link class="count-link" :to="{ name: 'superadmin.pending-surrender' }">Open queue</router-link>
+                        <router-link class="count-link" :to="{ name: 'superadmin.pending-surrender' }">Open
+                            queue</router-link>
                     </article>
 
                     <article class="count-card">
                         <div class="count-top">
                             <div class="icon-holder icon-orange">
-                                <svg viewBox="0 0 24 24"><path d="M6 4h12v4H6V4zm0 6h12v10H6V10zm2 2v6h2v-6H8zm4 0v6h2v-6h-2z" /></svg>
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M6 4h12v4H6V4zm0 6h12v10H6V10zm2 2v6h2v-6H8zm4 0v6h2v-6h-2z" />
+                                </svg>
                             </div>
                             <strong>{{ metrics.studentCount }}</strong>
                         </div>
@@ -570,4 +587,3 @@ onMounted(loadDashboard)
     }
 }
 </style>
-

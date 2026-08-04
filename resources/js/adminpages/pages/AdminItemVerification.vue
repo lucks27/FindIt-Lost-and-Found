@@ -4,7 +4,8 @@
             <div>
                 <p class="page-kicker">Item verification</p>
                 <h1>Approve or request more details on found items</h1>
-                <p class="page-copy">The queue now reads the real item verification records from the backend, including the verifier, notes, and final workflow status.</p>
+                <p class="page-copy">The queue now reads the real item verification records from the backend, including
+                    the verifier, notes, and final workflow status.</p>
             </div>
             <button type="button" class="primary-button" @click="loadVerifications">Refresh queue</button>
         </header>
@@ -36,7 +37,8 @@
             <div class="toolbar-row">
                 <label class="search-field">
                     <span class="sr-only">Search verification items</span>
-                    <input v-model.trim="query" type="search" placeholder="Search report, verifier, or status" aria-label="Search verification items" />
+                    <input v-model.trim="query" type="search" placeholder="Search report, verifier, or status"
+                        aria-label="Search verification items" />
                 </label>
             </div>
 
@@ -67,9 +69,13 @@
                             <td>{{ item.report?.student?.name || 'Unknown' }}</td>
                             <td>{{ item.notes || '—' }}</td>
                             <td class="action-cell">
-                                <button type="button" class="secondary-button" @click="verifyItem(item.id)" :disabled="String(item.status || '').toLowerCase() !== 'pending'">Approve</button>
-                                <button type="button" class="secondary-button" @click="rejectItem(item.id)" :disabled="String(item.status || '').toLowerCase() !== 'pending'">Reject</button>
-                                <button type="button" class="secondary-button" @click="requestDetails(item.id)" :disabled="String(item.status || '').toLowerCase() !== 'pending'">Request details</button>
+                                <button type="button" class="secondary-button" @click="verifyItem(item.id)"
+                                    :disabled="String(item.status || '').toLowerCase() !== 'pending'">Approve</button>
+                                <button type="button" class="secondary-button" @click="rejectItem(item.id)"
+                                    :disabled="String(item.status || '').toLowerCase() !== 'pending'">Reject</button>
+                                <button type="button" class="secondary-button" @click="requestDetails(item.id)"
+                                    :disabled="String(item.status || '').toLowerCase() !== 'pending'">Request
+                                    details</button>
                             </td>
                         </tr>
                     </tbody>

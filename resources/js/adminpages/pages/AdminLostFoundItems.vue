@@ -4,7 +4,8 @@
             <div>
                 <p class="page-kicker">Lost & Found items</p>
                 <h1>Review the found-item workflow inventory</h1>
-                <p class="page-copy">This screen now reads the real found-report inventory endpoint and surfaces the workflow backbone that the backend already exposes.</p>
+                <p class="page-copy">This screen now reads the real found-report inventory endpoint and surfaces the
+                    workflow backbone that the backend already exposes.</p>
             </div>
             <button type="button" class="primary-button" @click="loadItems">Refresh</button>
         </header>
@@ -36,7 +37,8 @@
             <div class="toolbar-row">
                 <label class="search-field">
                     <span class="sr-only">Search item workflow</span>
-                    <input v-model.trim="query" type="search" placeholder="Search title, category, or location" aria-label="Search item workflow" />
+                    <input v-model.trim="query" type="search" placeholder="Search title, category, or location"
+                        aria-label="Search item workflow" />
                 </label>
             </div>
 
@@ -46,7 +48,8 @@
             <div v-else class="table-shell">
                 <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No item records to display</h2>
-                    <p>Once reports move through the receive → verification → claim → release workflow, the inventory table will surface them here.</p>
+                    <p>Once reports move through the receive → verification → claim → release workflow, the inventory
+                        table will surface them here.</p>
                 </div>
 
                 <table v-else class="admin-table">
