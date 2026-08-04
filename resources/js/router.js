@@ -27,7 +27,6 @@ const AdminEventFinesPage = () => import("@/adminpages/pages/AdminEventFines.vue
 const AdminNotificationsPage = () => import("@/adminpages/pages/AdminNotifications.vue");
 const AdminAnnouncementsPage = () => import("@/adminpages/pages/AdminAnnouncements.vue");
 const AdminAuditLogsPage = () => import("@/adminpages/pages/AdminAuditLogs.vue");
-const AdminSettingsPage = () => import("@/adminpages/pages/AdminSettings.vue");
 const AdminReportsPage = () => import("@/adminpages/pages/AdminReports.vue");
 const AdminReportsDashboard = () => import("@/adminpages/pages/AdminDashboard.vue");
 
@@ -77,7 +76,6 @@ const routes = [
       { path: "notifications", name: "superadmin.notifications", component: AdminNotificationsPage },
       { path: "announcements", name: "superadmin.announcements", component: AdminAnnouncementsPage },
       { path: "audit", name: "superadmin.audit", component: AdminAuditLogsPage },
-      { path: "settings", name: "superadmin.settings", component: AdminSettingsPage },
     ],
   },
   {

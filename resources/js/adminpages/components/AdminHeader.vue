@@ -40,7 +40,6 @@
                     <div v-if="menuOpen" class="profile-menu" role="menu">
                         <div class="profile-menu-header">Account</div>
                         <button type="button" class="menu-item" role="menuitem" @click="goToProfile">Profile</button>
-                        <button type="button" class="menu-item" role="menuitem" @click="goToSettings">Settings</button>
                         <button type="button" class="menu-item danger" role="menuitem"
                             @click="handleLogout">Logout</button>
                     </div>
@@ -106,11 +105,6 @@ function closeMenu() {
 function goToProfile() {
     closeMenu()
     router.push({ name: 'superadmin.profile' })
-}
-
-function goToSettings() {
-    closeMenu()
-    router.push({ name: 'superadmin.settings' })
 }
 
 function goToNotifications() {
