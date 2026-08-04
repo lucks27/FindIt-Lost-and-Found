@@ -4,8 +4,8 @@
             <div>
                 <p class="page-kicker">Potential matches</p>
                 <h1>Compare lost and found cases with confidence</h1>
-                <p class="page-copy">Use match score, conflict details, and next actions to make clear, defensible
-                    decisions.</p>
+                <p class="page-copy">Use each backend-generated match suggestion to decide whether to confirm or reject
+                    the pairing.</p>
             </div>
             <button type="button" class="primary-button" @click="loadMatches">Refresh matches</button>
         </header>
@@ -17,11 +17,6 @@
                 <small>Awaiting review</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Reviewed</span>
-                <strong class="metric-value">{{ metrics.reviewed }}</strong>
-                <small>Recently checked</small>
-            </article>
-            <article class="metric-card">
                 <span class="metric-label">Confirmed</span>
                 <strong class="metric-value">{{ metrics.confirmed }}</strong>
                 <small>Ready for release</small>
@@ -31,13 +26,18 @@
                 <strong class="metric-value">{{ metrics.rejected }}</strong>
                 <small>Closed as mismatch</small>
             </article>
+            <article class="metric-card">
+                <span class="metric-label">Total</span>
+                <strong class="metric-value">{{ metrics.total }}</strong>
+                <small>Match suggestions</small>
+            </article>
         </section>
 
         <section class="panel-card">
             <div class="toolbar-row">
                 <label class="search-field">
                     <span class="sr-only">Search potential matches</span>
-                    <input v-model.trim="query" type="search" placeholder="Search match score, item, or owner"
+                    <input v-model.trim="query" type="search" placeholder="Search item, score, or note"
                         aria-label="Search potential matches" />
                 </label>
                 <div class="chip-row" aria-label="Match status filters">
@@ -45,10 +45,10 @@
                         @click="activeStatus = 'all'">All</button>
                     <button type="button" class="chip-button" :class="{ active: activeStatus === 'pending' }"
                         @click="activeStatus = 'pending'">Open</button>
-                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'reviewed' }"
-                        @click="activeStatus = 'reviewed'">Reviewed</button>
                     <button type="button" class="chip-button" :class="{ active: activeStatus === 'confirmed' }"
                         @click="activeStatus = 'confirmed'">Confirmed</button>
+                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'rejected' }"
+                        @click="activeStatus = 'rejected'">Rejected</button>
                 </div>
             </div>
 
@@ -58,8 +58,8 @@
             <div v-else class="table-shell">
                 <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No match suggestions to review</h2>
-                    <p>When matches are generated, score, factor summary, and conflict detail will appear here for quick
-                        admin action.</p>
+                    <p>When matches are generated, each score, note, and decision state will appear here for quick
+                        review.</p>
                 </div>
 
                 <table v-else class="admin-table">
@@ -78,7 +78,7 @@
                             <td>{{ item.source_report?.title || item.source_report_id }}</td>
                             <td>{{ item.matched_report?.title || item.matched_report_id }}</td>
                             <td>{{ item.score }}</td>
-                            <td><span class="status-chip">{{ item.status }}</span></td>
+                            <td><span class="status-chip">{{ formatStatus(item.status) }}</span></td>
                             <td>{{ item.notes || '—' }}</td>
                             <td class="action-cell">
                                 <button type="button" class="secondary-button" @click="confirmMatch(item.id)"
@@ -105,12 +105,11 @@ const loading = ref(false)
 const errorMessage = ref('')
 
 const metrics = computed(() => {
-    const counts = { open: 0, reviewed: 0, confirmed: 0, rejected: 0 }
+    const counts = { open: 0, confirmed: 0, rejected: 0, total: matches.value.length }
 
     matches.value.forEach((item) => {
         const status = String(item.status || '').toLowerCase()
         if (status === 'pending') counts.open += 1
-        if (status === 'reviewed') counts.reviewed += 1
         if (status === 'confirmed') counts.confirmed += 1
         if (status === 'rejected') counts.rejected += 1
     })
@@ -121,7 +120,8 @@ const metrics = computed(() => {
 const visibleRows = computed(() => {
     const search = query.value.toLowerCase()
     return matches.value.filter((item) => {
-        const matchesStatus = activeStatus.value === 'all' || String(item.status || '').toLowerCase() === activeStatus.value
+        const status = String(item.status || '').toLowerCase()
+        const matchesStatus = activeStatus.value === 'all' || status === activeStatus.value
         const matchesSearch = !search || [item.source_report?.title, item.matched_report?.title, item.notes, item.score]
             .filter(Boolean)
             .join(' ')
@@ -132,13 +132,18 @@ const visibleRows = computed(() => {
     })
 })
 
+function formatStatus(value) {
+    if (!value) return 'Pending'
+    return String(value).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 async function loadMatches() {
     loading.value = true
     errorMessage.value = ''
 
     try {
         const response = await api.get('/api/admin/matches')
-        matches.value = response.data?.data || []
+        matches.value = Array.isArray(response.data?.data) ? response.data.data : []
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Failed to load potential matches.'
         matches.value = []

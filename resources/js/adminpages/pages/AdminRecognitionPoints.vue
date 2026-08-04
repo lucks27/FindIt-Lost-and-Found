@@ -3,33 +3,33 @@
         <header class="page-header">
             <div>
                 <p class="page-kicker">Recognition points</p>
-                <h1>Review point approvals and balance history</h1>
-                <p class="page-copy">Surface pending approvals, point adjustments, and student impact clearly for fast
-                    action.</p>
+                <h1>Review point balances and activity</h1>
+                <p class="page-copy">View current recognition-point totals for students and the activity counts tied to
+                    each account.</p>
             </div>
-            <button type="button" class="primary-button">Award points</button>
+            <button type="button" class="primary-button" @click="loadStudents">Refresh</button>
         </header>
 
         <section class="metric-grid" aria-label="Recognition points summary metrics">
             <article class="metric-card">
-                <span class="metric-label">Pending</span>
-                <strong class="metric-value">11</strong>
-                <small>Awaiting approval</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Awarded</span>
-                <strong class="metric-value">246</strong>
-                <small>Points granted</small>
+                <span class="metric-label">Students</span>
+                <strong class="metric-value">{{ metrics.total }}</strong>
+                <small>Tracked accounts</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Total balance</span>
-                <strong class="metric-value">1,420</strong>
-                <small>Across students</small>
+                <strong class="metric-value">{{ metrics.awarded }}</strong>
+                <small>Recognition points</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Top finder</span>
-                <strong class="metric-value">82</strong>
-                <small>Highest recent total</small>
+                <span class="metric-label">Reports</span>
+                <strong class="metric-value">{{ metrics.reportCount }}</strong>
+                <small>Linked submissions</small>
+            </article>
+            <article class="metric-card">
+                <span class="metric-label">Top student</span>
+                <strong class="metric-value">{{ metrics.maxPoints }}</strong>
+                <small>Highest balance</small>
             </article>
         </section>
 
@@ -37,15 +37,9 @@
             <div class="toolbar-row">
                 <label class="search-field">
                     <span class="sr-only">Search recognition points</span>
-                    <input v-model.trim="query" type="search" placeholder="Search student, event, or reference"
+                    <input v-model.trim="query" type="search" placeholder="Search student or email"
                         aria-label="Search recognition points" />
                 </label>
-                <div class="chip-row" aria-label="Point status filters">
-                    <button type="button" class="chip-button active">All</button>
-                    <button type="button" class="chip-button">Pending</button>
-                    <button type="button" class="chip-button">Approved</button>
-                    <button type="button" class="chip-button">Adjusted</button>
-                </div>
             </div>
 
             <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
@@ -53,8 +47,7 @@
             <div v-else class="table-shell">
                 <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No point activity to display</h2>
-                    <p>Pending point approvals and award history will be grouped here with clear positive and negative
-                        indicators.</p>
+                    <p>Student balances will appear here once the backend returns recognition-point totals.</p>
                 </div>
 
                 <table v-else class="admin-table">
@@ -70,8 +63,8 @@
                         <tr v-for="student in visibleRows" :key="student.id">
                             <td>{{ student.name || student.email || 'Unnamed' }}</td>
                             <td>{{ student.recognition_points ?? 0 }}</td>
-                            <td>{{ student.rewards_count || 0 }}</td>
-                            <td>{{ student.reports_count || 0 }}</td>
+                            <td>{{ student.reward_count || 0 }}</td>
+                            <td>{{ student.report_count || 0 }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -92,11 +85,12 @@ const errorMessage = ref('')
 const metrics = computed(() => {
     const total = students.value.length
     const awarded = students.value.reduce((sum, student) => sum + (Number(student.recognition_points) || 0), 0)
+    const reportCount = students.value.reduce((sum, student) => sum + (Number(student.report_count) || 0), 0)
     const topStudent = students.value.slice().sort((a, b) => (Number(b.recognition_points) || 0) - (Number(a.recognition_points) || 0))[0]
     return {
-        total: total,
+        total,
         awarded,
-        topStudentName: topStudent?.name || 'None',
+        reportCount,
         maxPoints: topStudent ? Number(topStudent.recognition_points || 0) : 0,
     }
 })
@@ -114,7 +108,7 @@ async function loadStudents() {
     errorMessage.value = ''
     try {
         const response = await api.get('/api/admin/points')
-        students.value = response.data?.data || []
+        students.value = Array.isArray(response.data?.data) ? response.data.data : []
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Failed to load recognition points.'
         students.value = []

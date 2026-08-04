@@ -4,7 +4,7 @@
             <div>
                 <p class="page-kicker">Completed returns</p>
                 <h1>Review completed item handovers</h1>
-                <p class="page-copy">Track returned items, responsible staff, and the final release status.</p>
+                <p class="page-copy">Track finalized releases and the staff who completed each handover.</p>
             </div>
             <button type="button" class="primary-button" @click="loadReturns">Refresh</button>
         </header>
@@ -16,14 +16,14 @@
                 <small>Returned items</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Pending</span>
-                <strong class="metric-value">{{ metrics.pending }}</strong>
-                <small>Awaiting release</small>
-            </article>
-            <article class="metric-card">
                 <span class="metric-label">Released</span>
                 <strong class="metric-value">{{ metrics.released }}</strong>
                 <small>Handed over</small>
+            </article>
+            <article class="metric-card">
+                <span class="metric-label">Returned</span>
+                <strong class="metric-value">{{ metrics.returned }}</strong>
+                <small>Completed return status</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Total</span>
@@ -46,6 +46,8 @@
                         @click="activeFilter = 'completed'">Completed</button>
                     <button type="button" class="chip-button" :class="{ active: activeFilter === 'released' }"
                         @click="activeFilter = 'released'">Released</button>
+                    <button type="button" class="chip-button" :class="{ active: activeFilter === 'returned' }"
+                        @click="activeFilter = 'returned'">Returned</button>
                 </div>
             </div>
 
@@ -72,7 +74,7 @@
                         <tr v-for="record in filteredRecords" :key="record.id">
                             <td>{{ record.report?.title || record.report_id }}</td>
                             <td>{{ record.claimant_student?.name || 'Unknown' }}</td>
-                            <td>{{ record.status }}</td>
+                            <td>{{ formatStatus(record.status) }}</td>
                             <td>{{ record.released_at ? formatDate(record.released_at) : 'TBD' }}</td>
                             <td>{{ record.approved_by_admin?.name || 'Pending' }}</td>
                         </tr>
@@ -99,14 +101,15 @@ const metrics = computed(() => {
         total,
         completed: records.value.filter((item) => String(item.status || '').toLowerCase() === 'completed').length,
         released: records.value.filter((item) => String(item.status || '').toLowerCase() === 'released').length,
-        pending: records.value.filter((item) => !['completed', 'released'].includes(String(item.status || '').toLowerCase())).length,
+        returned: records.value.filter((item) => String(item.status || '').toLowerCase() === 'returned').length,
     }
 })
 
 const filteredRecords = computed(() => {
     const search = query.value.toLowerCase()
     return records.value.filter((item) => {
-        const matchesFilter = activeFilter.value === 'all' || String(item.status || '').toLowerCase() === activeFilter.value
+        const status = String(item.status || '').toLowerCase()
+        const matchesFilter = activeFilter.value === 'all' || status === activeFilter.value
         const text = [item.report?.title, item.claimant_student?.name, item.status, item.approved_by_admin?.name]
             .filter(Boolean)
             .join(' ')
@@ -115,6 +118,11 @@ const filteredRecords = computed(() => {
         return matchesFilter && matchesSearch
     })
 })
+
+function formatStatus(value) {
+    if (!value) return 'Pending'
+    return String(value).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+}
 
 function formatDate(value) {
     if (!value) return '—'
@@ -126,7 +134,7 @@ async function loadReturns() {
     errorMessage.value = ''
     try {
         const response = await api.get('/api/admin/completed-returns')
-        records.value = response.data?.data || []
+        records.value = Array.isArray(response.data?.data) ? response.data.data : []
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Failed to load completed returns.'
         records.value = []

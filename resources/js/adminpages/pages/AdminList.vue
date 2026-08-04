@@ -130,7 +130,7 @@
                                 <div>
                                     <div class="student-name">{{ student.name }}</div>
                                     <div class="student-subtext">{{ student.department || student.course || 'No program'
-                                        }}</div>
+                                    }}</div>
                                 </div>
                             </td>
                             <td>{{ student.student_id || '—' }}</td>
@@ -222,7 +222,7 @@
                             <span>Student ID *</span>
                             <input v-model.trim="studentForm.student_id" type="text" placeholder="e.g. 2026-00123" />
                             <span v-if="studentErrors.student_id" class="field-error">{{ studentErrors.student_id
-                                }}</span>
+                            }}</span>
                         </label>
                     </div>
 
@@ -235,7 +235,7 @@
                                 <option v-for="course in COURSES" :key="course" :value="course">{{ course }}</option>
                             </select>
                             <span v-if="studentErrors.course_base" class="field-error">{{ studentErrors.course_base
-                                }}</span>
+                            }}</span>
                         </label>
 
                         <label v-if="needsMajorSelection">
@@ -256,7 +256,7 @@
                                 </option>
                             </select>
                             <span v-if="studentErrors.concentration" class="field-error">{{ studentErrors.concentration
-                                }}</span>
+                            }}</span>
                         </label>
 
                         <label>
@@ -266,7 +266,7 @@
                                 <option v-for="year in YEAR_LEVELS" :key="year" :value="year">{{ year }}</option>
                             </select>
                             <span v-if="studentErrors.year_level" class="field-error">{{ studentErrors.year_level
-                                }}</span>
+                            }}</span>
                         </label>
 
                         <label>
@@ -276,7 +276,7 @@
                                 <option v-for="dept in DEPARTMENTS" :key="dept" :value="dept">{{ dept }}</option>
                             </select>
                             <span v-if="studentErrors.department" class="field-error">{{ studentErrors.department
-                                }}</span>
+                            }}</span>
                         </label>
                     </div>
 
@@ -332,17 +332,17 @@
                         <div class="detail-row"><span>Course</span><strong>{{ selectedStudent.course || '—' }}</strong>
                         </div>
                         <div class="detail-row"><span>Year level</span><strong>{{ selectedStudent.year_level || '—'
-                                }}</strong></div>
+                        }}</strong></div>
                         <div class="detail-row"><span>Department</span><strong>{{ selectedStudent.department || '—'
-                                }}</strong></div>
+                        }}</strong></div>
                         <div class="detail-row"><span>Email</span><strong>{{ selectedStudent.email || '—' }}</strong>
                         </div>
                         <div class="detail-row"><span>Status</span><strong>{{ capitalize(selectedStudent.account_status
                             || 'active') }}</strong></div>
                         <div class="detail-row"><span>Created</span><strong>{{ formatDate(selectedStudent.created_at)
-                                }}</strong></div>
+                        }}</strong></div>
                         <div class="detail-row"><span>Updated</span><strong>{{ formatDate(selectedStudent.updated_at)
-                                }}</strong></div>
+                        }}</strong></div>
                         <div v-if="selectedStudent.recognition_points !== undefined" class="detail-row">
                             <span>Recognition points</span><strong>{{ selectedStudent.recognition_points }}</strong>
                         </div>
@@ -792,7 +792,7 @@ async function loadListData() {
 
     try {
         const response = await api.get('/api/admin/list')
-        students.value = response.data?.data?.students || []
+        students.value = Array.isArray(response.data?.data?.students) ? response.data.data.students : []
     } catch (error) {
         students.value = []
         errorMessage.value = error.response?.data?.message || 'Failed to load student data.'

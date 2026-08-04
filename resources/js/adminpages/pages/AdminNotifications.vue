@@ -3,9 +3,9 @@
         <header class="page-header">
             <div>
                 <p class="page-kicker">Notifications</p>
-                <h1>Compose and track alerts across channels</h1>
-                <p class="page-copy">Keep audience targeting, send timing, and delivery status easy to review before
-                    publishing.</p>
+                <h1>Track workflow alerts and message history</h1>
+                <p class="page-copy">Review the notifications emitted by the workflow and their read state in a simple
+                    inbox view.</p>
             </div>
             <button type="button" class="primary-button" @click="loadNotifications">Refresh</button>
         </header>
@@ -27,9 +27,9 @@
                 <small>Already viewed</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Admin alerts</span>
-                <strong class="metric-value">{{ metrics.adminAlerts }}</strong>
-                <small>Actionable items</small>
+                <span class="metric-label">Student alerts</span>
+                <strong class="metric-value">{{ metrics.studentAlerts }}</strong>
+                <small>Workflow events</small>
             </article>
         </section>
 
@@ -37,15 +37,9 @@
             <div class="toolbar-row">
                 <label class="search-field">
                     <span class="sr-only">Search notifications</span>
-                    <input v-model.trim="query" type="search" placeholder="Search title, audience, or status"
+                    <input v-model.trim="query" type="search" placeholder="Search title, message, or recipient"
                         aria-label="Search notifications" />
                 </label>
-                <div class="chip-row" aria-label="Notification status filters">
-                    <button type="button" class="chip-button active">All</button>
-                    <button type="button" class="chip-button">Draft</button>
-                    <button type="button" class="chip-button">Scheduled</button>
-                    <button type="button" class="chip-button">Sent</button>
-                </div>
             </div>
 
             <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
@@ -53,14 +47,13 @@
             <div v-else class="table-shell">
                 <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No notification history yet</h2>
-                    <p>Once you send or draft messages, the queue will show delivery channel, audience, and status at a
-                        glance.</p>
+                    <p>Workflow alerts will appear here as soon as the backend creates them.</p>
                 </div>
                 <table v-else class="admin-table">
                     <thead>
                         <tr>
                             <th>Title</th>
-                            <th>Audience</th>
+                            <th>Recipient</th>
                             <th>Status</th>
                             <th>Sent</th>
                         </tr>
@@ -68,9 +61,9 @@
                     <tbody>
                         <tr v-for="item in visibleRows" :key="item.id">
                             <td>{{ item.title || 'Untitled' }}</td>
-                            <td>{{ item.recipient_role || 'All' }}</td>
-                            <td>{{ item.status || item.delivery_status || 'Draft' }}</td>
-                            <td>{{ formatDate(item.sent_at || item.created_at) }}</td>
+                            <td>{{ item.recipient_role || 'student' }}</td>
+                            <td>{{ item.is_read ? 'Read' : 'Unread' }}</td>
+                            <td>{{ formatDate(item.created_at) }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -92,8 +85,8 @@ const metrics = computed(() => {
     const total = notifications.value.length
     const unread = notifications.value.filter((item) => !item.is_read).length
     const read = total - unread
-    const adminAlerts = notifications.value.filter((item) => String(item.recipient_role || '').toLowerCase().includes('super')).length
-    return { total, unread, read, adminAlerts }
+    const studentAlerts = notifications.value.filter((item) => String(item.recipient_role || '').toLowerCase() === 'student').length
+    return { total, unread, read, studentAlerts }
 })
 
 const visibleRows = computed(() => {
@@ -118,7 +111,7 @@ async function loadNotifications() {
 
     try {
         const response = await api.get('/api/admin/notifications')
-        notifications.value = response.data?.data || []
+        notifications.value = Array.isArray(response.data?.data) ? response.data.data : []
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Failed to load notifications.'
         notifications.value = []

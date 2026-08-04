@@ -4,32 +4,32 @@
             <div>
                 <p class="page-kicker">Item release</p>
                 <h1>Release approved items with confidence</h1>
-                <p class="page-copy">Keep the claimant, checklist, receipt, and release status visible before final
-                    confirmation.</p>
+                <p class="page-copy">Track each release request against the backend checklist and completion state
+                    before final confirmation.</p>
             </div>
-            <button type="button" class="primary-button">Confirm release</button>
+            <button type="button" class="primary-button" @click="loadReleases">Refresh</button>
         </header>
 
         <section class="metric-grid" aria-label="Release summary metrics">
             <article class="metric-card">
-                <span class="metric-label">Approved</span>
-                <strong class="metric-value">17</strong>
-                <small>Ready for handover</small>
+                <span class="metric-label">Pending</span>
+                <strong class="metric-value">{{ metrics.pending }}</strong>
+                <small>Awaiting completion</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">In checklist</span>
-                <strong class="metric-value">5</strong>
-                <small>Awaiting verification</small>
+                <span class="metric-label">Ready</span>
+                <strong class="metric-value">{{ metrics.ready }}</strong>
+                <small>Checklist complete</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Released today</span>
-                <strong class="metric-value">12</strong>
+                <span class="metric-label">Released</span>
+                <strong class="metric-value">{{ metrics.released }}</strong>
                 <small>Completed successfully</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Pending pick-up</span>
-                <strong class="metric-value">3</strong>
-                <small>Follow-up required</small>
+                <span class="metric-label">Total</span>
+                <strong class="metric-value">{{ metrics.total }}</strong>
+                <small>Release requests</small>
             </article>
         </section>
 
@@ -37,14 +37,18 @@
             <div class="toolbar-row">
                 <label class="search-field">
                     <span class="sr-only">Search release requests</span>
-                    <input v-model.trim="query" type="search" placeholder="Search claimant, item ID, or schedule"
+                    <input v-model.trim="query" type="search" placeholder="Search claimant, item, or status"
                         aria-label="Search release requests" />
                 </label>
                 <div class="chip-row" aria-label="Release status filters">
-                    <button type="button" class="chip-button active">All</button>
-                    <button type="button" class="chip-button">Ready</button>
-                    <button type="button" class="chip-button">Released</button>
-                    <button type="button" class="chip-button">Pending</button>
+                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'all' }"
+                        @click="activeStatus = 'all'">All</button>
+                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'pending' }"
+                        @click="activeStatus = 'pending'">Pending</button>
+                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'ready' }"
+                        @click="activeStatus = 'ready'">Ready</button>
+                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'released' }"
+                        @click="activeStatus = 'released'">Released</button>
                 </div>
             </div>
 
@@ -53,8 +57,8 @@
             <div v-else class="table-shell">
                 <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No release requests to show</h2>
-                    <p>The release checklist, claimant details, and receipt controls will appear here as approvals
-                        become ready.</p>
+                    <p>The checklist, claimant details, and completion controls will appear here as approvals become
+                        ready.</p>
                 </div>
 
                 <table v-else class="admin-table">
@@ -71,11 +75,11 @@
                         <tr v-for="item in visibleRows" :key="item.id">
                             <td>{{ item.report?.title || item.report_id || 'Unknown' }}</td>
                             <td>{{ item.claimant_student?.name || item.claimant_student_id || 'Unknown' }}</td>
-                            <td>{{ item.status || item.release_status || 'Pending' }}</td>
+                            <td>{{ formatStatus(item.status) }}</td>
                             <td>{{ item.released_at ? formatDate(item.released_at) : 'No' }}</td>
                             <td class="action-cell">
                                 <button type="button" class="secondary-button" @click="completeRelease(item.id)"
-                                    :disabled="item.released_at">Complete</button>
+                                    :disabled="item.released_at || !isChecklistComplete(item)">Complete</button>
                             </td>
                         </tr>
                     </tbody>
@@ -90,32 +94,49 @@ import { computed, onMounted, ref } from 'vue'
 import api from '@/bootstrap'
 
 const query = ref('')
+const activeStatus = ref('all')
 const releases = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
 
 const metrics = computed(() => {
     const total = releases.value.length
-    const released = releases.value.filter((item) => !!item.released_at).length
-    const pending = total - released
-    const checklist = releases.value.filter((item) => item.checklist_complete).length
-    return { total, released, pending, checklist }
+    const released = releases.value.filter((item) => !!item.released_at || String(item.status || '').toLowerCase() === 'released').length
+    const ready = releases.value.filter((item) => isChecklistComplete(item) && String(item.status || '').toLowerCase() === 'pending').length
+    const pending = total - released - ready
+    return { total, released, pending, ready }
 })
 
 const visibleRows = computed(() => {
     const search = query.value.toLowerCase()
     return releases.value.filter((item) => {
-        const text = [item.report?.title, item.claimant_student?.name, item.status, item.release_status]
+        const status = String(item.status || '').toLowerCase()
+        const matchesStatus = activeStatus.value === 'all'
+            || (activeStatus.value === 'pending' && status === 'pending' && !isChecklistComplete(item))
+            || (activeStatus.value === 'ready' && status === 'pending' && isChecklistComplete(item))
+            || (activeStatus.value === 'released' && ['released', 'completed'].includes(status))
+
+        const text = [item.report?.title, item.claimant_student?.name, item.status, item.release_code]
             .filter(Boolean)
             .join(' ')
             .toLowerCase()
-        return !search || text.includes(search)
+        return matchesStatus && (!search || text.includes(search))
     })
 })
+
+function formatStatus(value) {
+    if (!value) return 'Pending'
+    return String(value).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+}
 
 function formatDate(value) {
     if (!value) return '—'
     return new Date(value).toLocaleDateString()
+}
+
+function isChecklistComplete(item) {
+    const checklist = item.checklist || {}
+    return ['claim_approved', 'claimant_identity_checked', 'ownership_proof_confirmed', 'physical_item_condition_checked', 'claimant_acknowledgment_completed'].every((key) => Boolean(checklist[key]))
 }
 
 async function loadReleases() {
@@ -123,7 +144,7 @@ async function loadReleases() {
     errorMessage.value = ''
     try {
         const response = await api.get('/api/admin/releases')
-        releases.value = response.data?.data || []
+        releases.value = Array.isArray(response.data?.data) ? response.data.data : []
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Failed to load release requests.'
         releases.value = []

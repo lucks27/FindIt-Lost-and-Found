@@ -194,13 +194,11 @@ async function loadProfile() {
             localStorage.removeItem('admin_facility_id')
         }
 
-        // Helper function to prevent duplicate '/api' prefixes
         const formatUrl = (path, defaultPath) => {
-            const targetPath = path || defaultPath;
-            return targetPath.startsWith('/api') ? targetPath : `/api${targetPath.startsWith('/') ? '' : '/'}${targetPath}`;
-        };
+            const targetPath = path || defaultPath
+            return targetPath.startsWith('/api') ? targetPath : `/api${targetPath.startsWith('/') ? '' : '/'}${targetPath}`
+        }
 
-        // Apply the helper to all URLs
         updateProfileUrl.value = formatUrl(response.data?.data?.update_profile_url, '/admin/profile-info')
         changePasswordUrl.value = formatUrl(response.data?.data?.change_password_url, '/admin/profile-change-pass')
         changePictureUrl.value = formatUrl(response.data?.data?.change_picture_url, '/admin/profile-picture')

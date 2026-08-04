@@ -4,7 +4,8 @@
             <div>
                 <p class="page-kicker">Announcements</p>
                 <h1>Manage campus announcements</h1>
-                <p class="page-copy">Create, review, and schedule updates while keeping each notice easy to scan.</p>
+                <p class="page-copy">Review the announcements returned by the backend and their current publish state.
+                </p>
             </div>
             <button type="button" class="primary-button" @click="loadAnnouncements">Refresh announcements</button>
         </header>
@@ -52,13 +53,11 @@
             </div>
 
             <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
-
             <div v-if="loading" class="loading-state">Loading announcements…</div>
-
             <div v-else class="table-shell">
                 <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No announcements to display</h2>
-                    <p>Use the create action to add the next public notice or review existing scheduled content.</p>
+                    <p>Announcements will appear here once they are created or published.</p>
                 </div>
 
                 <table v-else class="admin-table">
@@ -76,7 +75,7 @@
                         <tr v-for="item in visibleRows" :key="item.id">
                             <td>{{ item.title }}</td>
                             <td>{{ item.audience || 'All' }}</td>
-                            <td><span class="status-chip">{{ item.status }}</span></td>
+                            <td><span class="status-chip">{{ formatStatus(item.status) }}</span></td>
                             <td>{{ formatDate(item.published_at) }}</td>
                             <td>{{ formatDate(item.expires_at) }}</td>
                             <td>{{ item.message || '—' }}</td>
@@ -115,7 +114,8 @@ const visibleRows = computed(() => {
     const search = query.value.toLowerCase()
 
     return announcements.value.filter((item) => {
-        const matchesStatus = activeStatus.value === 'all' || String(item.status || '').toLowerCase() === activeStatus.value
+        const status = String(item.status || '').toLowerCase()
+        const matchesStatus = activeStatus.value === 'all' || status === activeStatus.value
         const matchesSearch = !search || [item.title, item.audience, item.status, item.message]
             .filter(Boolean)
             .join(' ')
@@ -125,6 +125,11 @@ const visibleRows = computed(() => {
         return matchesStatus && matchesSearch
     })
 })
+
+function formatStatus(value) {
+    if (!value) return 'Draft'
+    return String(value).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+}
 
 function formatDate(value) {
     if (!value) return '—'
@@ -137,7 +142,7 @@ async function loadAnnouncements() {
 
     try {
         const response = await api.get('/api/admin/announcements')
-        announcements.value = response.data?.data || []
+        announcements.value = Array.isArray(response.data?.data) ? response.data.data : []
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Failed to load announcements.'
         announcements.value = []

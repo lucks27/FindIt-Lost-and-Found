@@ -4,8 +4,7 @@
             <div>
                 <p class="page-kicker">Item inventory</p>
                 <h1>Track stored items with clean status visibility</h1>
-                <p class="page-copy">Monitor inventory by location, workflow stage, and recovery actions with a compact,
-                    low-noise layout.</p>
+                <p class="page-copy">Monitor inventory by location and workflow stage using the live backend states.</p>
             </div>
             <button type="button" class="primary-button" @click="loadInventory">Refresh</button>
         </header>
@@ -19,17 +18,17 @@
             <article class="metric-card">
                 <span class="metric-label">In storage</span>
                 <strong class="metric-value">{{ metrics.inStorage }}</strong>
-                <small>Available for release</small>
+                <small>Pending verification or verified</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Matched</span>
                 <strong class="metric-value">{{ metrics.matched }}</strong>
-                <small>Linked to claimant cases</small>
+                <small>Under claim review</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Ready</span>
                 <strong class="metric-value">{{ metrics.ready }}</strong>
-                <small>Ready to hand over</small>
+                <small>Ready for release</small>
             </article>
         </section>
 
@@ -37,13 +36,18 @@
             <div class="toolbar-row">
                 <label class="search-field">
                     <span class="sr-only">Search inventory</span>
-                    <input v-model.trim="query" type="search" placeholder="Search item ID, claimant, or location"
+                    <input v-model.trim="query" type="search" placeholder="Search item, location, or status"
                         aria-label="Search inventory" />
                 </label>
                 <div class="chip-row" aria-label="Inventory tabs">
-                    <button type="button" class="chip-button active">In Storage</button>
-                    <button type="button" class="chip-button">Matched</button>
-                    <button type="button" class="chip-button">Ready for Release</button>
+                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'all' }"
+                        @click="activeStatus = 'all'">All</button>
+                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'in-storage' }"
+                        @click="activeStatus = 'in-storage'">In Storage</button>
+                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'matched' }"
+                        @click="activeStatus = 'matched'">Matched</button>
+                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'ready' }"
+                        @click="activeStatus = 'ready'">Ready</button>
                 </div>
             </div>
 
@@ -52,8 +56,8 @@
             <div v-else class="table-shell">
                 <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No inventory items to display</h2>
-                    <p>Use the storage view and workflow tabs to review records by movement status, location, and
-                        handover readiness.</p>
+                    <p>Items currently in the active found-item workflow will appear here as they move through
+                        verification and release.</p>
                 </div>
 
                 <table v-else class="admin-table">
@@ -69,7 +73,7 @@
                         <tr v-for="item in visibleRows" :key="item.id">
                             <td>{{ item.title || item.report?.title || item.id }}</td>
                             <td>{{ item.location || item.report?.location || '—' }}</td>
-                            <td>{{ item.status || item.report?.status || 'Unknown' }}</td>
+                            <td>{{ formatStatus(item.status || item.report?.status) }}</td>
                             <td>{{ item.student?.name || item.report?.student?.name || 'Unknown' }}</td>
                         </tr>
                     </tbody>
@@ -84,37 +88,51 @@ import { computed, onMounted, ref } from 'vue'
 import api from '@/bootstrap'
 
 const query = ref('')
+const activeStatus = ref('all')
 const items = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
 
 const metrics = computed(() => {
-    const now = new Date()
     const total = items.value.length
-    const inStorage = items.value.filter((item) => !item.status || item.status.toLowerCase() === 'in storage').length
-    const matched = items.value.filter((item) => String(item.status || '').toLowerCase() === 'matched').length
-    const ready = items.value.filter((item) => String(item.status || '').toLowerCase() === 'ready for release').length
-    const pending = total - inStorage - matched - ready
-    return { total, inStorage, matched, ready, pending }
+    const inStorage = items.value.filter((item) => {
+        const status = String(item.status || item.report?.status || '').toLowerCase()
+        return ['pending_verification', 'verified'].includes(status)
+    }).length
+    const matched = items.value.filter((item) => String(item.status || item.report?.status || '').toLowerCase() === 'under_claim_review').length
+    const ready = items.value.filter((item) => String(item.status || item.report?.status || '').toLowerCase() === 'ready_for_release').length
+    return { total, inStorage, matched, ready }
 })
 
 const visibleRows = computed(() => {
     const search = query.value.toLowerCase()
     return items.value.filter((item) => {
+        const status = String(item.status || item.report?.status || '').toLowerCase()
+        const matchesStatus = activeStatus.value === 'all'
+            || (activeStatus.value === 'in-storage' && ['pending_verification', 'verified'].includes(status))
+            || (activeStatus.value === 'matched' && status === 'under_claim_review')
+            || (activeStatus.value === 'ready' && status === 'ready_for_release')
+
         const text = [item.title, item.location, item.status, item.report?.title, item.student?.name]
             .filter(Boolean)
             .join(' ')
             .toLowerCase()
-        return !search || text.includes(search)
+
+        return matchesStatus && (!search || text.includes(search))
     })
 })
+
+function formatStatus(value) {
+    if (!value) return 'Unknown'
+    return String(value).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+}
 
 async function loadInventory() {
     loading.value = true
     errorMessage.value = ''
     try {
         const response = await api.get('/api/admin/items')
-        items.value = response.data?.data || []
+        items.value = Array.isArray(response.data?.data) ? response.data.data : []
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Failed to load inventory items.'
         items.value = []

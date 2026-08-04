@@ -4,8 +4,7 @@
             <div>
                 <p class="page-kicker">Claims review</p>
                 <h1>Review claimant evidence and approvals</h1>
-                <p class="page-copy">Keep proof quality, related items, and final decisions visible without losing
-                    detail.</p>
+                <p class="page-copy">Keep reviewer notes, evidence, and final release status visible in one place.</p>
             </div>
             <button type="button" class="primary-button" @click="loadClaims">Refresh claims</button>
         </header>
@@ -58,8 +57,7 @@
             <div v-else class="table-shell">
                 <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No claim records to review</h2>
-                    <p>As claims come in, this queue will surface validation notes, proof uploads, and final decision
-                        controls.</p>
+                    <p>As claims come in, this queue will surface notes, proof items, and final decision controls.</p>
                 </div>
 
                 <table v-else class="admin-table">
@@ -77,7 +75,7 @@
                         <tr v-for="item in visibleRows" :key="item.id">
                             <td>{{ item.report?.title || item.report_id }}</td>
                             <td>{{ item.claimant_student?.name || item.claimant_student_id }}</td>
-                            <td><span class="status-chip">{{ item.review_status }}</span></td>
+                            <td><span class="status-chip">{{ formatStatus(item.review_status) }}</span></td>
                             <td>{{ item.notes || '—' }}</td>
                             <td>{{ formatEvidence(item.evidence) }}</td>
                             <td class="action-cell">
@@ -115,7 +113,7 @@ const metrics = computed(() => {
         else if (status === 'approved') counts.approved += 1
         else if (status === 'rejected') counts.rejected += 1
 
-        if (item.evidence && Object.values(item.evidence).includes(false)) counts.proof_required += 1
+        if (item.evidence && Object.values(item.evidence).some((value) => value === false)) counts.proof_required += 1
     })
 
     return counts
@@ -124,7 +122,8 @@ const metrics = computed(() => {
 const visibleRows = computed(() => {
     const search = query.value.toLowerCase()
     return claims.value.filter((item) => {
-        const matchesStatus = activeStatus.value === 'all' || String(item.review_status || '').toLowerCase() === activeStatus.value
+        const status = String(item.review_status || '').toLowerCase()
+        const matchesStatus = activeStatus.value === 'all' || status === activeStatus.value
         const matchesSearch = !search || [item.report?.title, item.claimant_student?.name, item.review_status, item.notes]
             .filter(Boolean)
             .join(' ')
@@ -134,6 +133,11 @@ const visibleRows = computed(() => {
         return matchesStatus && matchesSearch
     })
 })
+
+function formatStatus(value) {
+    if (!value) return 'Pending'
+    return String(value).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+}
 
 function formatEvidence(value) {
     if (!value) return '—'
@@ -149,7 +153,7 @@ async function loadClaims() {
 
     try {
         const response = await api.get('/api/admin/claims')
-        claims.value = response.data?.data || []
+        claims.value = Array.isArray(response.data?.data) ? response.data.data : []
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Failed to load claim review records.'
         claims.value = []

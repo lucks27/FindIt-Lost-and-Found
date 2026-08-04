@@ -4,22 +4,21 @@
             <div>
                 <p class="page-kicker">Analytics & Reports</p>
                 <h1>Review system performance at a glance</h1>
-                <p class="page-copy">Track activity, compare item trends, and export compact report snapshots for admin
-                    review.</p>
+                <p class="page-copy">Track workflow counts using the analytics payload from the backend.</p>
             </div>
-            <button type="button" class="primary-button">Export report</button>
+            <button type="button" class="primary-button" @click="loadReportData">Refresh</button>
         </header>
 
         <section class="metric-grid" aria-label="Report summary metrics">
             <article class="metric-card">
                 <span class="metric-label">Item activity</span>
                 <strong class="metric-value">{{ metrics.totalReports }}</strong>
-                <small>Reports this window</small>
+                <small>Reports in workflow</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Claims processed</span>
                 <strong class="metric-value">{{ metrics.totalClaims }}</strong>
-                <small>Resolved and logged</small>
+                <small>Review records</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Returns completed</span>
@@ -68,7 +67,7 @@
                 <div v-else class="table-shell">
                     <div v-if="!recentEvents.length" class="empty-state-card" role="status">
                         <h2>No recent events available</h2>
-                        <p>Activity summary will appear here once backend endpoints return data.</p>
+                        <p>Activity summary will appear here once the backend returns data.</p>
                     </div>
                     <div v-else>
                         <div v-for="event in recentEvents" :key="event.id" class="activity-row">
@@ -94,7 +93,7 @@ const releases = ref([])
 const students = ref([])
 
 const metrics = ref({
-    itemTitle: 'Weekly workflow trends',
+    itemTitle: 'Workflow trends',
     totalReports: 0,
     openReports: 0,
     claimsTitle: 'Claims and release summary',
@@ -114,50 +113,37 @@ async function loadReportData() {
     loading.value = true
     errorMessage.value = ''
     try {
-        const [reportsResponse, claimsResponse, releasesResponse, studentsResponse] = await Promise.all([
-            api.get('/api/admin/items'),
+        const [dashboardResponse, claimsResponse, releasesResponse, pointsResponse] = await Promise.all([
+            api.get('/api/admin/dashboard'),
             api.get('/api/admin/claims'),
             api.get('/api/admin/releases'),
-            api.get('/api/admin/list'),
+            api.get('/api/admin/points'),
         ])
 
-        reports.value = reportsResponse.data?.data || []
-        claims.value = claimsResponse.data?.data || []
-        releases.value = releasesResponse.data?.data || []
-        students.value = studentsResponse.data?.data?.students || []
+        const dashboard = dashboardResponse.data?.data || {}
+        const summary = dashboard.summary || {}
+        const activity = dashboard.recent_activity || []
+
+        reports.value = []
+        claims.value = Array.isArray(claimsResponse.data?.data) ? claimsResponse.data.data : []
+        releases.value = Array.isArray(releasesResponse.data?.data) ? releasesResponse.data.data : []
+        students.value = Array.isArray(pointsResponse.data?.data) ? pointsResponse.data.data : []
 
         metrics.value = {
             itemTitle: 'Report activity summary',
-            totalReports: reports.value.length,
-            openReports: reports.value.filter((item) => !item.status || ['open', 'pending'].includes(String(item.status || '').toLowerCase())).length,
+            totalReports: Number(summary.total_reports || 0),
+            openReports: Number(summary.open_reports || 0),
             claimsTitle: 'Claim and release summary',
             totalClaims: claims.value.length,
             totalReleases: releases.value.length,
             pointsAwarded: students.value.reduce((sum, student) => sum + (Number(student.recognition_points) || 0), 0),
         }
 
-        recentEvents.value = [
-            {
-                id: 'claims',
-                label: `${claims.value.length} claim records loaded`,
-                when: formatDate(new Date()),
-            },
-            {
-                id: 'releases',
-                label: `${releases.value.length} release requests loaded`,
-                when: formatDate(new Date()),
-            },
-            {
-                id: 'reports',
-                label: `${reports.value.length} item reports loaded`,
-                when: formatDate(new Date()),
-            },
-            {
-                id: 'points',
-                label: `${metrics.value.pointsAwarded} total points mapped`,
-                when: formatDate(new Date()),
-            },
-        ]
+        recentEvents.value = (activity || []).slice(0, 4).map((event, index) => ({
+            id: `${event.type || 'activity'}-${index}`,
+            label: event.label || 'Workflow event',
+            when: formatDate(event.when),
+        }))
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Failed to load report analytics.'
     } finally {
