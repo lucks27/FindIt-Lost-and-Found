@@ -1,60 +1,356 @@
 <template>
     <main class="admin-page-body">
+        <header class="page-header">
+            <div>
+                <p class="page-kicker">Potential matches</p>
+                <h1>Compare lost and found cases with confidence</h1>
+                <p class="page-copy">Use match score, conflict details, and next actions to make clear, defensible
+                    decisions.</p>
+            </div>
+            <button type="button" class="primary-button">Review matches</button>
+        </header>
 
-        <div class="page-card">
-            <p class="placeholder-text">This page will list suggested matches between lost items and claimant
-                submissions for review.</p>
-        </div>
+        <section class="metric-grid" aria-label="Potential match summary metrics">
+            <article class="metric-card">
+                <span class="metric-label">Open</span>
+                <strong class="metric-value">{{ metrics.open }}</strong>
+                <small>Awaiting review</small>
+            </article>
+            <article class="metric-card">
+                <span class="metric-label">Reviewed</span>
+                <strong class="metric-value">{{ metrics.reviewed }}</strong>
+                <small>Recently checked</small>
+            </article>
+            <article class="metric-card">
+                <span class="metric-label">Confirmed</span>
+                <strong class="metric-value">{{ metrics.confirmed }}</strong>
+                <small>Ready for release</small>
+            </article>
+            <article class="metric-card">
+                <span class="metric-label">Rejected</span>
+                <strong class="metric-value">{{ metrics.rejected }}</strong>
+                <small>Closed as mismatch</small>
+            </article>
+        </section>
+
+        <section class="panel-card">
+            <div class="toolbar-row">
+                <label class="search-field">
+                    <span class="sr-only">Search potential matches</span>
+                    <input v-model.trim="query" type="search" placeholder="Search match score, item, or owner"
+                        aria-label="Search potential matches" />
+                </label>
+                <div class="chip-row" aria-label="Match status filters">
+                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'all' }"
+                        @click="activeStatus = 'all'">All</button>
+                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'pending' }"
+                        @click="activeStatus = 'pending'">Open</button>
+                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'reviewed' }"
+                        @click="activeStatus = 'reviewed'">Reviewed</button>
+                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'confirmed' }"
+                        @click="activeStatus = 'confirmed'">Confirmed</button>
+                </div>
+            </div>
+
+            <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
+            <div v-if="loading" class="loading-state">Loading matches…</div>
+
+            <div v-else class="table-shell">
+                <div v-if="!visibleRows.length" class="empty-state-card" role="status">
+                    <h2>No match suggestions to review</h2>
+                    <p>When matches are generated, score, factor summary, and conflict detail will appear here for quick
+                        admin action.</p>
+                </div>
+
+                <table v-else class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Source item</th>
+                            <th>Matched item</th>
+                            <th>Score</th>
+                            <th>Status</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="item in visibleRows" :key="item.id">
+                            <td>{{ item.source_report?.title || item.source_report_id }}</td>
+                            <td>{{ item.matched_report?.title || item.matched_report_id }}</td>
+                            <td>{{ item.score }}</td>
+                            <td><span class="status-chip">{{ item.status }}</span></td>
+                            <td>{{ item.notes || '—' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </main>
 </template>
 
 <script setup>
+import { computed, onMounted, ref } from 'vue'
+import api from '@/bootstrap'
+
+const query = ref('')
+const activeStatus = ref('all')
+const matches = ref([])
+const loading = ref(false)
+const errorMessage = ref('')
+
+const metrics = computed(() => {
+    const counts = { open: 0, reviewed: 0, confirmed: 0, rejected: 0 }
+
+    matches.value.forEach((item) => {
+        const status = String(item.status || '').toLowerCase()
+        if (status === 'pending') counts.open += 1
+        if (status === 'reviewed') counts.reviewed += 1
+        if (status === 'confirmed') counts.confirmed += 1
+        if (status === 'rejected') counts.rejected += 1
+    })
+
+    return counts
+})
+
+const visibleRows = computed(() => {
+    const search = query.value.toLowerCase()
+    return matches.value.filter((item) => {
+        const matchesStatus = activeStatus.value === 'all' || String(item.status || '').toLowerCase() === activeStatus.value
+        const matchesSearch = !search || [item.source_report?.title, item.matched_report?.title, item.notes, item.score]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(search)
+
+        return matchesStatus && matchesSearch
+    })
+})
+
+async function loadMatches() {
+    loading.value = true
+    errorMessage.value = ''
+
+    try {
+        const response = await api.get('/api/admin/matches')
+        matches.value = response.data?.data || []
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Failed to load potential matches.'
+        matches.value = []
+    } finally {
+        loading.value = false
+    }
+}
+
+onMounted(loadMatches)
 </script>
 
 <style scoped>
 .admin-page-body {
-    padding: 24px;
-    color: #f8f4ea;
     min-height: calc(100vh - 60px);
-    background: transparent;
+    padding: 24px;
+    color: #eef1e5;
+    background: radial-gradient(circle at top left, rgba(80, 130, 82, 0.16), transparent 30%), #0f2112;
+}
+
+.page-header,
+.panel-card,
+.metric-card {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
 }
 
 .page-header {
-    margin-bottom: 24px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 20px 22px;
+    border-radius: 20px;
+    margin-bottom: 18px;
 }
 
 .page-kicker {
-    margin: 0 0 10px;
-    font-size: 12px;
+    margin: 0 0 8px;
+    color: #c1b37a;
+    font-size: 0.78rem;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: rgba(248, 244, 234, 0.72);
 }
 
 .page-header h1 {
     margin: 0;
-    font-size: clamp(30px, 4vw, 42px);
-    color: #fff;
+    font-size: clamp(1.9rem, 3vw, 2.6rem);
+    color: #fbf7eb;
 }
 
 .page-copy {
-    margin: 12px 0 0;
-    color: rgba(248, 244, 234, 0.78);
-    max-width: 760px;
+    margin: 8px 0 0;
+    max-width: 720px;
+    color: #bcc0a7;
     line-height: 1.6;
 }
 
-.page-card {
-    padding: 28px;
-    border-radius: 26px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 24px 44px rgba(0, 0, 0, 0.24);
+.primary-button,
+.chip-button {
+    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
 }
 
-.placeholder-text {
+.primary-button {
+    border: none;
+    border-radius: 14px;
+    padding: 0.86rem 1.2rem;
+    background: #c49d3b;
+    color: #131b10;
+    font-weight: 700;
+    cursor: pointer;
+    min-width: 168px;
+}
+
+.primary-button:hover,
+.chip-button:hover {
+    transform: translateY(-1px);
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.metric-card {
+    padding: 18px;
+    border-radius: 18px;
+}
+
+.metric-label {
+    display: block;
+    margin-bottom: 10px;
+    color: #b8be9d;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.metric-value {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 1.8rem;
+    color: #fbf7eb;
+}
+
+.metric-card small {
+    color: #9fa58d;
+}
+
+.panel-card {
+    padding: 18px;
+    border-radius: 20px;
+}
+
+.toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.search-field {
+    width: min(420px, 100%);
+}
+
+.search-field input {
+    width: 100%;
+    padding: 0.9rem 1rem;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(14, 29, 18, 0.95);
+    color: #eef1e5;
+}
+
+.search-field input:focus,
+.chip-button:focus-visible,
+.primary-button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(196, 157, 59, 0.18);
+}
+
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chip-button {
+    padding: 0.7rem 0.95rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: #dde2c9;
+    cursor: pointer;
+}
+
+.chip-button.active {
+    background: rgba(196, 157, 59, 0.16);
+    border-color: rgba(196, 157, 59, 0.38);
+    color: #f6cf77;
+}
+
+.table-shell {
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.empty-state-card {
+    padding: 42px 18px;
+    text-align: center;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.empty-state-card h2 {
+    margin: 0 0 10px;
+    font-size: 1.2rem;
+    color: #f8f5e8;
+}
+
+.empty-state-card p {
     margin: 0;
-    color: rgba(248, 244, 234, 0.78);
-    line-height: 1.75;
+    color: #b0b59b;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@media (max-width: 900px) {
+    .metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .page-header,
+    .toolbar-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+@media (max-width: 640px) {
+    .metric-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-page-body {
+        padding: 16px;
+    }
 }
 </style>

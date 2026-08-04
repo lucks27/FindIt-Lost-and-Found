@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             FacilityAssignedAdminSeeder::class,
             BookingSeeder::class,
             NotificationSeeder::class,
+            AdminWorkflowSeeder::class,
         ]);
     }
 }

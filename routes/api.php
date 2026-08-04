@@ -68,6 +68,22 @@ Route::middleware('auth:admin')->group(function () {
     Route::post('/admin/students', [AdminAuthController::class, 'storeStudentRecord']);
     Route::put('/admin/students/{id}', [AdminAuthController::class, 'updateStudentRecord']);
     Route::delete('/admin/students/{id}', [AdminAuthController::class, 'deleteStudentRecord']);
+    Route::get('/admin/list', [App\Http\Controllers\AdminWorkflowController::class, 'listStudents']);
+
+    Route::get('/admin/audit-logs', [App\Http\Controllers\AdminWorkflowController::class, 'indexAuditLogs']);
+    Route::get('/admin/audit-logs/export', [App\Http\Controllers\AdminWorkflowController::class, 'exportAuditLogs']);
+
+    Route::get('/admin/announcements', [App\Http\Controllers\AdminWorkflowController::class, 'indexAnnouncements']);
+    Route::post('/admin/announcements', [App\Http\Controllers\AdminWorkflowController::class, 'storeAnnouncement']);
+
+    Route::get('/admin/claims', [App\Http\Controllers\AdminWorkflowController::class, 'indexClaimReviews']);
+    Route::get('/admin/verifications', [App\Http\Controllers\AdminWorkflowController::class, 'indexItemVerifications']);
+    Route::get('/admin/releases', [App\Http\Controllers\AdminWorkflowController::class, 'indexItemReleases']);
+    Route::get('/admin/matches', [App\Http\Controllers\AdminWorkflowController::class, 'indexPotentialMatches']);
+    Route::get('/admin/surrenders', [App\Http\Controllers\AdminWorkflowController::class, 'indexSurrenderRequests']);
+    Route::get('/admin/event-fines', [App\Http\Controllers\AdminWorkflowController::class, 'indexEventFines']);
+    Route::get('/admin/settings', [App\Http\Controllers\AdminWorkflowController::class, 'indexAdminSettings']);
+    Route::post('/admin/settings', [App\Http\Controllers\AdminWorkflowController::class, 'storeAdminSetting']);
 
     Route::get('/admin/profile', [AdminProfileController::class, 'apiProfile']);
     Route::put('/admin/profile-info', [AdminProfileController::class, 'adminEditProfile']);
