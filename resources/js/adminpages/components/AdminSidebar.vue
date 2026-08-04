@@ -87,6 +87,7 @@ const sections = [
         label: 'Points and Fines',
         items: [
             { label: 'Recognition Points', page: 'recognition', to: { name: 'superadmin.recognition' }, icon: 'M12 2l2.39 4.84L20 7.43l-3.5 3.41.82 4.79L12 14.77l-4.32 2.86.82-4.79L4 7.43l5.61-.59L12 2z' },
+            { label: 'Point Rules', page: 'point-rules', to: { name: 'superadmin.point-rules' }, icon: 'M12 4a8 8 0 100 16 8 8 0 000-16zm1 11h-2v-2H9V9h2V7h2v2h2v4h-2v2z' },
             { label: 'Event Fine Management', page: 'fines', to: { name: 'superadmin.fines' }, icon: 'M6 2h12v2H6V2zm3 4h6v2H9V6zm-3 4h12v10H6V10z' },
         ],
     },

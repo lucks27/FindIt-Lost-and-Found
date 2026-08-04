@@ -70,6 +70,7 @@
                             <th>Status</th>
                             <th>Notes</th>
                             <th>Evidence</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -79,6 +80,13 @@
                             <td><span class="status-chip">{{ item.review_status }}</span></td>
                             <td>{{ item.notes || '—' }}</td>
                             <td>{{ formatEvidence(item.evidence) }}</td>
+                            <td class="action-cell">
+                                <button type="button" class="secondary-button" @click="approveClaim(item.id)"
+                                    :disabled="String(item.review_status || '').toLowerCase() === 'approved'">Approve</button>
+                                <button type="button" class="secondary-button" @click="rejectClaim(item.id)"
+                                    :disabled="String(item.review_status || '').toLowerCase() === 'rejected'">Reject</button>
+                                <button type="button" class="secondary-button" @click="requestInfo(item.id)">Request info</button>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -146,6 +154,36 @@ async function loadClaims() {
         claims.value = []
     } finally {
         loading.value = false
+    }
+}
+
+async function approveClaim(id) {
+    errorMessage.value = ''
+    try {
+        await api.post(`/api/admin/claims/${id}/approve`)
+        await loadClaims()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to approve claim.'
+    }
+}
+
+async function rejectClaim(id) {
+    errorMessage.value = ''
+    try {
+        await api.post(`/api/admin/claims/${id}/reject`)
+        await loadClaims()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to reject claim.'
+    }
+}
+
+async function requestInfo(id) {
+    errorMessage.value = ''
+    try {
+        await api.post(`/api/admin/claims/${id}/request-information`, { notes: 'Please submit additional evidence.' })
+        await loadClaims()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to request claim information.'
     }
 }
 

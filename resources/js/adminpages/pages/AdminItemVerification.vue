@@ -63,6 +63,7 @@
                             <th>Verifier</th>
                             <th>Status</th>
                             <th>Student</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -71,6 +72,14 @@
                             <td>{{ item.verifier_admin?.name || 'Pending' }}</td>
                             <td>{{ item.status || item.verification_status || 'Pending' }}</td>
                             <td>{{ item.report?.student?.name || 'Unknown' }}</td>
+                            <td class="action-cell">
+                                <button type="button" class="secondary-button" @click="verifyItem(item.id)"
+                                    :disabled="String(item.status || item.verification_status || 'pending').toLowerCase() !== 'pending'">Approve</button>
+                                <button type="button" class="secondary-button" @click="rejectItem(item.id)"
+                                    :disabled="String(item.status || item.verification_status || 'pending').toLowerCase() !== 'pending'">Reject</button>
+                                <button type="button" class="secondary-button" @click="requestDetails(item.id)">
+                                    Request details</button>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -119,6 +128,36 @@ async function loadVerifications() {
         verifications.value = []
     } finally {
         loading.value = false
+    }
+}
+
+async function verifyItem(id) {
+    errorMessage.value = ''
+    try {
+        await api.post(`/api/admin/verifications/${id}/verify`)
+        await loadVerifications()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to approve verification.'
+    }
+}
+
+async function rejectItem(id) {
+    errorMessage.value = ''
+    try {
+        await api.post(`/api/admin/verifications/${id}/reject`)
+        await loadVerifications()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to reject verification.'
+    }
+}
+
+async function requestDetails(id) {
+    errorMessage.value = ''
+    try {
+        await api.post(`/api/admin/verifications/${id}/request-details`, { notes: 'Please provide additional verification details.' })
+        await loadVerifications()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to request verification details.'
     }
 }
 

@@ -70,6 +70,7 @@
                             <th>Score</th>
                             <th>Status</th>
                             <th>Notes</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -79,6 +80,12 @@
                             <td>{{ item.score }}</td>
                             <td><span class="status-chip">{{ item.status }}</span></td>
                             <td>{{ item.notes || '—' }}</td>
+                            <td class="action-cell">
+                                <button type="button" class="secondary-button" @click="confirmMatch(item.id)"
+                                    :disabled="String(item.status || '').toLowerCase() === 'confirmed'">Confirm</button>
+                                <button type="button" class="secondary-button" @click="rejectMatch(item.id)"
+                                    :disabled="String(item.status || '').toLowerCase() === 'rejected'">Reject</button>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -137,6 +144,26 @@ async function loadMatches() {
         matches.value = []
     } finally {
         loading.value = false
+    }
+}
+
+async function confirmMatch(id) {
+    errorMessage.value = ''
+    try {
+        await api.put(`/api/admin/matches/${id}/confirm`)
+        await loadMatches()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to confirm match.'
+    }
+}
+
+async function rejectMatch(id) {
+    errorMessage.value = ''
+    try {
+        await api.put(`/api/admin/matches/${id}/reject`)
+        await loadMatches()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to reject match.'
     }
 }
 

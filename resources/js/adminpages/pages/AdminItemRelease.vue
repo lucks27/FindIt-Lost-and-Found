@@ -64,6 +64,7 @@
                             <th>Claimant</th>
                             <th>Status</th>
                             <th>Released</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -72,6 +73,10 @@
                             <td>{{ item.claimant_student?.name || item.claimant_student_id || 'Unknown' }}</td>
                             <td>{{ item.status || item.release_status || 'Pending' }}</td>
                             <td>{{ item.released_at ? formatDate(item.released_at) : 'No' }}</td>
+                            <td class="action-cell">
+                                <button type="button" class="secondary-button" @click="completeRelease(item.id)"
+                                    :disabled="item.released_at">Complete</button>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -124,6 +129,16 @@ async function loadReleases() {
         releases.value = []
     } finally {
         loading.value = false
+    }
+}
+
+async function completeRelease(id) {
+    errorMessage.value = ''
+    try {
+        await api.post(`/api/admin/releases/${id}/complete`)
+        await loadReleases()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to complete item release.'
     }
 }
 

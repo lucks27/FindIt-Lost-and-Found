@@ -34,6 +34,10 @@ const pageTitle = computed(() => {
             return 'Item Verification'
         case 'items':
             return 'Lost & Found Items'
+        case 'report-approval':
+            return 'Report Approval'
+        case 'completed-returns':
+            return 'Completed Returns'
         case 'matches':
             return 'Potential Match'
         case 'claims':
@@ -44,6 +48,8 @@ const pageTitle = computed(() => {
             return 'Item Release'
         case 'recognition':
             return 'Recognition Points'
+        case 'point-rules':
+            return 'Point Rules'
         case 'fines':
             return 'Event Fine Management'
         case 'notifications':
@@ -64,12 +70,15 @@ const pageCategory = computed(() => {
         case 'pending-surrender':
         case 'item-verification':
         case 'items':
+        case 'report-approval':
+        case 'completed-returns':
         case 'matches':
         case 'claims':
         case 'inventory':
         case 'release':
             return 'Lost and Found'
         case 'recognition':
+        case 'point-rules':
         case 'fines':
             return 'Points and Fines'
         case 'notifications':

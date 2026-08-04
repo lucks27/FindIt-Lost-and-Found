@@ -76,7 +76,45 @@ Route::middleware('auth:admin')->group(function () {
     Route::get('/admin/announcements', [App\Http\Controllers\AdminWorkflowController::class, 'indexAnnouncements']);
     Route::post('/admin/announcements', [App\Http\Controllers\AdminWorkflowController::class, 'storeAnnouncement']);
     Route::get('/admin/items', [App\Http\Controllers\AdminWorkflowController::class, 'indexLostFoundItems']);
+    Route::get('/admin/dashboard', [App\Http\Controllers\AdminWorkflowController::class, 'dashboardMetrics']);
+    Route::get('/admin/completed-returns', [App\Http\Controllers\AdminWorkflowController::class, 'indexCompletedReturns']);
+    Route::get('/admin/point-rules', [App\Http\Controllers\AdminWorkflowController::class, 'indexPointRules']);
+    Route::post('/admin/point-rules', [App\Http\Controllers\AdminWorkflowController::class, 'storePointRule']);
+    Route::put('/admin/point-rules/{id}', [App\Http\Controllers\AdminWorkflowController::class, 'updatePointRule']);
+    Route::delete('/admin/point-rules/{id}', [App\Http\Controllers\AdminWorkflowController::class, 'destroyPointRule']);
+    Route::get('/admin/points', [App\Http\Controllers\AdminWorkflowController::class, 'indexPointBalances']);
+    Route::post('/admin/notifications/{id}/mark-read', [App\Http\Controllers\AdminWorkflowController::class, 'markAdminNotificationRead']);
+
     Route::get('/admin/notifications', [App\Http\Controllers\AdminWorkflowController::class, 'indexAdminNotifications']);
+
+    Route::put('/admin/announcements/{id}', [App\Http\Controllers\AdminWorkflowController::class, 'updateAnnouncement']);
+    Route::delete('/admin/announcements/{id}', [App\Http\Controllers\AdminWorkflowController::class, 'deleteAnnouncement']);
+    Route::post('/admin/announcements/{id}/publish', [App\Http\Controllers\AdminWorkflowController::class, 'publishAnnouncement']);
+    Route::post('/admin/announcements/{id}/unpublish', [App\Http\Controllers\AdminWorkflowController::class, 'unpublishAnnouncement']);
+
+    Route::post('/admin/reports/{id}/approve', [App\Http\Controllers\AdminWorkflowController::class, 'approveLostReport']);
+    Route::post('/admin/reports/{id}/reject', [App\Http\Controllers\AdminWorkflowController::class, 'rejectLostReport']);
+    Route::post('/admin/reports/{id}/request-correction', [App\Http\Controllers\AdminWorkflowController::class, 'requestLostReportCorrection']);
+
+    Route::post('/admin/surrenders/{id}/receive', [App\Http\Controllers\AdminWorkflowController::class, 'receiveSurrenderRequest']);
+    Route::post('/admin/surrenders/{id}/reject', [App\Http\Controllers\AdminWorkflowController::class, 'rejectSurrenderRequest']);
+    Route::post('/admin/surrenders/{id}/overdue', [App\Http\Controllers\AdminWorkflowController::class, 'markSurrenderOverdue']);
+
+    Route::post('/admin/verifications/{id}/verify', [App\Http\Controllers\AdminWorkflowController::class, 'verifyItem']);
+    Route::post('/admin/verifications/{id}/reject', [App\Http\Controllers\AdminWorkflowController::class, 'rejectVerification']);
+    Route::post('/admin/verifications/{id}/request-details', [App\Http\Controllers\AdminWorkflowController::class, 'requestVerificationDetails']);
+
+    Route::put('/admin/matches/{id}/confirm', [App\Http\Controllers\AdminWorkflowController::class, 'confirmPotentialMatch']);
+    Route::put('/admin/matches/{id}/reject', [App\Http\Controllers\AdminWorkflowController::class, 'rejectPotentialMatch']);
+
+    Route::post('/admin/claims/{id}/approve', [App\Http\Controllers\AdminWorkflowController::class, 'approveClaim']);
+    Route::post('/admin/claims/{id}/reject', [App\Http\Controllers\AdminWorkflowController::class, 'rejectClaim']);
+    Route::post('/admin/claims/{id}/request-information', [App\Http\Controllers\AdminWorkflowController::class, 'requestClaimInformation']);
+
+    Route::post('/admin/releases/{id}/complete', [App\Http\Controllers\AdminWorkflowController::class, 'completeItemRelease']);
+
+    Route::post('/admin/event-fines/{id}/approve-conversion', [App\Http\Controllers\AdminWorkflowController::class, 'approveEventFineConversion']);
+    Route::post('/admin/event-fines/{id}/reject-conversion', [App\Http\Controllers\AdminWorkflowController::class, 'rejectEventFineConversion']);
 
     Route::get('/admin/claims', [App\Http\Controllers\AdminWorkflowController::class, 'indexClaimReviews']);
     Route::get('/admin/verifications', [App\Http\Controllers\AdminWorkflowController::class, 'indexItemVerifications']);

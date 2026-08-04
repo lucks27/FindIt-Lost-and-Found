@@ -18,6 +18,9 @@ const AdminStudentManagementPage = () => import("@/adminpages/pages/AdminList.vu
 const AdminPendingSurrenderPage = () => import("@/adminpages/pages/AdminPendingSurrender.vue");
 const AdminItemVerificationPage = () => import("@/adminpages/pages/AdminItemVerification.vue");
 const AdminLostFoundItemsPage = () => import("@/adminpages/pages/AdminLostFoundItems.vue");
+const AdminLostReportApprovalPage = () => import("@/adminpages/pages/AdminLostReportApproval.vue");
+const AdminCompletedReturnsPage = () => import("@/adminpages/pages/AdminCompletedReturns.vue");
+const AdminPointRulesPage = () => import("@/adminpages/pages/AdminPointRules.vue");
 const AdminPotentialMatchesPage = () => import("@/adminpages/pages/AdminPotentialMatches.vue");
 const AdminClaimsReviewPage = () => import("@/adminpages/pages/AdminClaimsReview.vue");
 const AdminItemInventoryPage = () => import("@/adminpages/pages/AdminItemInventory.vue");
@@ -62,6 +65,9 @@ const routes = [
       { path: "", redirect: { name: "superadmin.dashboard" } },
       { path: "dashboard", name: "superadmin.dashboard", component: AdminReportsDashboard },
       { path: "reports", name: "superadmin.reports", component: AdminReportsPage },
+      { path: "report-approval", name: "superadmin.report-approval", component: AdminLostReportApprovalPage },
+      { path: "completed-returns", name: "superadmin.completed-returns", component: AdminCompletedReturnsPage },
+      { path: "point-rules", name: "superadmin.point-rules", component: AdminPointRulesPage },
       { path: "profile", name: "superadmin.profile", component: AdminProfilePage },
       { path: "list", name: "superadmin.list", component: AdminStudentManagementPage },
       { path: "pending-surrender", name: "superadmin.pending-surrender", component: AdminPendingSurrenderPage },

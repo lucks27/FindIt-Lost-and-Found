@@ -71,6 +71,7 @@
                             <th>Amount</th>
                             <th>Status</th>
                             <th>Reason</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -81,6 +82,12 @@
                             <td>{{ item.amount }}</td>
                             <td><span class="status-chip">{{ item.status }}</span></td>
                             <td>{{ item.reason || '—' }}</td>
+                            <td class="action-cell">
+                                <button type="button" class="secondary-button" @click="approveConversion(item.id)"
+                                    :disabled="String(item.status || '').toLowerCase() === 'approved'">Approve</button>
+                                <button type="button" class="secondary-button" @click="rejectConversion(item.id)"
+                                    :disabled="String(item.status || '').toLowerCase() === 'rejected'">Reject</button>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -139,6 +146,26 @@ async function loadFines() {
         fines.value = []
     } finally {
         loading.value = false
+    }
+}
+
+async function approveConversion(id) {
+    errorMessage.value = ''
+    try {
+        await api.post(`/api/admin/event-fines/${id}/approve-conversion`)
+        await loadFines()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to approve conversion.'
+    }
+}
+
+async function rejectConversion(id) {
+    errorMessage.value = ''
+    try {
+        await api.post(`/api/admin/event-fines/${id}/reject-conversion`)
+        await loadFines()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to reject conversion.'
     }
 }
 

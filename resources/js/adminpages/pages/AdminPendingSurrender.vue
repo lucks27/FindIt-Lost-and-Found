@@ -63,6 +63,7 @@
                             <th>Student</th>
                             <th>Status</th>
                             <th>Due date</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -71,6 +72,14 @@
                             <td>{{ item.student?.name || 'Unknown' }}</td>
                             <td>{{ item.status || 'Pending' }}</td>
                             <td>{{ item.due_date ? formatDate(item.due_date) : 'TBD' }}</td>
+                            <td class="action-cell">
+                                <button type="button" class="secondary-button" @click="receiveRequest(item.id)"
+                                    :disabled="item.status && item.status !== 'pending'">Receive</button>
+                                <button type="button" class="secondary-button" @click="rejectRequest(item.id)"
+                                    :disabled="item.status && item.status !== 'pending'">Reject</button>
+                                <button type="button" class="secondary-button" @click="markOverdue(item.id)"
+                                    :disabled="item.status && item.status !== 'pending'">Overdue</button>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -129,6 +138,36 @@ async function loadSurrenders() {
         surrenders.value = []
     } finally {
         loading.value = false
+    }
+}
+
+async function receiveRequest(id) {
+    errorMessage.value = ''
+    try {
+        await api.post(`/api/admin/surrenders/${id}/receive`)
+        await loadSurrenders()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to receive surrender request.'
+    }
+}
+
+async function rejectRequest(id) {
+    errorMessage.value = ''
+    try {
+        await api.post(`/api/admin/surrenders/${id}/reject`)
+        await loadSurrenders()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to reject surrender request.'
+    }
+}
+
+async function markOverdue(id) {
+    errorMessage.value = ''
+    try {
+        await api.post(`/api/admin/surrenders/${id}/overdue`)
+        await loadSurrenders()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to mark surrender request overdue.'
     }
 }
 

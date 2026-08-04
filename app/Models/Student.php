@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -55,6 +56,11 @@ class Student extends Authenticatable
     public function rewards()
     {
         return $this->hasMany(Reward::class);
+    }
+
+    public function pointTransactions(): HasMany
+    {
+        return $this->hasMany(PointTransaction::class);
     }
 
     public function deviceTokens()

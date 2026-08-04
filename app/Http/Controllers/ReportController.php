@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\DeviceToken;
 use App\Models\Notification;
+use App\Models\PotentialMatch;
 use App\Models\Report;
 use App\Models\Reward;
+use App\Models\SurrenderRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -32,6 +33,16 @@ class ReportController extends Controller
 
         if ($request->filled('mine')) {
             $query->where('student_id', $user->id);
+        } else {
+            $query->where(function ($sub) {
+                $sub->where(function ($q) {
+                    $q->where('report_type', 'lost')
+                        ->where('status', 'approved');
+                })->orWhere(function ($q) {
+                    $q->where('report_type', 'found')
+                        ->where('status', 'verified');
+                });
+            });
         }
 
         if ($request->filled('search')) {
@@ -60,9 +71,21 @@ class ReportController extends Controller
         return response()->json(['status' => 'success', 'data' => $reports]);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $report = Report::with(['student', 'rewards'])->findOrFail($id);
+        $user = $request->user();
+
+        if ($report->student_id !== $user->id) {
+            if ($report->report_type === 'lost' && $report->status !== 'approved') {
+                return response()->json(['status' => 'error', 'message' => 'Report not found.'], 404);
+            }
+
+            if ($report->report_type === 'found' && $report->status !== 'verified') {
+                return response()->json(['status' => 'error', 'message' => 'Report not found.'], 404);
+            }
+        }
+
         return response()->json(['status' => 'success', 'data' => $report]);
     }
 
@@ -83,10 +106,33 @@ class ReportController extends Controller
             'metadata' => 'nullable|array',
         ]);
 
+        $status = $validated['report_type'] === 'lost' ? 'pending_approval' : 'pending_surrender';
+
         $report = Report::create(array_merge($validated, [
             'student_id' => $user->id,
-            'status' => 'open',
+            'status' => $status,
         ]));
+
+        if ($status === 'pending_surrender') {
+            SurrenderRequest::create([
+                'report_id' => $report->id,
+                'student_id' => $user->id,
+                'status' => 'pending',
+                'deadline_at' => now()->addDays(3),
+            ]);
+
+            Notification::create([
+                'student_id' => $user->id,
+                'title' => 'Surrender Request Created',
+                'message' => 'Please bring the found item to USC as soon as possible.',
+                'action' => 'surrender_requested',
+                'recipient_id' => $user->id,
+                'recipient_role' => 'student',
+                'subject_type' => Report::class,
+                'subject_id' => $report->id,
+                'is_read' => false,
+            ]);
+        }
 
         if (!empty($validated['reward_amount'])) {
             Reward::create([
@@ -103,13 +149,29 @@ class ReportController extends Controller
         return response()->json(['status' => 'success', 'message' => 'Report created successfully.', 'data' => $report], 201);
     }
 
-    public function matches($id)
+    public function matches(Request $request, $id)
     {
         $report = Report::findOrFail($id);
+        $user = $request->user();
+
+        if ($report->student_id !== $user->id) {
+            if ($report->report_type === 'lost' && $report->status !== 'approved') {
+                return response()->json(['status' => 'error', 'message' => 'Report not found.'], 404);
+            }
+
+            if ($report->report_type === 'found' && $report->status !== 'verified') {
+                return response()->json(['status' => 'error', 'message' => 'Report not found.'], 404);
+            }
+        }
+
         $oppositeType = $report->report_type === 'lost' ? 'found' : 'lost';
 
+        $validStatuses = $oppositeType === 'lost'
+            ? ['approved']
+            : ['verified'];
+
         $candidates = Report::where('report_type', $oppositeType)
-            ->where('status', 'open')
+            ->whereIn('status', $validStatuses)
             ->where('id', '<>', $report->id)
             ->get();
 
@@ -156,35 +218,80 @@ class ReportController extends Controller
             return response()->json(['status' => 'error', 'message' => 'You do not own this report.'], 403);
         }
 
-        if ($report->status !== 'open' || $matchedReport->status !== 'open') {
-            return response()->json(['status' => 'error', 'message' => 'One of the reports is not open for matching.'], 422);
+        $validCurrentStatuses = ['approved', 'verified'];
+        if (!in_array($report->status, $validCurrentStatuses, true) || !in_array($matchedReport->status, $validCurrentStatuses, true)) {
+            return response()->json(['status' => 'error', 'message' => 'One of the reports is not eligible for a potential match.'], 422);
         }
 
-        $report->status = 'matched';
-        $matchedReport->status = 'matched';
-        $report->save();
-        $matchedReport->save();
+        $existingMatch = PotentialMatch::where(function ($query) use ($report, $matchedReport) {
+            $query->where('source_report_id', $report->id)
+                ->where('matched_report_id', $matchedReport->id);
+        })->orWhere(function ($query) use ($report, $matchedReport) {
+            $query->where('source_report_id', $matchedReport->id)
+                ->where('matched_report_id', $report->id);
+        })->first();
 
-        $this->createMatchNotification($report, $matchedReport);
-        $this->createMatchNotification($matchedReport, $report);
+        $score = 0;
+        if ($report->category && $matchedReport->category && Str::lower($report->category) === Str::lower($matchedReport->category)) {
+            $score += 20;
+        }
+        if ($report->location && $matchedReport->location && (Str::contains(Str::lower($matchedReport->location), Str::lower($report->location)) || Str::contains(Str::lower($report->location), Str::lower($matchedReport->location)))) {
+            $score += 15;
+        }
+        $reportKeywords = $this->extractKeywords($report->title . ' ' . $report->description);
+        $candidateKeywords = $this->extractKeywords($matchedReport->title . ' ' . $matchedReport->description);
+        $keywordMatches = array_intersect($reportKeywords, $candidateKeywords);
+        $score += count($keywordMatches) * 5;
+        if ($report->reward_amount && $matchedReport->reward_amount) {
+            $score += 5;
+        }
 
-        $this->sendPushNotificationToUser($report->student_id, 'Match Found', "A potential match has been confirmed for your report '{$report->title}'.", [
-            'report_id' => $report->id,
-            'matched_report_id' => $matchedReport->id,
+        if (!$existingMatch) {
+            $existingMatch = PotentialMatch::create([
+                'source_report_id' => $report->id,
+                'matched_report_id' => $matchedReport->id,
+                'score' => min(100, $score),
+                'status' => 'pending',
+                'notes' => 'Potential match suggested by student.',
+            ]);
+        }
+
+        Notification::create([
+            'student_id' => $matchedReport->student_id,
+            'title' => 'Potential Match Submitted',
+            'message' => "A potential match has been created for your report '{$matchedReport->title}'.",
+            'action' => 'potential_match_submitted',
+            'recipient_id' => $matchedReport->student_id,
+            'recipient_role' => 'student',
+            'subject_type' => PotentialMatch::class,
+            'subject_id' => $existingMatch->id,
+            'is_read' => false,
+            'data' => [
+                'report_id' => $matchedReport->id,
+                'matched_report_id' => $report->id,
+            ],
         ]);
 
-        $this->sendPushNotificationToUser($matchedReport->student_id, 'Match Found', "A potential match has been confirmed for your report '{$matchedReport->title}'.", [
-            'report_id' => $matchedReport->id,
-            'matched_report_id' => $report->id,
+        Notification::create([
+            'student_id' => $report->student_id,
+            'title' => 'Potential Match Submitted',
+            'message' => "A potential match has been created for your report '{$report->title}'.",
+            'action' => 'potential_match_submitted',
+            'recipient_id' => $report->student_id,
+            'recipient_role' => 'student',
+            'subject_type' => PotentialMatch::class,
+            'subject_id' => $existingMatch->id,
+            'is_read' => false,
+            'data' => [
+                'report_id' => $report->id,
+                'matched_report_id' => $matchedReport->id,
+            ],
         ]);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Match confirmed successfully.',
-            'data' => [
-                'report' => $report,
-                'matched_report' => $matchedReport,
-            ]
+            'message' => 'Potential match submitted for review.',
+            'data' => $existingMatch,
         ]);
     }
 

@@ -113,8 +113,8 @@ async function loadStudents() {
     loading.value = true
     errorMessage.value = ''
     try {
-        const response = await api.get('/api/admin/list')
-        students.value = response.data?.data?.students || []
+        const response = await api.get('/api/admin/points')
+        students.value = response.data?.data || []
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Failed to load recognition points.'
         students.value = []
