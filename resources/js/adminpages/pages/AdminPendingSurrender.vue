@@ -3,31 +3,31 @@
         <header class="page-header">
             <div>
                 <p class="page-kicker">Pending surrender</p>
-                <h1>Track due items before they become overdue</h1>
-                <p class="page-copy">Focus on urgent deadlines clearly so admin review stays efficient and low-risk.</p>
+                <h1>Track found-item surrender intake</h1>
+                <p class="page-copy">Use the real surrender queue to receive, reject, or escalate items based on the backend status flags and deadline fields.</p>
             </div>
-            <button type="button" class="primary-button">Review queue</button>
+            <button type="button" class="primary-button" @click="loadSurrenders">Refresh queue</button>
         </header>
 
         <section class="metric-grid" aria-label="Surrender summary metrics">
             <article class="metric-card">
                 <span class="metric-label">Pending</span>
-                <strong class="metric-value">15</strong>
+                <strong class="metric-value">{{ metrics.pending }}</strong>
                 <small>Waiting for admin action</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Due soon</span>
-                <strong class="metric-value">7</strong>
+                <strong class="metric-value">{{ metrics.dueSoon }}</strong>
                 <small>Upcoming deadlines</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Overdue</span>
-                <strong class="metric-value">4</strong>
+                <strong class="metric-value">{{ metrics.overdue }}</strong>
                 <small>Escalate and review</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Received</span>
-                <strong class="metric-value">54</strong>
+                <strong class="metric-value">{{ metrics.received }}</strong>
                 <small>Completed handovers</small>
             </article>
         </section>
@@ -36,15 +36,8 @@
             <div class="toolbar-row">
                 <label class="search-field">
                     <span class="sr-only">Search surrender records</span>
-                    <input v-model.trim="query" type="search" placeholder="Search item, student, or deadline"
-                        aria-label="Search surrender records" />
+                    <input v-model.trim="query" type="search" placeholder="Search item, student, or deadline" aria-label="Search surrender records" />
                 </label>
-                <div class="chip-row" aria-label="Deadline filters">
-                    <button type="button" class="chip-button active">All</button>
-                    <button type="button" class="chip-button">Due soon</button>
-                    <button type="button" class="chip-button">Overdue</button>
-                    <button type="button" class="chip-button">Received</button>
-                </div>
             </div>
 
             <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
@@ -52,8 +45,7 @@
             <div v-else class="table-shell">
                 <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No surrender records to display</h2>
-                    <p>As pending surrenders arrive, the queue will highlight urgency, due dates, and received status
-                        clearly.</p>
+                    <p>As pending surrenders arrive, the queue will show the report title, linked student, status, and deadline.</p>
                 </div>
 
                 <table v-else class="admin-table">
@@ -62,23 +54,22 @@
                             <th>Report</th>
                             <th>Student</th>
                             <th>Status</th>
-                            <th>Due date</th>
+                            <th>Deadline</th>
+                            <th>Received</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="item in visibleRows" :key="item.id">
                             <td>{{ item.report?.title || item.report_id }}</td>
-                            <td>{{ item.student?.name || 'Unknown' }}</td>
-                            <td>{{ item.status || 'Pending' }}</td>
-                            <td>{{ item.due_date ? formatDate(item.due_date) : 'TBD' }}</td>
+                            <td>{{ item.student?.name || item.report?.student?.name || 'Unknown' }}</td>
+                            <td><span class="status-chip">{{ item.status || 'pending' }}</span></td>
+                            <td>{{ item.deadline_at ? formatDate(item.deadline_at) : 'TBD' }}</td>
+                            <td>{{ item.received_at ? formatDate(item.received_at) : 'Not yet' }}</td>
                             <td class="action-cell">
-                                <button type="button" class="secondary-button" @click="receiveRequest(item.id)"
-                                    :disabled="item.status && item.status !== 'pending'">Receive</button>
-                                <button type="button" class="secondary-button" @click="rejectRequest(item.id)"
-                                    :disabled="item.status && item.status !== 'pending'">Reject</button>
-                                <button type="button" class="secondary-button" @click="markOverdue(item.id)"
-                                    :disabled="item.status && item.status !== 'pending'">Overdue</button>
+                                <button type="button" class="secondary-button" @click="receiveRequest(item.id)" :disabled="String(item.status || '').toLowerCase() !== 'pending'">Receive</button>
+                                <button type="button" class="secondary-button" @click="rejectRequest(item.id)" :disabled="String(item.status || '').toLowerCase() !== 'pending'">Reject</button>
+                                <button type="button" class="secondary-button" @click="markOverdue(item.id)" :disabled="String(item.status || '').toLowerCase() !== 'pending'">Overdue</button>
                             </td>
                         </tr>
                     </tbody>
@@ -98,23 +89,25 @@ const loading = ref(false)
 const errorMessage = ref('')
 
 const metrics = computed(() => {
-    const total = surrenders.value.length
+    const now = Date.now()
+    const pending = surrenders.value.filter((item) => String(item.status || '').toLowerCase() === 'pending').length
     const dueSoon = surrenders.value.filter((item) => {
-        const dueDate = item.due_date ? new Date(item.due_date) : null
-        return dueDate && dueDate.getTime() <= Date.now() + 5 * 24 * 60 * 60 * 1000
+        const deadline = item.deadline_at ? new Date(item.deadline_at).getTime() : null
+        return deadline && deadline <= now + 5 * 24 * 60 * 60 * 1000 && deadline >= now
     }).length
     const overdue = surrenders.value.filter((item) => {
-        const dueDate = item.due_date ? new Date(item.due_date) : null
-        return dueDate && dueDate.getTime() < Date.now()
+        const deadline = item.deadline_at ? new Date(item.deadline_at).getTime() : null
+        return deadline && deadline < now
     }).length
-    const received = surrenders.value.filter((item) => item.received_by_admin_id).length
-    return { total, dueSoon, overdue, received }
+    const received = surrenders.value.filter((item) => item.received_by_admin_id || String(item.status || '').toLowerCase() === 'received').length
+
+    return { pending, dueSoon, overdue, received }
 })
 
 const visibleRows = computed(() => {
     const search = query.value.toLowerCase()
     return surrenders.value.filter((item) => {
-        const text = [item.report?.title, item.student?.name, item.status, item.due_date]
+        const text = [item.report?.title, item.report?.student?.name, item.student?.name, item.status, item.deadline_at]
             .filter(Boolean)
             .join(' ')
             .toLowerCase()
@@ -130,6 +123,7 @@ function formatDate(value) {
 async function loadSurrenders() {
     loading.value = true
     errorMessage.value = ''
+
     try {
         const response = await api.get('/api/admin/surrenders')
         surrenders.value = response.data?.data || []

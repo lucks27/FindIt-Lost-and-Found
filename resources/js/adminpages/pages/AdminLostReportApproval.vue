@@ -3,32 +3,32 @@
         <header class="page-header">
             <div>
                 <p class="page-kicker">Report approval</p>
-                <h1>Approve or reject incoming lost and found reports</h1>
-                <p class="page-copy">Review draft report details, send correction requests, and keep the intake queue moving.</p>
+                <h1>Approve or reject intake reports</h1>
+                <p class="page-copy">The approval queue now follows the actual workflow statuses that the backend exposes for reported found items.</p>
             </div>
             <button type="button" class="primary-button" @click="loadReports">Refresh</button>
         </header>
 
         <section class="metric-grid" aria-label="Report approval metrics">
             <article class="metric-card">
-                <span class="metric-label">Total</span>
-                <strong class="metric-value">{{ metrics.total }}</strong>
-                <small>Reports in queue</small>
+                <span class="metric-label">Pending surrender</span>
+                <strong class="metric-value">{{ metrics.pendingSurrender }}</strong>
+                <small>Not yet received</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Open</span>
-                <strong class="metric-value">{{ metrics.open }}</strong>
-                <small>Waiting for review</small>
+                <span class="metric-label">Pending verification</span>
+                <strong class="metric-value">{{ metrics.pendingVerification }}</strong>
+                <small>Awaiting admin review</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Approved</span>
-                <strong class="metric-value">{{ metrics.approved }}</strong>
-                <small>Ready for processing</small>
+                <span class="metric-label">Verified</span>
+                <strong class="metric-value">{{ metrics.verified }}</strong>
+                <small>Ready for next step</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Rejected</span>
-                <strong class="metric-value">{{ metrics.rejected }}</strong>
-                <small>Closed reports</small>
+                <span class="metric-label">Ready for release</span>
+                <strong class="metric-value">{{ metrics.readyForRelease }}</strong>
+                <small>Controlled handover</small>
             </article>
         </section>
 
@@ -36,19 +36,8 @@
             <div class="toolbar-row">
                 <label class="search-field">
                     <span class="sr-only">Search reports</span>
-                    <input v-model.trim="query" type="search" placeholder="Search title, student, or status"
-                        aria-label="Search reports" />
+                    <input v-model.trim="query" type="search" placeholder="Search title, student, or status" aria-label="Search reports" />
                 </label>
-                <div class="chip-row" aria-label="Report filters">
-                    <button type="button" class="chip-button" :class="{ active: activeFilter === 'all' }"
-                        @click="activeFilter = 'all'">All</button>
-                    <button type="button" class="chip-button" :class="{ active: activeFilter === 'open' }"
-                        @click="activeFilter = 'open'">Open</button>
-                    <button type="button" class="chip-button" :class="{ active: activeFilter === 'approved' }"
-                        @click="activeFilter = 'approved'">Approved</button>
-                    <button type="button" class="chip-button" :class="{ active: activeFilter === 'rejected' }"
-                        @click="activeFilter = 'rejected'">Rejected</button>
-                </div>
             </div>
 
             <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
@@ -57,7 +46,7 @@
             <div v-else class="table-shell">
                 <div v-if="!filteredReports.length" class="empty-state-card" role="status">
                     <h2>No reports match this filter</h2>
-                    <p>Use search or refresh to see the latest lost and found intake records.</p>
+                    <p>Use search or refresh to see the latest reports that are present in the workflow queue.</p>
                 </div>
 
                 <table v-else class="admin-table">
@@ -67,6 +56,7 @@
                             <th>Type</th>
                             <th>Status</th>
                             <th>Student</th>
+                            <th>Location</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -74,15 +64,13 @@
                         <tr v-for="report in filteredReports" :key="report.id">
                             <td>{{ report.title }}</td>
                             <td>{{ report.report_type }}</td>
-                            <td>{{ report.status }}</td>
+                            <td><span class="status-chip">{{ report.status }}</span></td>
                             <td>{{ report.student?.name || 'Unknown' }}</td>
+                            <td>{{ report.location || '—' }}</td>
                             <td class="action-cell">
-                                <button type="button" class="secondary-button" @click="approveReport(report.id)"
-                                    :disabled="report.status === 'approved' || report.status === 'rejected'">Approve</button>
-                                <button type="button" class="secondary-button" @click="rejectReport(report.id)"
-                                    :disabled="report.status === 'approved' || report.status === 'rejected'">Reject</button>
-                                <button type="button" class="secondary-button" @click="requestCorrection(report.id)">
-                                    Request correction</button>
+                                <button type="button" class="secondary-button" @click="approveReport(report.id)" :disabled="['approved', 'rejected'].includes(String(report.status || '').toLowerCase())">Approve</button>
+                                <button type="button" class="secondary-button" @click="rejectReport(report.id)" :disabled="['approved', 'rejected'].includes(String(report.status || '').toLowerCase())">Reject</button>
+                                <button type="button" class="secondary-button" @click="requestCorrection(report.id)">Request correction</button>
                             </td>
                         </tr>
                     </tbody>
@@ -97,37 +85,34 @@ import { computed, onMounted, ref } from 'vue'
 import api from '@/bootstrap'
 
 const query = ref('')
-const activeFilter = ref('all')
 const reports = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
 
 const metrics = computed(() => {
-    const total = reports.value.length
-    return {
-        total,
-        open: reports.value.filter((item) => String(item.status || '').toLowerCase() === 'open').length,
-        approved: reports.value.filter((item) => String(item.status || '').toLowerCase() === 'approved').length,
-        rejected: reports.value.filter((item) => String(item.status || '').toLowerCase() === 'rejected').length,
-    }
+    const pendingSurrender = reports.value.filter((item) => String(item.status || '').toLowerCase() === 'pending_surrender').length
+    const pendingVerification = reports.value.filter((item) => String(item.status || '').toLowerCase() === 'pending_verification').length
+    const verified = reports.value.filter((item) => String(item.status || '').toLowerCase() === 'verified').length
+    const readyForRelease = reports.value.filter((item) => String(item.status || '').toLowerCase() === 'ready_for_release').length
+
+    return { pendingSurrender, pendingVerification, verified, readyForRelease }
 })
 
 const filteredReports = computed(() => {
     const search = query.value.toLowerCase()
     return reports.value.filter((item) => {
-        const matchesFilter = activeFilter.value === 'all' || String(item.status || '').toLowerCase() === activeFilter.value
         const text = [item.title, item.report_type, item.status, item.location, item.student?.name]
             .filter(Boolean)
             .join(' ')
             .toLowerCase()
-        const matchesSearch = !search || text.includes(search)
-        return matchesFilter && matchesSearch
+        return !search || text.includes(search)
     })
 })
 
 async function loadReports() {
     loading.value = true
     errorMessage.value = ''
+
     try {
         const response = await api.get('/api/admin/items')
         reports.value = response.data?.data || []
@@ -159,7 +144,7 @@ async function rejectReport(id) {
 
 async function requestCorrection(id) {
     try {
-        await api.post(`/api/admin/reports/${id}/request-correction`, { message: 'Please correct missing details before approval.' })
+        await api.post(`/api/admin/reports/${id}/request-correction`, { notes: 'Please provide the missing details before approval.' })
         await loadReports()
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Unable to request correction.'

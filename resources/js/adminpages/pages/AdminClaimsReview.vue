@@ -85,7 +85,8 @@
                                     :disabled="String(item.review_status || '').toLowerCase() === 'approved'">Approve</button>
                                 <button type="button" class="secondary-button" @click="rejectClaim(item.id)"
                                     :disabled="String(item.review_status || '').toLowerCase() === 'rejected'">Reject</button>
-                                <button type="button" class="secondary-button" @click="requestInfo(item.id)">Request info</button>
+                                <button type="button" class="secondary-button" @click="requestInfo(item.id)">Request
+                                    info</button>
                             </td>
                         </tr>
                     </tbody>

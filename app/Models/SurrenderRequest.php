@@ -15,12 +15,14 @@ class SurrenderRequest extends Model
         'student_id',
         'status',
         'deadline_at',
+        'received_at',
         'received_by_admin_id',
         'notes',
     ];
 
     protected $casts = [
         'deadline_at' => 'datetime',
+        'received_at' => 'datetime',
     ];
 
     public function report(): BelongsTo

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Report extends Model
 {
@@ -40,6 +41,21 @@ class Report extends Model
     public function rewards(): HasMany
     {
         return $this->hasMany(Reward::class);
+    }
+
+    public function surrenderRequest(): HasOne
+    {
+        return $this->hasOne(SurrenderRequest::class);
+    }
+
+    public function itemVerification(): HasOne
+    {
+        return $this->hasOne(ItemVerification::class);
+    }
+
+    public function claimReview(): HasOne
+    {
+        return $this->hasOne(ClaimReview::class);
     }
 
     public function scopeLost($query)

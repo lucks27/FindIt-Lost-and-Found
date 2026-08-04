@@ -3,44 +3,41 @@
         <header class="page-header">
             <div>
                 <p class="page-kicker">Lost & Found items</p>
-                <h1>Review item visibility and recovery queues</h1>
-                <p class="page-copy">Scan category, location, visibility, and status at a glance to keep the item
-                    workflow moving.</p>
+                <h1>Review the found-item workflow inventory</h1>
+                <p class="page-copy">This screen now reads the real found-report inventory endpoint and surfaces the workflow backbone that the backend already exposes.</p>
             </div>
             <button type="button" class="primary-button" @click="loadItems">Refresh</button>
         </header>
 
         <section class="metric-grid" aria-label="Lost and found summary metrics">
             <article class="metric-card">
-                <span class="metric-label">Lost</span>
-                <strong class="metric-value">{{ metrics.lost }}</strong>
-                <small>Lost reports</small>
+                <span class="metric-label">Pending verification</span>
+                <strong class="metric-value">{{ metrics.pendingVerification }}</strong>
+                <small>Waiting intake review</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Found</span>
-                <strong class="metric-value">{{ metrics.found }}</strong>
-                <small>Found reports</small>
+                <span class="metric-label">Verified</span>
+                <strong class="metric-value">{{ metrics.verified }}</strong>
+                <small>Cleared for next step</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Open</span>
-                <strong class="metric-value">{{ metrics.open }}</strong>
-                <small>Active cases</small>
+                <span class="metric-label">Under claim review</span>
+                <strong class="metric-value">{{ metrics.underClaimReview }}</strong>
+                <small>Needs claimant proof</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Closed</span>
-                <strong class="metric-value">{{ metrics.closed }}</strong>
-                <small>Resolved cases</small>
+                <span class="metric-label">Ready for release</span>
+                <strong class="metric-value">{{ metrics.readyForRelease }}</strong>
+                <small>Awaiting handover</small>
             </article>
         </section>
 
         <section class="panel-card">
             <div class="toolbar-row">
                 <label class="search-field">
-                    <span class="sr-only">Search lost and found items</span>
-                    <input v-model.trim="query" type="search" placeholder="Search item ID, category, or location"
-                        aria-label="Search lost and found items" />
+                    <span class="sr-only">Search item workflow</span>
+                    <input v-model.trim="query" type="search" placeholder="Search title, category, or location" aria-label="Search item workflow" />
                 </label>
-                <button type="button" class="primary-button" @click="loadItems">Refresh</button>
             </div>
 
             <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
@@ -49,27 +46,26 @@
             <div v-else class="table-shell">
                 <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No item records to display</h2>
-                    <p>Once items are reported or published, this screen will show category, location, visibility, and
-                        stage filters.</p>
+                    <p>Once reports move through the receive → verification → claim → release workflow, the inventory table will surface them here.</p>
                 </div>
 
                 <table v-else class="admin-table">
                     <thead>
                         <tr>
                             <th>Title</th>
-                            <th>Type</th>
                             <th>Status</th>
                             <th>Student</th>
                             <th>Location</th>
+                            <th>Category</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="item in visibleRows" :key="item.id">
                             <td>{{ item.title || item.id }}</td>
-                            <td>{{ item.report_type || '—' }}</td>
-                            <td>{{ item.status || 'unknown' }}</td>
+                            <td><span class="status-chip">{{ item.status || 'unknown' }}</span></td>
                             <td>{{ item.student?.name || 'Unknown' }}</td>
                             <td>{{ item.location || '—' }}</td>
+                            <td>{{ item.category || '—' }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -88,17 +84,18 @@ const loading = ref(false)
 const errorMessage = ref('')
 
 const metrics = computed(() => {
-    const lost = items.value.filter((item) => String(item.report_type || '').toLowerCase() === 'lost').length
-    const found = items.value.filter((item) => String(item.report_type || '').toLowerCase() === 'found').length
-    const open = items.value.filter((item) => !['closed', 'resolved', 'returned'].includes(String(item.status || '').toLowerCase())).length
-    const closed = items.value.length - open
-    return { lost, found, open, closed }
+    const pendingVerification = items.value.filter((item) => String(item.status || '').toLowerCase() === 'pending_verification').length
+    const verified = items.value.filter((item) => String(item.status || '').toLowerCase() === 'verified').length
+    const underClaimReview = items.value.filter((item) => String(item.status || '').toLowerCase() === 'under_claim_review').length
+    const readyForRelease = items.value.filter((item) => String(item.status || '').toLowerCase() === 'ready_for_release').length
+
+    return { pendingVerification, verified, underClaimReview, readyForRelease }
 })
 
 const visibleRows = computed(() => {
     const search = query.value.toLowerCase()
     return items.value.filter((item) => {
-        const text = [item.title, item.report_type, item.status, item.location, item.student?.name]
+        const text = [item.title, item.status, item.location, item.category, item.student?.name]
             .filter(Boolean)
             .join(' ')
             .toLowerCase()

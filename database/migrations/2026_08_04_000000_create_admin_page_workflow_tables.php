@@ -99,6 +99,7 @@ return new class extends Migration {
                 $table->foreignId('student_id')->constrained('students')->cascadeOnDelete();
                 $table->string('status')->default('pending');
                 $table->dateTime('deadline_at')->nullable();
+                $table->dateTime('received_at')->nullable();
                 $table->foreignId('received_by_admin_id')->nullable()->constrained('admin')->nullOnDelete();
                 $table->text('notes')->nullable();
                 $table->timestamps();

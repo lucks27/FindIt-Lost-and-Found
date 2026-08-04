@@ -3,33 +3,32 @@
         <header class="page-header">
             <div>
                 <p class="page-kicker">Item verification</p>
-                <h1>Compare submitted and received item details</h1>
-                <p class="page-copy">Use a concise comparison workflow to approve, reject, or request corrections with
-                    minimal friction.</p>
+                <h1>Approve or request more details on found items</h1>
+                <p class="page-copy">The queue now reads the real item verification records from the backend, including the verifier, notes, and final workflow status.</p>
             </div>
-            <button type="button" class="primary-button">Open queue</button>
+            <button type="button" class="primary-button" @click="loadVerifications">Refresh queue</button>
         </header>
 
         <section class="metric-grid" aria-label="Verification summary metrics">
             <article class="metric-card">
                 <span class="metric-label">Pending</span>
-                <strong class="metric-value">12</strong>
-                <small>Needs comparison review</small>
+                <strong class="metric-value">{{ metrics.pending }}</strong>
+                <small>Needs review</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Approved</span>
-                <strong class="metric-value">39</strong>
+                <span class="metric-label">Verified</span>
+                <strong class="metric-value">{{ metrics.verified }}</strong>
                 <small>Clear for inventory</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Rejected</span>
-                <strong class="metric-value">6</strong>
+                <strong class="metric-value">{{ metrics.rejected }}</strong>
                 <small>Requires closure</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Corrections</span>
-                <strong class="metric-value">4</strong>
-                <small>Sent back for update</small>
+                <span class="metric-label">More info</span>
+                <strong class="metric-value">{{ metrics.moreInfo }}</strong>
+                <small>Awaiting student follow-up</small>
             </article>
         </section>
 
@@ -37,15 +36,8 @@
             <div class="toolbar-row">
                 <label class="search-field">
                     <span class="sr-only">Search verification items</span>
-                    <input v-model.trim="query" type="search" placeholder="Search report ID, item, or status"
-                        aria-label="Search verification items" />
+                    <input v-model.trim="query" type="search" placeholder="Search report, verifier, or status" aria-label="Search verification items" />
                 </label>
-                <div class="chip-row" aria-label="Verification status filters">
-                    <button type="button" class="chip-button active">All</button>
-                    <button type="button" class="chip-button">Pending</button>
-                    <button type="button" class="chip-button">Approved</button>
-                    <button type="button" class="chip-button">Rejected</button>
-                </div>
             </div>
 
             <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
@@ -63,6 +55,7 @@
                             <th>Verifier</th>
                             <th>Status</th>
                             <th>Student</th>
+                            <th>Notes</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -70,15 +63,13 @@
                         <tr v-for="item in visibleRows" :key="item.id">
                             <td>{{ item.report?.title || item.report_id }}</td>
                             <td>{{ item.verifier_admin?.name || 'Pending' }}</td>
-                            <td>{{ item.status || item.verification_status || 'Pending' }}</td>
+                            <td><span class="status-chip">{{ item.status || 'pending' }}</span></td>
                             <td>{{ item.report?.student?.name || 'Unknown' }}</td>
+                            <td>{{ item.notes || '—' }}</td>
                             <td class="action-cell">
-                                <button type="button" class="secondary-button" @click="verifyItem(item.id)"
-                                    :disabled="String(item.status || item.verification_status || 'pending').toLowerCase() !== 'pending'">Approve</button>
-                                <button type="button" class="secondary-button" @click="rejectItem(item.id)"
-                                    :disabled="String(item.status || item.verification_status || 'pending').toLowerCase() !== 'pending'">Reject</button>
-                                <button type="button" class="secondary-button" @click="requestDetails(item.id)">
-                                    Request details</button>
+                                <button type="button" class="secondary-button" @click="verifyItem(item.id)" :disabled="String(item.status || '').toLowerCase() !== 'pending'">Approve</button>
+                                <button type="button" class="secondary-button" @click="rejectItem(item.id)" :disabled="String(item.status || '').toLowerCase() !== 'pending'">Reject</button>
+                                <button type="button" class="secondary-button" @click="requestDetails(item.id)" :disabled="String(item.status || '').toLowerCase() !== 'pending'">Request details</button>
                             </td>
                         </tr>
                     </tbody>
@@ -98,18 +89,18 @@ const loading = ref(false)
 const errorMessage = ref('')
 
 const metrics = computed(() => {
-    const total = verifications.value.length
-    const pending = verifications.value.filter((item) => String(item.status || item.verification_status || '').toLowerCase() === 'pending').length
-    const approved = verifications.value.filter((item) => String(item.status || item.verification_status || '').toLowerCase() === 'approved').length
-    const rejected = verifications.value.filter((item) => String(item.status || item.verification_status || '').toLowerCase() === 'rejected').length
-    const reviewNeeded = verifications.value.filter((item) => item.review_notes).length
-    return { total, pending, approved, rejected, reviewNeeded }
+    const pending = verifications.value.filter((item) => String(item.status || '').toLowerCase() === 'pending').length
+    const verified = verifications.value.filter((item) => String(item.status || '').toLowerCase() === 'verified').length
+    const rejected = verifications.value.filter((item) => String(item.status || '').toLowerCase() === 'rejected').length
+    const moreInfo = verifications.value.filter((item) => String(item.status || '').toLowerCase() === 'needs_more_information').length
+
+    return { pending, verified, rejected, moreInfo }
 })
 
 const visibleRows = computed(() => {
     const search = query.value.toLowerCase()
     return verifications.value.filter((item) => {
-        const text = [item.report?.title, item.verifier_admin?.name, item.status, item.verification_status, item.review_notes]
+        const text = [item.report?.title, item.verifier_admin?.name, item.status, item.notes, item.report?.student?.name]
             .filter(Boolean)
             .join(' ')
             .toLowerCase()
@@ -120,6 +111,7 @@ const visibleRows = computed(() => {
 async function loadVerifications() {
     loading.value = true
     errorMessage.value = ''
+
     try {
         const response = await api.get('/api/admin/verifications')
         verifications.value = response.data?.data || []
@@ -144,7 +136,7 @@ async function verifyItem(id) {
 async function rejectItem(id) {
     errorMessage.value = ''
     try {
-        await api.post(`/api/admin/verifications/${id}/reject`)
+        await api.post(`/api/admin/verifications/${id}/reject`, { notes: 'Verification rejected by admin.' })
         await loadVerifications()
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Unable to reject verification.'

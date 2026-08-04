@@ -4,7 +4,8 @@
             <div>
                 <p class="page-kicker">Point rules</p>
                 <h1>Manage recognition point rules for item categories</h1>
-                <p class="page-copy">Define how many points students earn for reporting different item types and keep rules updated.</p>
+                <p class="page-copy">Define how many points students earn for reporting different item types and keep
+                    rules updated.</p>
             </div>
             <button type="button" class="primary-button" @click="loadRules">Refresh</button>
         </header>
@@ -26,7 +27,9 @@
                 </label>
             </div>
             <div class="form-actions">
-                <button type="button" class="primary-button" @click="saveRule">{{ editRule ? 'Update rule' : 'Create rule' }}</button>
+                <button type="button" class="primary-button" @click="saveRule">
+                    {{ editRule ? 'Update rule' : 'Create rule' }}
+                </button>
                 <button v-if="editRule" type="button" class="secondary-button" @click="resetForm">Cancel</button>
             </div>
             <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
@@ -69,7 +72,8 @@
                             <td>{{ rule.updated_by_admin?.name || 'System' }}</td>
                             <td class="action-cell">
                                 <button type="button" class="secondary-button" @click="editExisting(rule)">Edit</button>
-                                <button type="button" class="secondary-button" @click="removeRule(rule.id)">Delete</button>
+                                <button type="button" class="secondary-button"
+                                    @click="removeRule(rule.id)">Delete</button>
                             </td>
                         </tr>
                     </tbody>
