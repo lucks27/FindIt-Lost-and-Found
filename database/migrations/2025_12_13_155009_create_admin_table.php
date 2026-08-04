@@ -19,10 +19,6 @@ return new class extends Migration {
             $table->boolean('status')->default(0);
             $table->string('profile_picture')->nullable();
             $table->string('role')->default('admin');
-            $table->foreignId('facility_id')
-                ->nullable()
-                ->constrained('facilities')
-                ->nullOnDelete();
             $table->timestamps();
         });
     }

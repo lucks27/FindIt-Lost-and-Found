@@ -7,7 +7,9 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        if (Schema::hasTable('admin')) {
+        $driver = Schema::getConnection()->getDriverName();
+
+        if (Schema::hasTable('admin') && $driver !== 'sqlite') {
             Schema::table('admin', function (Blueprint $table) {
                 if (Schema::hasColumn('admin', 'facility_id')) {
                     $table->dropColumn('facility_id');
@@ -15,7 +17,7 @@ return new class extends Migration {
             });
         }
 
-        if (Schema::hasTable('notifications')) {
+        if (Schema::hasTable('notifications') && $driver !== 'sqlite') {
             Schema::table('notifications', function (Blueprint $table) {
                 if (Schema::hasColumn('notifications', 'facility_id')) {
                     $table->dropForeign(['facility_id']);
@@ -24,7 +26,9 @@ return new class extends Migration {
             });
         }
 
-        Schema::dropIfExists('facilities');
+        if ($driver !== 'sqlite') {
+            Schema::dropIfExists('facilities');
+        }
     }
 
     public function down(): void

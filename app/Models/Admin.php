@@ -2,11 +2,9 @@
 
 namespace App\Models;
 
-use App\Models\Facility;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -40,7 +38,6 @@ class Admin extends Authenticatable
         'status',
         'role',
         'profile_picture',
-        'facility_id', // Links admin to a specific facility
     ];
 
     /**
@@ -65,43 +62,9 @@ class Admin extends Authenticatable
 
     protected static function booted()
     {
-        static::created(function (Admin $admin) {
-            if ($admin->role === 'admin' && $admin->facility_id) {
-                Facility::where('id', $admin->facility_id)
-                    ->update([
-                        'assigned_admin' => $admin->name,
-                        'administrator_name' => $admin->name,
-                    ]);
-            }
-        });
-
-        static::updated(function (Admin $admin) {
-            $newName = $admin->name;
-            $oldName = $admin->getOriginal('name');
-            $oldFacilityId = $admin->getOriginal('facility_id');
-            $newFacilityId = $admin->facility_id;
-
-            if ($admin->role === 'admin') {
-                if ($oldFacilityId && $oldFacilityId !== $newFacilityId) {
-                    Facility::where('id', $oldFacilityId)->update([
-                        'assigned_admin' => null,
-                        'administrator_name' => null,
-                    ]);
-                }
-
-                if ($newFacilityId) {
-                    Facility::where('id', $newFacilityId)->update([
-                        'assigned_admin' => $newName,
-                        'administrator_name' => $newName,
-                    ]);
-                }
-
-                if ($admin->wasChanged('name') && $newFacilityId) {
-                    Facility::where('id', $newFacilityId)->update([
-                        'assigned_admin' => $newName,
-                        'administrator_name' => $newName,
-                    ]);
-                }
+        static::creating(function (Admin $admin) {
+            if (Admin::query()->exists()) {
+                throw new \RuntimeException('Only one admin account can exist.');
             }
         });
     }
@@ -116,14 +79,6 @@ class Admin extends Authenticatable
     public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class, 'recipient_admin_id');
-    }
-
-    /**
-     * Get the facility associated with the admin.
-     */
-    public function facility(): BelongsTo
-    {
-        return $this->belongsTo(Facility::class, 'facility_id');
     }
 
     /**

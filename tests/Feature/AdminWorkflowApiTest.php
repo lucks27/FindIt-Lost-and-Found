@@ -11,6 +11,27 @@ class AdminWorkflowApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_only_one_super_admin_account_can_exist(): void
+    {
+        Admin::create([
+            'name' => 'Super Admin',
+            'email' => 'super@example.com',
+            'password' => bcrypt('secret123'),
+            'status' => true,
+            'role' => 'super_admin',
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+
+        Admin::create([
+            'name' => 'Second Super Admin',
+            'email' => 'second-super@example.com',
+            'password' => bcrypt('secret123'),
+            'status' => true,
+            'role' => 'super_admin',
+        ]);
+    }
+
     public function test_super_admin_can_fetch_audit_logs(): void
     {
         $admin = Admin::create([

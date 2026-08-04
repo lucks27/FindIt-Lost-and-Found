@@ -33,7 +33,7 @@ class AdminWorkflowController extends Controller
         $students = Student::query()
             ->latest()
             ->get()
-            ->map(function ($student) {
+            ->map(function (Student $student) {
                 return array_merge($student->toArray(), [
                     'recognition_points' => $student->rewards()->sum('amount') ?? 0,
                 ]);
