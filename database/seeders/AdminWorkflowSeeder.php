@@ -30,29 +30,25 @@ class AdminWorkflowSeeder extends Seeder
 
         $reportLost = Report::create([
             'student_id' => $studentA->id,
-            'report_type' => 'lost',
-            'category' => 'wallet',
+            'type' => 'lost',
             'title' => 'Lost navy wallet',
             'description' => 'Black wallet lost near the library entrance.',
             'location' => 'Library entrance',
+            'date_occurred' => now()->subDay(),
             'event_date' => now()->subDay(),
             'status' => 'open',
-            'reward_amount' => 150,
-            'reward_type' => 'reward',
             'metadata' => ['priority' => 'high'],
         ]);
 
         $reportFound = Report::create([
             'student_id' => $studentB->id,
-            'report_type' => 'found',
-            'category' => 'wallet',
+            'type' => 'found',
             'title' => 'Found navy wallet',
             'description' => 'Found a navy wallet with student ID and cash.',
             'location' => 'Library entrance',
+            'date_occurred' => now()->subHours(2),
             'event_date' => now()->subHours(2),
             'status' => 'open',
-            'reward_amount' => 150,
-            'reward_type' => 'reward',
             'metadata' => ['priority' => 'medium'],
         ]);
 

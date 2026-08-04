@@ -1013,7 +1013,7 @@ class AdminWorkflowController extends Controller
                     ->get();
 
                 foreach ($matchingLostReports as $match) {
-                    if ($match->sourceReport && $match->sourceReport->report_type === 'lost') {
+                    if ($match->sourceReport && $match->sourceReport->type === 'lost') {
                         $match->sourceReport->update(['status' => 'under_claim_review']);
                     }
                 }
@@ -1246,7 +1246,7 @@ class AdminWorkflowController extends Controller
                     ->get();
 
                 foreach ($matchingLostReports as $match) {
-                    if ($match->sourceReport && $match->sourceReport->report_type === 'lost') {
+                    if ($match->sourceReport && $match->sourceReport->type === 'lost') {
                         $match->sourceReport->update(['status' => 'completed_return']);
                     }
                 }

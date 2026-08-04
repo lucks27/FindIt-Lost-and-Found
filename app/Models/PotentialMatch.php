@@ -11,20 +11,24 @@ class PotentialMatch extends Model
     use HasFactory;
 
     protected $fillable = [
-        'source_report_id',
-        'matched_report_id',
+        'lost_report_id',
+        'found_report_id',
         'score',
         'status',
-        'notes',
+        'review_notes',
+        'source',
+        'reviewed_by_admin_id',
+        'reviewed_at',
+        'created_by_student_id',
     ];
 
-    public function sourceReport(): BelongsTo
+    public function lostReport(): BelongsTo
     {
-        return $this->belongsTo(Report::class, 'source_report_id');
+        return $this->belongsTo(Report::class, 'lost_report_id');
     }
 
-    public function matchedReport(): BelongsTo
+    public function foundReport(): BelongsTo
     {
-        return $this->belongsTo(Report::class, 'matched_report_id');
+        return $this->belongsTo(Report::class, 'found_report_id');
     }
 }

@@ -33,8 +33,8 @@ class ReportWorkflowApiTest extends TestCase
                 'type' => 'lost',
                 'title' => 'Lost Notebook',
                 'description' => 'Blue notebook with stickers',
-                'category' => 'Stationery',
                 'location' => 'Library',
+                'date_occurred' => now()->subDay()->toDateString(),
             ]);
 
         $lostResponse->assertCreated()
@@ -45,8 +45,8 @@ class ReportWorkflowApiTest extends TestCase
                 'type' => 'found',
                 'title' => 'Found Calculator',
                 'description' => 'Black scientific calculator',
-                'category' => 'Electronics',
                 'location' => 'Auditorium',
+                'date_occurred' => now()->subHours(4)->toDateString(),
             ]);
 
         $foundResponse->assertCreated()
@@ -99,21 +99,21 @@ class ReportWorkflowApiTest extends TestCase
 
         $lostReport = Report::create([
             'student_id' => $owner->id,
-            'report_type' => 'lost',
+            'type' => 'lost',
             'title' => 'Lost Card',
             'description' => 'Yellow ID card',
-            'category' => 'Personal Items',
             'location' => 'Cafeteria',
+            'date_occurred' => now()->subDays(2)->toDateString(),
             'status' => 'approved',
         ]);
 
         $foundReport = Report::create([
             'student_id' => $finder->id,
-            'report_type' => 'found',
+            'type' => 'found',
             'title' => 'Found Card',
             'description' => 'Yellow ID card found near cafeteria',
-            'category' => 'Personal Items',
             'location' => 'Cafeteria',
+            'date_occurred' => now()->subDay()->toDateString(),
             'status' => 'verified',
         ]);
 
@@ -125,8 +125,8 @@ class ReportWorkflowApiTest extends TestCase
             ->assertJsonPath('data.status', 'pending');
 
         $this->assertDatabaseHas('potential_matches', [
-            'source_report_id' => $lostReport->id,
-            'matched_report_id' => $foundReport->id,
+            'lost_report_id' => $lostReport->id,
+            'found_report_id' => $foundReport->id,
             'status' => 'pending',
         ]);
 

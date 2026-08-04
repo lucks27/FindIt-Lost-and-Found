@@ -28,7 +28,7 @@ class ReportController extends Controller
         }
 
         if ($request->filled('category')) {
-            $query->where('category', $request->input('category'));
+            $query->where('category_id', $request->input('category'));
         }
 
         if ($request->filled('mine')) {
@@ -77,11 +77,11 @@ class ReportController extends Controller
         $user = $request->user();
 
         if ($report->student_id !== $user->id) {
-            if ($report->report_type === 'lost' && $report->status !== 'approved') {
+            if ($report->type === 'lost' && $report->status !== 'approved') {
                 return response()->json(['status' => 'error', 'message' => 'Report not found.'], 404);
             }
 
-            if ($report->report_type === 'found' && $report->status !== 'verified') {
+            if ($report->type === 'found' && $report->status !== 'verified') {
                 return response()->json(['status' => 'error', 'message' => 'Report not found.'], 404);
             }
         }
@@ -96,9 +96,10 @@ class ReportController extends Controller
         $validated = $request->validate([
             'type' => 'required|in:lost,found',
             'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'category' => 'nullable|string|max:120',
-            'location' => 'nullable|string|max:255',
+            'description' => 'required|string',
+            'category_id' => 'nullable|exists:item_categories,id',
+            'location' => 'required|string|max:255',
+            'date_occurred' => 'required|date',
             'event_date' => 'nullable|date',
             'reward_amount' => 'nullable|numeric|min:0',
             'reward_type' => 'nullable|in:reward,fine',
@@ -155,11 +156,11 @@ class ReportController extends Controller
         $user = $request->user();
 
         if ($report->student_id !== $user->id) {
-            if ($report->report_type === 'lost' && $report->status !== 'approved') {
+            if ($report->type === 'lost' && $report->status !== 'approved') {
                 return response()->json(['status' => 'error', 'message' => 'Report not found.'], 404);
             }
 
-            if ($report->report_type === 'found' && $report->status !== 'verified') {
+            if ($report->type === 'found' && $report->status !== 'verified') {
                 return response()->json(['status' => 'error', 'message' => 'Report not found.'], 404);
             }
         }
@@ -224,11 +225,11 @@ class ReportController extends Controller
         }
 
         $existingMatch = PotentialMatch::where(function ($query) use ($report, $matchedReport) {
-            $query->where('source_report_id', $report->id)
-                ->where('matched_report_id', $matchedReport->id);
+            $query->where('lost_report_id', $report->id)
+                ->where('found_report_id', $matchedReport->id);
         })->orWhere(function ($query) use ($report, $matchedReport) {
-            $query->where('source_report_id', $matchedReport->id)
-                ->where('matched_report_id', $report->id);
+            $query->where('lost_report_id', $matchedReport->id)
+                ->where('found_report_id', $report->id);
         })->first();
 
         $score = 0;
@@ -248,11 +249,11 @@ class ReportController extends Controller
 
         if (!$existingMatch) {
             $existingMatch = PotentialMatch::create([
-                'source_report_id' => $report->id,
-                'matched_report_id' => $matchedReport->id,
+                'lost_report_id' => $report->id,
+                'found_report_id' => $matchedReport->id,
                 'score' => min(100, $score),
                 'status' => 'pending',
-                'notes' => 'Potential match suggested by student.',
+                'review_notes' => 'Potential match suggested by student.',
             ]);
         }
 
@@ -311,7 +312,7 @@ class ReportController extends Controller
         return Notification::create([
             'student_id' => $report->student_id,
             'title' => 'Potential Match Found',
-            'message' => "Your '{$report->report_type}' report '{$report->title}' has a possible match: '{$otherReport->title}'.",
+            'message' => "Your '{$report->type}' report '{$report->title}' has a possible match: '{$otherReport->title}'.",
             'type' => 'lost_found_match',
             'action' => 'matched',
             'recipient_id' => $report->student_id,

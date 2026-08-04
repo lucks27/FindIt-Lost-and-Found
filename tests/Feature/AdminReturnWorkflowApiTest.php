@@ -54,11 +54,11 @@ class AdminReturnWorkflowApiTest extends TestCase
 
         $report = Report::create([
             'student_id' => $finder->id,
-            'report_type' => 'found',
+            'type' => 'found',
             'title' => 'Found ID Card',
             'description' => 'Blue student ID card found near library',
-            'category' => 'Personal Items',
             'location' => 'Library',
+            'date_occurred' => now()->subDay()->toDateString(),
             'status' => 'pending_surrender',
         ]);
 
