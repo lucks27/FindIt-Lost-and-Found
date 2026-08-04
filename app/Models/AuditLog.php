@@ -11,21 +11,25 @@ class AuditLog extends Model
     use HasFactory;
 
     protected $fillable = [
-        'actor_admin_id',
+        'actor_type',
+        'actor_id',
         'action',
         'subject_type',
         'subject_id',
-        'subject_label',
-        'details',
+        'description',
+        'old_values',
+        'new_values',
         'ip_address',
+        'user_agent',
     ];
 
     protected $casts = [
-        'details' => 'array',
+        'old_values' => 'array',
+        'new_values' => 'array',
     ];
 
     public function actorAdmin(): BelongsTo
     {
-        return $this->belongsTo(Admin::class, 'actor_admin_id');
+        return $this->belongsTo(Admin::class, 'actor_id');
     }
 }

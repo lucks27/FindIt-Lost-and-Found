@@ -43,13 +43,16 @@ class AdminWorkflowApiTest extends TestCase
         ]);
 
         AuditLog::create([
-            'actor_admin_id' => $admin->id,
+            'actor_type' => 'admin',
+            'actor_id' => $admin->id,
             'action' => 'logged_in',
             'subject_type' => 'admin',
             'subject_id' => $admin->id,
-            'subject_label' => 'Super Admin',
-            'details' => ['module' => 'auth'],
+            'description' => 'Super Admin logged in',
+            'old_values' => null,
+            'new_values' => ['module' => 'auth'],
             'ip_address' => '127.0.0.1',
+            'user_agent' => 'phpunit',
         ]);
 
         $response = $this->actingAs($admin, 'admin')->getJson('/api/admin/audit-logs');

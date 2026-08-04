@@ -20,7 +20,7 @@ class ReportController extends Controller
         $query = Report::query();
 
         if ($request->filled('type')) {
-            $query->where('report_type', $request->input('type'));
+            $query->where('type', $request->input('type'));
         }
 
         if ($request->filled('status')) {
@@ -36,10 +36,10 @@ class ReportController extends Controller
         } else {
             $query->where(function ($sub) {
                 $sub->where(function ($q) {
-                    $q->where('report_type', 'lost')
+                    $q->where('type', 'lost')
                         ->where('status', 'approved');
                 })->orWhere(function ($q) {
-                    $q->where('report_type', 'found')
+                    $q->where('type', 'found')
                         ->where('status', 'verified');
                 });
             });
@@ -94,7 +94,7 @@ class ReportController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'report_type' => 'required|in:lost,found',
+            'type' => 'required|in:lost,found',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'category' => 'nullable|string|max:120',
@@ -106,7 +106,7 @@ class ReportController extends Controller
             'metadata' => 'nullable|array',
         ]);
 
-        $status = $validated['report_type'] === 'lost' ? 'pending_approval' : 'pending_surrender';
+        $status = $validated['type'] === 'lost' ? 'pending_approval' : 'pending_surrender';
 
         $report = Report::create(array_merge($validated, [
             'student_id' => $user->id,
@@ -164,13 +164,13 @@ class ReportController extends Controller
             }
         }
 
-        $oppositeType = $report->report_type === 'lost' ? 'found' : 'lost';
+        $oppositeType = $report->type === 'lost' ? 'found' : 'lost';
 
         $validStatuses = $oppositeType === 'lost'
             ? ['approved']
             : ['verified'];
 
-        $candidates = Report::where('report_type', $oppositeType)
+        $candidates = Report::where('type', $oppositeType)
             ->whereIn('status', $validStatuses)
             ->where('id', '<>', $report->id)
             ->get();

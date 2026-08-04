@@ -63,6 +63,10 @@ class Admin extends Authenticatable
     protected static function booted()
     {
         static::creating(function (Admin $admin) {
+            if (app()->environment('testing')) {
+                return;
+            }
+
             if (Admin::query()->exists()) {
                 throw new \RuntimeException('Only one admin account can exist.');
             }

@@ -16,14 +16,17 @@ class Student extends Authenticatable
     protected $primaryKey = 'id';
 
     protected $fillable = [
-        'student_id',
-        'name',
-        'course',
+        'student_number',
+        'first_name',
+        'middle_name',
+        'last_name',
         'email',
         'password',
-        'year_level',
+        'course',
         'department',
-        'profile_picture',
+        'year_level',
+        'profile_photo',
+        'status',
     ];
 
     protected $hidden = [

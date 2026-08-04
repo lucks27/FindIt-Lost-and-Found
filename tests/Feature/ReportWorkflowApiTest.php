@@ -17,18 +17,20 @@ class ReportWorkflowApiTest extends TestCase
     public function test_student_can_create_lost_and_found_reports_with_workflow_statuses(): void
     {
         $student = Student::create([
-            'student_id' => '2026-0001',
-            'name' => 'Test Student',
+            'student_number' => '2026-0001',
+            'first_name' => 'Test',
+            'last_name' => 'Student',
             'course' => 'Computer Science',
             'year_level' => '1',
             'department' => 'Engineering',
             'email' => 'student@example.com',
             'password' => 'secret123',
+            'status' => 'active',
         ]);
 
         $lostResponse = $this->actingAs($student, 'sanctum')
             ->postJson('/api/reports', [
-                'report_type' => 'lost',
+                'type' => 'lost',
                 'title' => 'Lost Notebook',
                 'description' => 'Blue notebook with stickers',
                 'category' => 'Stationery',
@@ -40,7 +42,7 @@ class ReportWorkflowApiTest extends TestCase
 
         $foundResponse = $this->actingAs($student, 'sanctum')
             ->postJson('/api/reports', [
-                'report_type' => 'found',
+                'type' => 'found',
                 'title' => 'Found Calculator',
                 'description' => 'Black scientific calculator',
                 'category' => 'Electronics',
@@ -72,23 +74,27 @@ class ReportWorkflowApiTest extends TestCase
     public function test_student_can_submit_potential_match_for_approved_and_verified_reports(): void
     {
         $owner = Student::create([
-            'student_id' => '2026-0002',
-            'name' => 'Owner Student',
+            'student_number' => '2026-0002',
+            'first_name' => 'Owner',
+            'last_name' => 'Student',
             'course' => 'Computer Science',
             'year_level' => '2',
             'department' => 'Engineering',
             'email' => 'owner@example.com',
             'password' => 'secret123',
+            'status' => 'active',
         ]);
 
         $finder = Student::create([
-            'student_id' => '2026-0003',
-            'name' => 'Finder Student',
+            'student_number' => '2026-0003',
+            'first_name' => 'Finder',
+            'last_name' => 'Student',
             'course' => 'Computer Science',
             'year_level' => '2',
             'department' => 'Engineering',
             'email' => 'finder@example.com',
             'password' => 'secret123',
+            'status' => 'active',
         ]);
 
         $lostReport = Report::create([

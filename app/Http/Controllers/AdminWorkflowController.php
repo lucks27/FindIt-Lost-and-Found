@@ -160,7 +160,7 @@ class AdminWorkflowController extends Controller
         }
 
         $query = Report::query()
-            ->where('report_type', 'found')
+            ->where('type', 'found')
             ->whereIn('status', ['pending_verification', 'verified', 'under_claim_review', 'ready_for_release']);
 
         if ($request->filled('status')) {
@@ -405,8 +405,8 @@ class AdminWorkflowController extends Controller
         $summary = [
             'total_reports' => Report::count(),
             'open_reports' => Report::whereIn('status', ['pending_approval', 'pending_surrender', 'pending_verification', 'verified', 'ready_for_release', 'under_claim_review'])->count(),
-            'lost_reports' => Report::where('report_type', 'lost')->count(),
-            'found_reports' => Report::where('report_type', 'found')->count(),
+            'lost_reports' => Report::where('type', 'lost')->count(),
+            'found_reports' => Report::where('type', 'found')->count(),
             'total_claims' => ClaimReview::count(),
             'total_releases' => ItemRelease::count(),
             'active_surrenders' => SurrenderRequest::where('status', 'pending')->count(),
@@ -807,7 +807,7 @@ class AdminWorkflowController extends Controller
 
                 $report = $verification->report()->lockForUpdate()->firstOrFail();
 
-                if ($report->report_type !== 'found' || $report->status !== 'pending_verification') {
+                if ($report->type !== 'found' || $report->status !== 'pending_verification') {
                     return response()->json(['status' => 'error', 'message' => 'This found report is not ready for verification approval.'], 422);
                 }
 
@@ -996,7 +996,7 @@ class AdminWorkflowController extends Controller
                     ->firstOrFail();
 
                 $report = $claim->report()->lockForUpdate()->firstOrFail();
-                if ($report->report_type !== 'found' || $report->status !== 'verified') {
+                if ($report->type !== 'found' || $report->status !== 'verified') {
                     return response()->json(['status' => 'error', 'message' => 'Only verified found items can be approved for claim review.'], 422);
                 }
 

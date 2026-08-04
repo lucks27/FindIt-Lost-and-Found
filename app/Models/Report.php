@@ -14,23 +14,33 @@ class Report extends Model
 
     protected $fillable = [
         'student_id',
-        'report_type',
-        'category',
+        'category_id',
+        'type',
         'title',
         'description',
+        'color',
+        'date_occurred',
         'location',
-        'event_date',
+        'additional_details',
+        'private_identifying_details',
         'status',
-        'reward_amount',
-        'reward_type',
-        'image',
-        'metadata',
+        'review_notes',
+        'approved_by_admin_id',
+        'approved_at',
+        'rejected_by_admin_id',
+        'rejected_at',
+        'published_at',
+        'completed_at',
+        'archived_at',
     ];
 
     protected $casts = [
-        'metadata' => 'array',
-        'reward_amount' => 'decimal:2',
-        'event_date' => 'date',
+        'date_occurred' => 'date',
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
+        'published_at' => 'datetime',
+        'completed_at' => 'datetime',
+        'archived_at' => 'datetime',
     ];
 
     public function student(): BelongsTo
@@ -60,16 +70,16 @@ class Report extends Model
 
     public function scopeLost($query)
     {
-        return $query->where('report_type', 'lost');
+        return $query->where('type', 'lost');
     }
 
     public function scopeFound($query)
     {
-        return $query->where('report_type', 'found');
+        return $query->where('type', 'found');
     }
 
     public function scopeOpen($query)
     {
-        return $query->where('status', 'open');
+        return $query->where('status', 'pending_approval');
     }
 }

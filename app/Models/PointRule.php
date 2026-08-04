@@ -12,15 +12,23 @@ class PointRule extends Model
 
     protected $fillable = [
         'item_category',
+        'category_id',
         'base_points',
         'active',
+        'is_active',
         'updated_by_admin_id',
     ];
 
     protected $casts = [
         'base_points' => 'integer',
         'active' => 'boolean',
+        'is_active' => 'boolean',
     ];
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ItemCategory::class, 'category_id');
+    }
 
     public function updatedByAdmin(): BelongsTo
     {

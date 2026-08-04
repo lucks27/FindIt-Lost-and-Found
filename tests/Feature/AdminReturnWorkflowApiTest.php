@@ -29,23 +29,27 @@ class AdminReturnWorkflowApiTest extends TestCase
         ]);
 
         $finder = Student::create([
-            'student_id' => '2026-0001',
-            'name' => 'Finder Student',
+            'student_number' => '2026-0001',
+            'first_name' => 'Finder',
+            'last_name' => 'Student',
             'course' => 'Computer Science',
             'year_level' => '2',
             'department' => 'Engineering',
             'email' => 'finder@example.com',
             'password' => 'secret123',
+            'status' => 'active',
         ]);
 
         $owner = Student::create([
-            'student_id' => '2026-0002',
-            'name' => 'Owner Student',
+            'student_number' => '2026-0002',
+            'first_name' => 'Owner',
+            'last_name' => 'Student',
             'course' => 'Computer Science',
             'year_level' => '2',
             'department' => 'Engineering',
             'email' => 'owner@example.com',
             'password' => 'secret123',
+            'status' => 'active',
         ]);
 
         $report = Report::create([
