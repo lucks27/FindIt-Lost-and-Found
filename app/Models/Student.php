@@ -41,9 +41,10 @@ class Student extends Authenticatable
         return $this->hasMany(Booking::class);
     }
 
-    public function notifications()
+    public function notifications(): HasMany
     {
-        return $this->hasMany(Notification::class, 'recipient_student_id');
+        return $this->hasMany(Notification::class, 'recipient_id')
+            ->where('recipient_role', 'student');
     }
 
     public function reports()

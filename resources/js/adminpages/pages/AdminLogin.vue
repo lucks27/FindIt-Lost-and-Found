@@ -5,10 +5,11 @@
         <div class="admin-login-shell">
             <section class="admin-login-branding">
                 <img src="/assets/ESENESYU.png" alt="SNSU background emblem" class="hero-mark" />
-                <p class="eyebrow">SNSU Campus Space</p>
+                <p class="eyebrow">SNSU Campus Lost & Found System</p>
                 <h1>{{ loginTitle }}</h1>
                 <p class="brand-copy">
-                    Secure facility management for campus operations, booking oversight, and profile maintenance.
+                    The super admin portal provides a secure interface for managing student accounts, overseeing lost &
+                    found reports, and maintaining notifications and support workflows across the SNSU campus.
                 </p>
 
                 <div class="logo-row">
@@ -32,7 +33,7 @@
                     <input type="hidden" name="_token" :value="csrf" />
                     <label>
                         Email Address
-                        <input v-model="email" type="email" name="email" placeholder="name@snsu.com"
+                        <input v-model="email" type="email" name="email" placeholder="name@snsu.edu.ph"
                             autocomplete="email" required />
                     </label>
 
@@ -43,7 +44,7 @@
                     </label>
 
                     <button type="submit" class="btn-login" :disabled="isLoading">
-                        {{ isLoading ? 'Signing in...' : 'Continue' }}
+                        {{ isLoading ? 'Signing in...' : 'Login' }}
                     </button>
                 </form>
 

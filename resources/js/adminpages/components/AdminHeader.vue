@@ -14,7 +14,7 @@
         </div>
 
         <div class="header-actions">
-            <button class="icon-button" type="button" aria-label="Notifications">
+            <button class="icon-button" type="button" aria-label="Notifications" @click="goToNotifications">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path
                         d="M12 22a2.5 2.5 0 002.45-2h-4.9A2.5 2.5 0 0012 22zm6.5-6V11c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C7.13 5.36 5.5 7.92 5.5 11v5l-1.5 1.5v.5h16v-.5L18.5 16z" />
@@ -58,7 +58,7 @@ import api from '@/bootstrap'
 const props = defineProps({
     pageTitle: { type: String, default: 'Dashboard' },
     title: { type: String, default: 'Home' },
-    notificationCount: { type: Number, default: 3 },
+    notificationCount: { type: Number, default: 0 },
 })
 
 const emit = defineEmits(['toggle-mobile-menu'])
@@ -110,7 +110,11 @@ function goToProfile() {
 
 function goToSettings() {
     closeMenu()
-    router.push({ name: 'superadmin.dashboard' })
+    router.push({ name: 'superadmin.settings' })
+}
+
+function goToNotifications() {
+    router.push({ name: 'superadmin.notifications' })
 }
 
 function handleLogout() {
