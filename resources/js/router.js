@@ -37,12 +37,12 @@ const routes = [
     path: "/",
     redirect: () => {
       const adminAuth = isAdminAuthenticated();
-      return adminAuth ? "/superadmin/dashboard" : "/admin/login";
+      return adminAuth ? "/superadmin/welcome" : "/admin/login";
     }
   },
   {
     path: "/home-page",
-    redirect: { name: "superadmin.dashboard" }
+    redirect: { name: "superadmin.welcome" }
   },
 
   // --- STUDENT ROUTES ---

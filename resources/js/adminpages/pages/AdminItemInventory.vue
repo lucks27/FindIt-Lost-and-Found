@@ -7,28 +7,28 @@
                 <p class="page-copy">Monitor inventory by location, workflow stage, and recovery actions with a compact,
                     low-noise layout.</p>
             </div>
-            <button type="button" class="primary-button">Review storage</button>
+            <button type="button" class="primary-button" @click="loadInventory">Refresh</button>
         </header>
 
         <section class="metric-grid" aria-label="Inventory summary metrics">
             <article class="metric-card">
+                <span class="metric-label">Total</span>
+                <strong class="metric-value">{{ metrics.total }}</strong>
+                <small>Inventory items</small>
+            </article>
+            <article class="metric-card">
                 <span class="metric-label">In storage</span>
-                <strong class="metric-value">82</strong>
+                <strong class="metric-value">{{ metrics.inStorage }}</strong>
                 <small>Available for release</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Matched</span>
-                <strong class="metric-value">27</strong>
+                <strong class="metric-value">{{ metrics.matched }}</strong>
                 <small>Linked to claimant cases</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Under review</span>
-                <strong class="metric-value">9</strong>
-                <small>Needs follow-up</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Ready for release</span>
-                <strong class="metric-value">14</strong>
+                <span class="metric-label">Ready</span>
+                <strong class="metric-value">{{ metrics.ready }}</strong>
                 <small>Ready to hand over</small>
             </article>
         </section>
@@ -47,26 +47,83 @@
                 </div>
             </div>
 
-            <div class="table-shell">
-                <div class="empty-state-card" role="status">
+            <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
+            <div v-if="loading" class="loading-state">Loading inventory…</div>
+            <div v-else class="table-shell">
+                <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No inventory items to display</h2>
                     <p>Use the storage view and workflow tabs to review records by movement status, location, and
                         handover readiness.</p>
                 </div>
+
+                <table v-else class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Location</th>
+                            <th>Status</th>
+                            <th>Student</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="item in visibleRows" :key="item.id">
+                            <td>{{ item.title || item.report?.title || item.id }}</td>
+                            <td>{{ item.location || item.report?.location || '—' }}</td>
+                            <td>{{ item.status || item.report?.status || 'Unknown' }}</td>
+                            <td>{{ item.student?.name || item.report?.student?.name || 'Unknown' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </section>
     </main>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import api from '@/bootstrap'
 
 const query = ref('')
+const items = ref([])
+const loading = ref(false)
+const errorMessage = ref('')
+
+const metrics = computed(() => {
+    const now = new Date()
+    const total = items.value.length
+    const inStorage = items.value.filter((item) => !item.status || item.status.toLowerCase() === 'in storage').length
+    const matched = items.value.filter((item) => String(item.status || '').toLowerCase() === 'matched').length
+    const ready = items.value.filter((item) => String(item.status || '').toLowerCase() === 'ready for release').length
+    const pending = total - inStorage - matched - ready
+    return { total, inStorage, matched, ready, pending }
+})
 
 const visibleRows = computed(() => {
-    if (!query.value) return []
-    return []
+    const search = query.value.toLowerCase()
+    return items.value.filter((item) => {
+        const text = [item.title, item.location, item.status, item.report?.title, item.student?.name]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+        return !search || text.includes(search)
+    })
 })
+
+async function loadInventory() {
+    loading.value = true
+    errorMessage.value = ''
+    try {
+        const response = await api.get('/api/admin/items')
+        items.value = response.data?.data || []
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Failed to load inventory items.'
+        items.value = []
+    } finally {
+        loading.value = false
+    }
+}
+
+onMounted(loadInventory)
 </script>
 
 <style scoped>

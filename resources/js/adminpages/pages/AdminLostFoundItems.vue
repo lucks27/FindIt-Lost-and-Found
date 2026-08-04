@@ -7,29 +7,29 @@
                 <p class="page-copy">Scan category, location, visibility, and status at a glance to keep the item
                     workflow moving.</p>
             </div>
-            <button type="button" class="primary-button">Add item</button>
+            <button type="button" class="primary-button" @click="loadItems">Refresh</button>
         </header>
 
         <section class="metric-grid" aria-label="Lost and found summary metrics">
             <article class="metric-card">
                 <span class="metric-label">Lost</span>
-                <strong class="metric-value">24</strong>
-                <small>Inactive reports</small>
+                <strong class="metric-value">{{ metrics.lost }}</strong>
+                <small>Lost reports</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Found</span>
-                <strong class="metric-value">46</strong>
-                <small>Awaiting review</small>
+                <strong class="metric-value">{{ metrics.found }}</strong>
+                <small>Found reports</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Published</span>
-                <strong class="metric-value">31</strong>
-                <small>Visible to users</small>
+                <span class="metric-label">Open</span>
+                <strong class="metric-value">{{ metrics.open }}</strong>
+                <small>Active cases</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Returned</span>
-                <strong class="metric-value">18</strong>
-                <small>Completed cycles</small>
+                <span class="metric-label">Closed</span>
+                <strong class="metric-value">{{ metrics.closed }}</strong>
+                <small>Resolved cases</small>
             </article>
         </section>
 
@@ -40,34 +40,88 @@
                     <input v-model.trim="query" type="search" placeholder="Search item ID, category, or location"
                         aria-label="Search lost and found items" />
                 </label>
-                <div class="chip-row" aria-label="Item visibility and status filters">
-                    <button type="button" class="chip-button active">All</button>
-                    <button type="button" class="chip-button">Published</button>
-                    <button type="button" class="chip-button">Archived</button>
-                    <button type="button" class="chip-button">Returned</button>
-                </div>
+                <button type="button" class="primary-button" @click="loadItems">Refresh</button>
             </div>
 
-            <div class="table-shell">
-                <div class="empty-state-card" role="status">
+            <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
+            <div v-if="loading" class="loading-state">Loading items…</div>
+
+            <div v-else class="table-shell">
+                <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No item records to display</h2>
                     <p>Once items are reported or published, this screen will show category, location, visibility, and
                         stage filters.</p>
                 </div>
+
+                <table v-else class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Student</th>
+                            <th>Location</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="item in visibleRows" :key="item.id">
+                            <td>{{ item.title || item.id }}</td>
+                            <td>{{ item.report_type || '—' }}</td>
+                            <td>{{ item.status || 'unknown' }}</td>
+                            <td>{{ item.student?.name || 'Unknown' }}</td>
+                            <td>{{ item.location || '—' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </section>
     </main>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import api from '@/bootstrap'
 
 const query = ref('')
+const items = ref([])
+const loading = ref(false)
+const errorMessage = ref('')
+
+const metrics = computed(() => {
+    const lost = items.value.filter((item) => String(item.report_type || '').toLowerCase() === 'lost').length
+    const found = items.value.filter((item) => String(item.report_type || '').toLowerCase() === 'found').length
+    const open = items.value.filter((item) => !['closed', 'resolved', 'returned'].includes(String(item.status || '').toLowerCase())).length
+    const closed = items.value.length - open
+    return { lost, found, open, closed }
+})
 
 const visibleRows = computed(() => {
-    if (!query.value) return []
-    return []
+    const search = query.value.toLowerCase()
+    return items.value.filter((item) => {
+        const text = [item.title, item.report_type, item.status, item.location, item.student?.name]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+        return !search || text.includes(search)
+    })
 })
+
+async function loadItems() {
+    loading.value = true
+    errorMessage.value = ''
+
+    try {
+        const response = await api.get('/api/admin/items')
+        items.value = response.data?.data || []
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Failed to load lost and found items.'
+        items.value = []
+    } finally {
+        loading.value = false
+    }
+}
+
+onMounted(loadItems)
 </script>
 
 <style scoped>

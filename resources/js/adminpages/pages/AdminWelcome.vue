@@ -15,7 +15,6 @@
             </div>
 
             <div class="welcome-panel">
-                <img src="/assets/ESENESYU.png" alt="SNSU Background Logo" class="panel-art" />
                 <div class="panel-grid">
                     <article>
                         <span>Students</span>
@@ -80,8 +79,8 @@ defineProps({
 <style scoped>
 .admin-welcome-page {
     position: relative;
-    height: 100%;
-    min-height: 0;
+    height: auto;
+    min-height: 100vh;
     overflow: auto;
 }
 
@@ -99,12 +98,11 @@ defineProps({
     max-width: 1320px;
     margin: 0 auto;
     display: grid;
-    grid-template-columns: 1.05fr 0.95fr;
-    gap: 30px;
+    grid-template-columns: 1fr 0.75fr;
+    gap: 32px;
     align-items: center;
-    height: 100%;
-    min-height: 0;
-    overflow: auto;
+    min-height: 100vh;
+    padding: 56px 24px;
 }
 
 .welcome-copy,
@@ -113,8 +111,8 @@ defineProps({
 }
 
 .welcome-logo {
-    width: 96px;
-    height: 96px;
+    width: 84px;
+    height: 84px;
     object-fit: contain;
 }
 
@@ -128,9 +126,9 @@ defineProps({
 
 .welcome-copy h1 {
     margin: 0 0 16px;
-    font-size: clamp(34px, 4.6vw, 60px);
+    font-size: clamp(34px, 4.2vw, 56px);
     line-height: 1.02;
-    max-width: 760px;
+    max-width: 620px;
 }
 
 .welcome-copy p {
@@ -174,21 +172,21 @@ defineProps({
 
 .welcome-panel {
     position: relative;
-    padding: 30px;
-    border-radius: 30px;
+    padding: 28px;
+    border-radius: 24px;
     background: rgba(247, 242, 230, 0.08);
     border: 1px solid rgba(247, 242, 230, 0.12);
     backdrop-filter: blur(14px);
-    overflow: auto;
-    min-height: 420px;
+    overflow: hidden;
+    min-height: 360px;
 }
 
 .panel-art {
     position: absolute;
-    right: -40px;
-    bottom: -20px;
-    width: 70%;
-    opacity: 0.18;
+    right: -20px;
+    bottom: -10px;
+    width: 58%;
+    opacity: 0.16;
 }
 
 .panel-grid {
@@ -222,6 +220,12 @@ defineProps({
 @media (max-width: 960px) {
     .welcome-shell {
         grid-template-columns: 1fr;
+    }
+
+    .welcome-panel {
+        min-height: 320px;
+        padding: 20px;
+        border-radius: 18px;
     }
 }
 </style>

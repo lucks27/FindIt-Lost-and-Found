@@ -27,10 +27,10 @@
                                     d="M20 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2zM4 8h16v2H4V8zm0 4h10v6H4v-6zm12 0h4v6h-4v-6z" />
                             </svg>
                         </div>
-                        <strong>12</strong>
+                        <strong>{{ metrics.pendingSurrender }}</strong>
                     </div>
                     <p>Pending surrender</p>
-                    <router-link class="count-link" :to="{ name: 'superadmin.reports' }">
+                    <router-link class="count-link" :to="{ name: 'superadmin.pending-surrender' }">
                         View reports <svg viewBox="0 0 24 24">
                             <path d="M13 5l7 7-7 7M5 12h14" />
                         </svg>
@@ -44,7 +44,7 @@
                                 <path d="M6 3l12 5v10l-12 5L4 17V7l2-4zm1.5 3.2v11.6L15 18V6L7.5 6.2z" />
                             </svg>
                         </div>
-                        <strong>8</strong>
+                        <strong>{{ metrics.itemsReceived }}</strong>
                     </div>
                     <p>Items received</p>
                     <router-link class="count-link" :to="{ name: 'superadmin.items' }">
@@ -62,7 +62,7 @@
                                     d="M12 2l7 4v6c0 5-4 9-7 9s-7-4-7-9V6l7-4zm0 2.18L6 7.05V12c0 3.78 2.69 6.95 6 7.9 3.31-.95 6-4.12 6-7.9V7.05l-6-2.87z" />
                             </svg>
                         </div>
-                        <strong>6</strong>
+                        <strong>{{ metrics.awaitingVerification }}</strong>
                     </div>
                     <p>Awaiting verification</p>
                     <router-link class="count-link" :to="{ name: 'superadmin.item-verification' }">
@@ -79,7 +79,7 @@
                                 <path d="M9 12l2 2 4-4M4 12a8 8 0 1 1 16 0 8 8 0 0 1-16 0z" />
                             </svg>
                         </div>
-                        <strong>45</strong>
+                        <strong>{{ metrics.verifiedItems }}</strong>
                     </div>
                     <p>Verified items</p>
                     <router-link class="count-link" :to="{ name: 'superadmin.items' }">
@@ -96,7 +96,7 @@
                                 <path d="M5 12l4 4 10-10" />
                             </svg>
                         </div>
-                        <strong>16</strong>
+                        <strong>{{ metrics.potentialMatches }}</strong>
                     </div>
                     <p>Potential matches</p>
                     <router-link class="count-link" :to="{ name: 'superadmin.matches' }">
@@ -113,7 +113,7 @@
                                 <path d="M6 4h12v4H6V4zm0 6h12v10H6V10zm2 2v6h2v-6H8zm4 0v6h2v-6h-2z" />
                             </svg>
                         </div>
-                        <strong>10</strong>
+                        <strong>{{ metrics.pendingClaims }}</strong>
                     </div>
                     <p>Pending claims</p>
                     <router-link class="count-link" :to="{ name: 'superadmin.claims' }">
@@ -130,7 +130,7 @@
                                 <path d="M12 2l3 3H9l3-3zm-3 7h6l-3 9-3-9z" />
                             </svg>
                         </div>
-                        <strong>5</strong>
+                        <strong>{{ metrics.readyForRelease }}</strong>
                     </div>
                     <p>Ready for release</p>
                     <router-link class="count-link" :to="{ name: 'superadmin.items' }">
@@ -147,7 +147,7 @@
                                 <path d="M12 4a8 8 0 1 0 8 8h-2a6 6 0 1 1-6-6V4z" />
                             </svg>
                         </div>
-                        <strong>32</strong>
+                        <strong>{{ metrics.returnedItems }}</strong>
                     </div>
                     <p>Returned items</p>
                     <router-link class="count-link" :to="{ name: 'superadmin.items' }">
@@ -171,26 +171,26 @@
                     <div class="chart-row">
                         <div class="pie-chart">
                             <div class="pie-inner">
-                                <strong>128</strong>
+                                <strong>{{ metrics.totalReports }}</strong>
                                 <span>Total reports</span>
                             </div>
                         </div>
                         <div class="chart-legend">
                             <div class="legend-item">
                                 <span><i class="legend-dot lost"></i>Lost reports</span>
-                                <strong>64 (50%)</strong>
+                                <strong>{{ metrics.lostReports }} ({{ metrics.lostPercent }}%)</strong>
                             </div>
                             <div class="legend-item">
                                 <span><i class="legend-dot found"></i>Found reports</span>
-                                <strong>54 (42%)</strong>
+                                <strong>{{ metrics.foundReports }} ({{ metrics.foundPercent }}%)</strong>
                             </div>
                             <div class="legend-item">
                                 <span><i class="legend-dot verified"></i>Verified items</span>
-                                <strong>45 (35%)</strong>
+                                <strong>{{ metrics.verifiedItems }} ({{ metrics.verifiedPercent }}%)</strong>
                             </div>
                             <div class="legend-item">
                                 <span><i class="legend-dot returned"></i>Returned items</span>
-                                <strong>32 (25%)</strong>
+                                <strong>{{ metrics.returnedItems }} ({{ metrics.returnedPercent }}%)</strong>
                             </div>
                         </div>
                     </div>
@@ -211,25 +211,15 @@
                     </div>
 
                     <div class="bar-chart">
-                        <div class="bar-row">
-                            <div class="bar-meta"><span>Wallet</span><span>28</span></div>
-                            <div class="bar-track"><span class="bar-fill" style="width: 90%"></span></div>
+                        <div class="bar-row" v-for="category in topCategories" :key="category.name">
+                            <div class="bar-meta"><span>{{ category.name }}</span><span>{{ category.count }}</span>
+                            </div>
+                            <div class="bar-track"><span class="bar-fill"
+                                    :style="{ width: category.width + '%' }"></span></div>
                         </div>
-                        <div class="bar-row">
-                            <div class="bar-meta"><span>Phone</span><span>24</span></div>
-                            <div class="bar-track"><span class="bar-fill" style="width: 75%"></span></div>
-                        </div>
-                        <div class="bar-row">
-                            <div class="bar-meta"><span>ID / Card</span><span>18</span></div>
-                            <div class="bar-track"><span class="bar-fill" style="width: 55%"></span></div>
-                        </div>
-                        <div class="bar-row">
-                            <div class="bar-meta"><span>Keys</span><span>15</span></div>
-                            <div class="bar-track"><span class="bar-fill" style="width: 45%"></span></div>
-                        </div>
-                        <div class="bar-row">
-                            <div class="bar-meta"><span>Earphones</span><span>12</span></div>
-                            <div class="bar-track"><span class="bar-fill" style="width: 35%"></span></div>
+                        <div v-if="!topCategories.length" class="bar-row">
+                            <div class="bar-meta"><span>No categories</span><span>0</span></div>
+                            <div class="bar-track"><span class="bar-fill" style="width: 0%"></span></div>
                         </div>
                     </div>
 
@@ -303,64 +293,18 @@
                     </div>
 
                     <ul class="activity-list">
-                        <li>
-                            <router-link class="activity-link" :to="{ name: 'superadmin.items' }">
-                                <div class="activity-badge badge-lost">📦</div>
-                                <div class="activity-body">
-                                    <p>Item received from Juan Dela Cruz</p>
-                                    <small>Black Wallet · INV-2025-006</small>
-                                </div>
-                                <div class="activity-action">10:24 AM</div>
-                            </router-link>
+                        <li v-if="!recentActivity.length" class="empty-state-card" role="status">
+                            <h2>No recent activity yet</h2>
+                            <p>Dashboard activity will populate once admin reports and workflows load successfully.</p>
                         </li>
-                        <li>
-                            <router-link class="activity-link" :to="{ name: 'superadmin.claims' }">
-                                <div class="activity-badge badge-claim">📄</div>
+                        <li v-for="event in recentActivity" :key="event.id">
+                            <router-link class="activity-link" :to="event.route">
+                                <div class="activity-badge" :class="event.badgeClass">{{ event.icon }}</div>
                                 <div class="activity-body">
-                                    <p>New claim submitted by Maria Santos</p>
-                                    <small>ITEM-2025-0045</small>
+                                    <p>{{ event.label }}</p>
+                                    <small>{{ event.subtitle }}</small>
                                 </div>
-                                <div class="activity-action">09:15 AM</div>
-                            </router-link>
-                        </li>
-                        <li>
-                            <router-link class="activity-link" :to="{ name: 'superadmin.claims' }">
-                                <div class="activity-badge badge-user">✅</div>
-                                <div class="activity-body">
-                                    <p>Claim approved for John Paul</p>
-                                    <small>ITEM-2025-0032</small>
-                                </div>
-                                <div class="activity-action">Yesterday</div>
-                            </router-link>
-                        </li>
-                        <li>
-                            <router-link class="activity-link" :to="{ name: 'superadmin.recognition' }">
-                                <div class="activity-badge badge-audit">⭐</div>
-                                <div class="activity-body">
-                                    <p>Points awarded to Ana Reyes</p>
-                                    <small>+100 Points</small>
-                                </div>
-                                <div class="activity-action">Yesterday</div>
-                            </router-link>
-                        </li>
-                        <li>
-                            <router-link class="activity-link" :to="{ name: 'superadmin.matches' }">
-                                <div class="activity-badge badge-match">🔗</div>
-                                <div class="activity-body">
-                                    <p>New potential match found</p>
-                                    <small>ITEM-2025-0048</small>
-                                </div>
-                                <div class="activity-action">May 23</div>
-                            </router-link>
-                        </li>
-                        <li>
-                            <router-link class="activity-link" :to="{ name: 'superadmin.notifications' }">
-                                <div class="activity-badge badge-announcement">📣</div>
-                                <div class="activity-body">
-                                    <p>Announcement sent to all students</p>
-                                    <small>General Assembly Reminder</small>
-                                </div>
-                                <div class="activity-action">May 22</div>
+                                <div class="activity-action">{{ event.when }}</div>
                             </router-link>
                         </li>
                     </ul>
@@ -371,6 +315,185 @@
 </template>
 
 <script setup>
+import { computed, onMounted, ref } from 'vue'
+import api from '@/bootstrap'
+
+const loading = ref(false)
+const errorMessage = ref('')
+const items = ref([])
+const verifications = ref([])
+const releases = ref([])
+const claims = ref([])
+const matches = ref([])
+const surrenders = ref([])
+
+const metrics = computed(() => {
+    const totalReports = items.value.length
+    const lostReports = items.value.filter((item) => String(item.report_type || '').toLowerCase() === 'lost').length
+    const foundReports = items.value.filter((item) => String(item.report_type || '').toLowerCase() === 'found').length
+    const verifiedItems = verifications.value.filter((item) => String(item.status || '').toLowerCase() === 'approved').length
+    const returnedItems = releases.value.filter((item) => item.released_at).length
+    const pendingSurrender = surrenders.value.filter((item) => !item.received_by_admin_id || String(item.status || '').toLowerCase() === 'pending').length
+    const itemsReceived = foundReports
+    const awaitingVerification = verifications.value.filter((item) => String(item.status || '').toLowerCase() === 'pending').length
+    const pendingClaims = claims.value.filter((item) => !item.review_status || String(item.review_status || '').toLowerCase() === 'pending').length
+    const readyForRelease = releases.value.filter((item) => String(item.status || '').toLowerCase().includes('ready')).length
+
+    return {
+        totalReports,
+        lostReports,
+        foundReports,
+        verifiedItems,
+        returnedItems,
+        pendingSurrender,
+        itemsReceived,
+        awaitingVerification,
+        pendingClaims,
+        readyForRelease,
+        lostPercent: totalReports ? Math.round((lostReports / totalReports) * 100) : 0,
+        foundPercent: totalReports ? Math.round((foundReports / totalReports) * 100) : 0,
+        verifiedPercent: totalReports ? Math.round((verifiedItems / totalReports) * 100) : 0,
+        returnedPercent: totalReports ? Math.round((returnedItems / totalReports) * 100) : 0,
+    }
+})
+
+const topCategories = computed(() => {
+    const counts = items.value.reduce((acc, item) => {
+        const category = item.category || item.report_type || 'Unknown'
+        acc[category] = (acc[category] || 0) + 1
+        return acc
+    }, {})
+
+    const entries = Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+
+    const maxCount = entries[0]?.[1] || 1
+
+    return entries.map(([name, count]) => ({
+        name,
+        count,
+        width: Math.max(10, Math.round((count / maxCount) * 100)),
+    }))
+})
+
+const recentActivity = computed(() => {
+    const events = []
+
+    items.value.forEach((item) => {
+        const when = item.created_at || item.updated_at
+        events.push({
+            id: `item-${item.id}`,
+            route: { name: 'superadmin.items' },
+            badgeClass: 'badge-lost',
+            icon: '📦',
+            label: `Report received: ${item.title || item.id}`,
+            subtitle: `${item.report_type ? item.report_type.toUpperCase() : 'Report'} · ${item.category || 'Uncategorized'}`,
+            when: formatDate(when),
+            timestamp: when ? new Date(when).getTime() : 0,
+        })
+    })
+
+    claims.value.forEach((item) => {
+        const when = item.created_at || item.updated_at
+        events.push({
+            id: `claim-${item.id}`,
+            route: { name: 'superadmin.claims' },
+            badgeClass: 'badge-claim',
+            icon: '📄',
+            label: `Claim review: ${item.claimantStudent?.name || item.claimant_student_id || 'Unknown'}`,
+            subtitle: `${item.review_status || 'Pending'} · ${item.report?.title || 'No report title'}`,
+            when: formatDate(when),
+            timestamp: when ? new Date(when).getTime() : 0,
+        })
+    })
+
+    releases.value.forEach((item) => {
+        const when = item.created_at || item.updated_at
+        events.push({
+            id: `release-${item.id}`,
+            route: { name: 'superadmin.release' },
+            badgeClass: 'badge-user',
+            icon: '✅',
+            label: `Release request: ${item.claimantStudent?.name || item.claimant_student_id || 'Claimant'}`,
+            subtitle: `${item.status || 'Pending'} · ${item.report?.title || 'No report title'}`,
+            when: formatDate(when),
+            timestamp: when ? new Date(when).getTime() : 0,
+        })
+    })
+
+    matches.value.forEach((item) => {
+        const when = item.created_at || item.updated_at
+        events.push({
+            id: `match-${item.id}`,
+            route: { name: 'superadmin.matches' },
+            badgeClass: 'badge-match',
+            icon: '🔗',
+            label: `Potential match found`,
+            subtitle: `${item.source_report_id || 'Report'} / ${item.matched_report_id || 'Report'}`,
+            when: formatDate(when),
+            timestamp: when ? new Date(when).getTime() : 0,
+        })
+    })
+
+    surrenders.value.forEach((item) => {
+        const when = item.created_at || item.updated_at
+        events.push({
+            id: `surrender-${item.id}`,
+            route: { name: 'superadmin.pending-surrender' },
+            badgeClass: 'badge-audit',
+            icon: '📦',
+            label: `Surrender request pending`,
+            subtitle: `${item.report?.title || item.id} · Deadline ${formatDate(item.deadline_at)}`,
+            when: formatDate(when),
+            timestamp: when ? new Date(when).getTime() : 0,
+        })
+    })
+
+    return events
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 5)
+})
+
+function formatDate(value) {
+    if (!value) return 'Just now'
+    return new Date(value).toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    })
+}
+
+async function loadDashboard() {
+    loading.value = true
+    errorMessage.value = ''
+
+    try {
+        const [itemsResponse, verificationsResponse, releasesResponse, claimsResponse, matchesResponse, surrendersResponse] = await Promise.all([
+            api.get('/api/admin/items'),
+            api.get('/api/admin/verifications'),
+            api.get('/api/admin/releases'),
+            api.get('/api/admin/claims'),
+            api.get('/api/admin/matches'),
+            api.get('/api/admin/surrenders'),
+        ])
+
+        items.value = itemsResponse.data?.data || []
+        verifications.value = verificationsResponse.data?.data || []
+        releases.value = releasesResponse.data?.data || []
+        claims.value = claimsResponse.data?.data || []
+        matches.value = matchesResponse.data?.data || []
+        surrenders.value = surrendersResponse.data?.data || []
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Failed to load dashboard metrics.'
+    } finally {
+        loading.value = false
+    }
+}
+
+onMounted(loadDashboard)
 </script>
 
 <style scoped>

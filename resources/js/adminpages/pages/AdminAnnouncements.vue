@@ -6,7 +6,7 @@
                 <h1>Manage campus announcements</h1>
                 <p class="page-copy">Create, review, and schedule updates while keeping each notice easy to scan.</p>
             </div>
-            <button type="button" class="primary-button">Create announcement</button>
+            <button type="button" class="primary-button" @click="loadAnnouncements">Refresh announcements</button>
         </header>
 
         <section class="metric-grid" aria-label="Announcement summary metrics">
@@ -100,11 +100,12 @@ const errorMessage = ref('')
 
 const metrics = computed(() => {
     const counts = { draft: 0, scheduled: 0, published: 0, expired: 0 }
+    const now = new Date()
 
     announcements.value.forEach((item) => {
         const status = String(item.status || '').toLowerCase()
         if (status in counts) counts[status] += 1
-        if (item.expires_at && new Date(item.expires_at) < new Date()) counts.expired += 1
+        if (status === 'expired' || (item.expires_at && new Date(item.expires_at) < now)) counts.expired += 1
     })
 
     return counts

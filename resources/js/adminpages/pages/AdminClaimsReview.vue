@@ -7,7 +7,7 @@
                 <p class="page-copy">Keep proof quality, related items, and final decisions visible without losing
                     detail.</p>
             </div>
-            <button type="button" class="primary-button">Pending queue</button>
+            <button type="button" class="primary-button" @click="loadClaims">Refresh claims</button>
         </header>
 
         <section class="metric-grid" aria-label="Claim review metrics">

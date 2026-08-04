@@ -48,26 +48,82 @@
                 </div>
             </div>
 
-            <div class="table-shell">
-                <div class="empty-state-card" role="status">
+            <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
+            <div v-if="loading" class="loading-state">Loading recognition points…</div>
+            <div v-else class="table-shell">
+                <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No point activity to display</h2>
                     <p>Pending point approvals and award history will be grouped here with clear positive and negative
                         indicators.</p>
                 </div>
+
+                <table v-else class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Points</th>
+                            <th>Reward total</th>
+                            <th>Reports</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="student in visibleRows" :key="student.id">
+                            <td>{{ student.name || student.email || 'Unnamed' }}</td>
+                            <td>{{ student.recognition_points ?? 0 }}</td>
+                            <td>{{ student.rewards_count || 0 }}</td>
+                            <td>{{ student.reports_count || 0 }}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </section>
     </main>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import api from '@/bootstrap'
 
 const query = ref('')
+const students = ref([])
+const loading = ref(false)
+const errorMessage = ref('')
+
+const metrics = computed(() => {
+    const total = students.value.length
+    const awarded = students.value.reduce((sum, student) => sum + (Number(student.recognition_points) || 0), 0)
+    const topStudent = students.value.slice().sort((a, b) => (Number(b.recognition_points) || 0) - (Number(a.recognition_points) || 0))[0]
+    return {
+        total: total,
+        awarded,
+        topStudentName: topStudent?.name || 'None',
+        maxPoints: topStudent ? Number(topStudent.recognition_points || 0) : 0,
+    }
+})
 
 const visibleRows = computed(() => {
-    if (!query.value) return []
-    return []
+    const search = query.value.toLowerCase()
+    return students.value.filter((item) => {
+        const text = [item.name, item.email, item.recognition_points].filter(Boolean).join(' ').toLowerCase()
+        return !search || text.includes(search)
+    })
 })
+
+async function loadStudents() {
+    loading.value = true
+    errorMessage.value = ''
+    try {
+        const response = await api.get('/api/admin/list')
+        students.value = response.data?.data?.students || []
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Failed to load recognition points.'
+        students.value = []
+    } finally {
+        loading.value = false
+    }
+}
+
+onMounted(loadStudents)
 </script>
 
 <style scoped>

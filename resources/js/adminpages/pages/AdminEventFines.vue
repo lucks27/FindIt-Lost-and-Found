@@ -7,7 +7,7 @@
                 <p class="page-copy">Review fine totals, pending conversions, and recent event-related adjustments in
                     one place.</p>
             </div>
-            <button type="button" class="primary-button">Create eligible fine</button>
+            <button type="button" class="primary-button" @click="loadFines">Refresh fines</button>
         </header>
 
         <section class="metric-grid" aria-label="Event fine summary metrics">

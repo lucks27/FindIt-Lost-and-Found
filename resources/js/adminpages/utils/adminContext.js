@@ -18,7 +18,7 @@ export function getAdminRouteBase() {
 }
 
 export function getAdminHomeRouteName() {
-  return 'superadmin.dashboard'
+  return 'superadmin.welcome'
 }
 
 export function getAdminLoginRouteName() {

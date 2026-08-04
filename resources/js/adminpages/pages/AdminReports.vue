@@ -13,22 +13,22 @@
         <section class="metric-grid" aria-label="Report summary metrics">
             <article class="metric-card">
                 <span class="metric-label">Item activity</span>
-                <strong class="metric-value">184</strong>
-                <small>Events this window</small>
+                <strong class="metric-value">{{ metrics.totalReports }}</strong>
+                <small>Reports this window</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Claims processed</span>
-                <strong class="metric-value">42</strong>
+                <strong class="metric-value">{{ metrics.totalClaims }}</strong>
                 <small>Resolved and logged</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Returns completed</span>
-                <strong class="metric-value">21</strong>
+                <strong class="metric-value">{{ metrics.totalReleases }}</strong>
                 <small>Completed handovers</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Points awarded</span>
-                <strong class="metric-value">314</strong>
+                <strong class="metric-value">{{ metrics.pointsAwarded }}</strong>
                 <small>Recognition activity</small>
             </article>
         </section>
@@ -36,31 +36,46 @@
         <section class="report-layout">
             <article class="report-card">
                 <p class="card-label">Item activity</p>
-                <strong>Weekly workflow trends</strong>
-                <div class="bar-chart" aria-hidden="true">
-                    <div class="bar-row"><span>Mon</span><i style="height: 38%"></i></div>
-                    <div class="bar-row"><span>Tue</span><i style="height: 54%"></i></div>
-                    <div class="bar-row"><span>Wed</span><i style="height: 64%"></i></div>
-                    <div class="bar-row"><span>Thu</span><i style="height: 48%"></i></div>
-                    <div class="bar-row"><span>Fri</span><i style="height: 76%"></i></div>
+                <strong>{{ metrics.itemTitle }}</strong>
+                <div class="stat-row">
+                    <span>Total reports</span>
+                    <strong>{{ metrics.totalReports }}</strong>
+                </div>
+                <div class="stat-row">
+                    <span>Open reports</span>
+                    <strong>{{ metrics.openReports }}</strong>
                 </div>
             </article>
             <article class="report-card">
-                <p class="card-label">Category mix</p>
-                <strong>Items by category</strong>
-                <div class="legend-list">
-                    <div><span class="dot dot-gold"></span>Electronics</div>
-                    <div><span class="dot dot-green"></span>Documents</div>
-                    <div><span class="dot dot-muted"></span>Accessories</div>
+                <p class="card-label">Claim and release mix</p>
+                <strong>{{ metrics.claimsTitle }}</strong>
+                <div class="stat-row">
+                    <span>Total claims</span>
+                    <strong>{{ metrics.totalClaims }}</strong>
+                </div>
+                <div class="stat-row">
+                    <span>Total releases</span>
+                    <strong>{{ metrics.totalReleases }}</strong>
                 </div>
             </article>
             <article class="report-card wide-card">
                 <p class="card-label">Recent activity</p>
-                <strong>Latest operational updates</strong>
-                <div class="table-shell">
-                    <div class="activity-row"><span>Claim reviewed</span><strong>12 min ago</strong></div>
-                    <div class="activity-row"><span>Item approved for release</span><strong>28 min ago</strong></div>
-                    <div class="activity-row"><span>Notification sent</span><strong>54 min ago</strong></div>
+                <strong>Latest backend updates</strong>
+
+                <div v-if="loading" class="loading-state">Loading report insights…</div>
+                <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
+
+                <div v-else class="table-shell">
+                    <div v-if="!recentEvents.length" class="empty-state-card" role="status">
+                        <h2>No recent events available</h2>
+                        <p>Activity summary will appear here once backend endpoints return data.</p>
+                    </div>
+                    <div v-else>
+                        <div v-for="event in recentEvents" :key="event.id" class="activity-row">
+                            <span>{{ event.label }}</span>
+                            <strong>{{ event.when }}</strong>
+                        </div>
+                    </div>
                 </div>
             </article>
         </section>
@@ -68,6 +83,89 @@
 </template>
 
 <script setup>
+import { onMounted, ref } from 'vue'
+import api from '@/bootstrap'
+
+const loading = ref(false)
+const errorMessage = ref('')
+const reports = ref([])
+const claims = ref([])
+const releases = ref([])
+const students = ref([])
+
+const metrics = ref({
+    itemTitle: 'Weekly workflow trends',
+    totalReports: 0,
+    openReports: 0,
+    claimsTitle: 'Claims and release summary',
+    totalClaims: 0,
+    totalReleases: 0,
+    pointsAwarded: 0,
+})
+
+const recentEvents = ref([])
+
+function formatDate(value) {
+    if (!value) return '—'
+    return new Date(value).toLocaleDateString()
+}
+
+async function loadReportData() {
+    loading.value = true
+    errorMessage.value = ''
+    try {
+        const [reportsResponse, claimsResponse, releasesResponse, studentsResponse] = await Promise.all([
+            api.get('/api/admin/items'),
+            api.get('/api/admin/claims'),
+            api.get('/api/admin/releases'),
+            api.get('/api/admin/list'),
+        ])
+
+        reports.value = reportsResponse.data?.data || []
+        claims.value = claimsResponse.data?.data || []
+        releases.value = releasesResponse.data?.data || []
+        students.value = studentsResponse.data?.data?.students || []
+
+        metrics.value = {
+            itemTitle: 'Report activity summary',
+            totalReports: reports.value.length,
+            openReports: reports.value.filter((item) => !item.status || ['open', 'pending'].includes(String(item.status || '').toLowerCase())).length,
+            claimsTitle: 'Claim and release summary',
+            totalClaims: claims.value.length,
+            totalReleases: releases.value.length,
+            pointsAwarded: students.value.reduce((sum, student) => sum + (Number(student.recognition_points) || 0), 0),
+        }
+
+        recentEvents.value = [
+            {
+                id: 'claims',
+                label: `${claims.value.length} claim records loaded`,
+                when: formatDate(new Date()),
+            },
+            {
+                id: 'releases',
+                label: `${releases.value.length} release requests loaded`,
+                when: formatDate(new Date()),
+            },
+            {
+                id: 'reports',
+                label: `${reports.value.length} item reports loaded`,
+                when: formatDate(new Date()),
+            },
+            {
+                id: 'points',
+                label: `${metrics.value.pointsAwarded} total points mapped`,
+                when: formatDate(new Date()),
+            },
+        ]
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Failed to load report analytics.'
+    } finally {
+        loading.value = false
+    }
+}
+
+onMounted(loadReportData)
 </script>
 
 <style scoped>

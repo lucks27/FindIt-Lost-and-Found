@@ -48,25 +48,81 @@
                 </div>
             </div>
 
-            <div class="table-shell">
-                <div class="empty-state-card" role="status">
+            <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
+            <div v-if="loading" class="loading-state">Loading verification records…</div>
+            <div v-else class="table-shell">
+                <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No verification records to display</h2>
                     <p>Verification checklist details and comparison actions will appear here as submissions arrive.</p>
                 </div>
+
+                <table v-else class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Report</th>
+                            <th>Verifier</th>
+                            <th>Status</th>
+                            <th>Student</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="item in visibleRows" :key="item.id">
+                            <td>{{ item.report?.title || item.report_id }}</td>
+                            <td>{{ item.verifier_admin?.name || 'Pending' }}</td>
+                            <td>{{ item.status || item.verification_status || 'Pending' }}</td>
+                            <td>{{ item.report?.student?.name || 'Unknown' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </section>
     </main>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import api from '@/bootstrap'
 
 const query = ref('')
+const verifications = ref([])
+const loading = ref(false)
+const errorMessage = ref('')
+
+const metrics = computed(() => {
+    const total = verifications.value.length
+    const pending = verifications.value.filter((item) => String(item.status || item.verification_status || '').toLowerCase() === 'pending').length
+    const approved = verifications.value.filter((item) => String(item.status || item.verification_status || '').toLowerCase() === 'approved').length
+    const rejected = verifications.value.filter((item) => String(item.status || item.verification_status || '').toLowerCase() === 'rejected').length
+    const reviewNeeded = verifications.value.filter((item) => item.review_notes).length
+    return { total, pending, approved, rejected, reviewNeeded }
+})
 
 const visibleRows = computed(() => {
-    if (!query.value) return []
-    return []
+    const search = query.value.toLowerCase()
+    return verifications.value.filter((item) => {
+        const text = [item.report?.title, item.verifier_admin?.name, item.status, item.verification_status, item.review_notes]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+        return !search || text.includes(search)
+    })
 })
+
+async function loadVerifications() {
+    loading.value = true
+    errorMessage.value = ''
+    try {
+        const response = await api.get('/api/admin/verifications')
+        verifications.value = response.data?.data || []
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Failed to load verification records.'
+        verifications.value = []
+    } finally {
+        loading.value = false
+    }
+}
+
+onMounted(loadVerifications)
 </script>
 
 <style scoped>

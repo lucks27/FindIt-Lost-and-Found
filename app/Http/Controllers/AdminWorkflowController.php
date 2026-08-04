@@ -8,7 +8,9 @@ use App\Models\ClaimReview;
 use App\Models\EventFine;
 use App\Models\ItemRelease;
 use App\Models\ItemVerification;
+use App\Models\Notification;
 use App\Models\PotentialMatch;
+use App\Models\Report;
 use App\Models\Student;
 use App\Models\SurrenderRequest;
 use App\Models\AdminSetting;
@@ -135,6 +137,44 @@ class AdminWorkflowController extends Controller
         $items = AdminAnnouncement::query()
             ->with('admin')
             ->latest('published_at')
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $items,
+        ]);
+    }
+
+    public function indexLostFoundItems(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $items = Report::query()
+            ->with('student')
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $items,
+        ]);
+    }
+
+    public function indexAdminNotifications(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $items = Notification::query()
+            ->with('actorAdmin')
             ->latest()
             ->get();
 

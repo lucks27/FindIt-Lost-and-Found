@@ -75,6 +75,8 @@ Route::middleware('auth:admin')->group(function () {
 
     Route::get('/admin/announcements', [App\Http\Controllers\AdminWorkflowController::class, 'indexAnnouncements']);
     Route::post('/admin/announcements', [App\Http\Controllers\AdminWorkflowController::class, 'storeAnnouncement']);
+    Route::get('/admin/items', [App\Http\Controllers\AdminWorkflowController::class, 'indexLostFoundItems']);
+    Route::get('/admin/notifications', [App\Http\Controllers\AdminWorkflowController::class, 'indexAdminNotifications']);
 
     Route::get('/admin/claims', [App\Http\Controllers\AdminWorkflowController::class, 'indexClaimReviews']);
     Route::get('/admin/verifications', [App\Http\Controllers\AdminWorkflowController::class, 'indexItemVerifications']);

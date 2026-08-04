@@ -48,26 +48,86 @@
                 </div>
             </div>
 
-            <div class="table-shell">
-                <div class="empty-state-card" role="status">
+            <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
+            <div v-if="loading" class="loading-state">Loading release queue…</div>
+            <div v-else class="table-shell">
+                <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No release requests to show</h2>
                     <p>The release checklist, claimant details, and receipt controls will appear here as approvals
                         become ready.</p>
                 </div>
+
+                <table v-else class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Report</th>
+                            <th>Claimant</th>
+                            <th>Status</th>
+                            <th>Released</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="item in visibleRows" :key="item.id">
+                            <td>{{ item.report?.title || item.report_id || 'Unknown' }}</td>
+                            <td>{{ item.claimant_student?.name || item.claimant_student_id || 'Unknown' }}</td>
+                            <td>{{ item.status || item.release_status || 'Pending' }}</td>
+                            <td>{{ item.released_at ? formatDate(item.released_at) : 'No' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </section>
     </main>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import api from '@/bootstrap'
 
 const query = ref('')
+const releases = ref([])
+const loading = ref(false)
+const errorMessage = ref('')
+
+const metrics = computed(() => {
+    const total = releases.value.length
+    const released = releases.value.filter((item) => !!item.released_at).length
+    const pending = total - released
+    const checklist = releases.value.filter((item) => item.checklist_complete).length
+    return { total, released, pending, checklist }
+})
 
 const visibleRows = computed(() => {
-    if (!query.value) return []
-    return []
+    const search = query.value.toLowerCase()
+    return releases.value.filter((item) => {
+        const text = [item.report?.title, item.claimant_student?.name, item.status, item.release_status]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+        return !search || text.includes(search)
+    })
 })
+
+function formatDate(value) {
+    if (!value) return '—'
+    return new Date(value).toLocaleDateString()
+}
+
+async function loadReleases() {
+    loading.value = true
+    errorMessage.value = ''
+    try {
+        const response = await api.get('/api/admin/releases')
+        releases.value = response.data?.data || []
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Failed to load release requests.'
+        releases.value = []
+    } finally {
+        loading.value = false
+    }
+}
+
+onMounted(loadReleases)
 </script>
 
 <style scoped>

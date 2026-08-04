@@ -7,29 +7,29 @@
                 <p class="page-copy">Keep audience targeting, send timing, and delivery status easy to review before
                     publishing.</p>
             </div>
-            <button type="button" class="primary-button">Compose</button>
+            <button type="button" class="primary-button" @click="loadNotifications">Refresh</button>
         </header>
 
         <section class="metric-grid" aria-label="Notification summary metrics">
             <article class="metric-card">
-                <span class="metric-label">Draft</span>
-                <strong class="metric-value">9</strong>
-                <small>Saved locally</small>
+                <span class="metric-label">Total</span>
+                <strong class="metric-value">{{ metrics.total }}</strong>
+                <small>All notifications</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Scheduled</span>
-                <strong class="metric-value">4</strong>
-                <small>Queued for dispatch</small>
+                <span class="metric-label">Unread</span>
+                <strong class="metric-value">{{ metrics.unread }}</strong>
+                <small>Needs review</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Sent</span>
-                <strong class="metric-value">35</strong>
-                <small>Delivered successfully</small>
+                <span class="metric-label">Read</span>
+                <strong class="metric-value">{{ metrics.read }}</strong>
+                <small>Already viewed</small>
             </article>
             <article class="metric-card">
-                <span class="metric-label">Retry needed</span>
-                <strong class="metric-value">2</strong>
-                <small>Needs follow-up</small>
+                <span class="metric-label">Admin alerts</span>
+                <strong class="metric-value">{{ metrics.adminAlerts }}</strong>
+                <small>Actionable items</small>
             </article>
         </section>
 
@@ -48,26 +48,86 @@
                 </div>
             </div>
 
-            <div class="table-shell">
-                <div class="empty-state-card" role="status">
+            <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
+            <div v-if="loading" class="loading-state">Loading notifications…</div>
+            <div v-else class="table-shell">
+                <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No notification history yet</h2>
                     <p>Once you send or draft messages, the queue will show delivery channel, audience, and status at a
                         glance.</p>
                 </div>
+                <table v-else class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Audience</th>
+                            <th>Status</th>
+                            <th>Sent</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="item in visibleRows" :key="item.id">
+                            <td>{{ item.title || 'Untitled' }}</td>
+                            <td>{{ item.recipient_role || 'All' }}</td>
+                            <td>{{ item.status || item.delivery_status || 'Draft' }}</td>
+                            <td>{{ formatDate(item.sent_at || item.created_at) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </section>
     </main>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import api from '@/bootstrap'
 
 const query = ref('')
+const notifications = ref([])
+const loading = ref(false)
+const errorMessage = ref('')
+
+const metrics = computed(() => {
+    const total = notifications.value.length
+    const unread = notifications.value.filter((item) => !item.is_read).length
+    const read = total - unread
+    const adminAlerts = notifications.value.filter((item) => String(item.recipient_role || '').toLowerCase().includes('super')).length
+    return { total, unread, read, adminAlerts }
+})
 
 const visibleRows = computed(() => {
-    if (!query.value) return []
-    return []
+    const search = query.value.toLowerCase()
+    return notifications.value.filter((item) => {
+        const text = [item.title, item.message, item.actor_admin?.name, item.recipient_role]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+        return !search || text.includes(search)
+    })
 })
+
+function formatDate(value) {
+    if (!value) return '—'
+    return new Date(value).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+async function loadNotifications() {
+    loading.value = true
+    errorMessage.value = ''
+
+    try {
+        const response = await api.get('/api/admin/notifications')
+        notifications.value = response.data?.data || []
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Failed to load notifications.'
+        notifications.value = []
+    } finally {
+        loading.value = false
+    }
+}
+
+onMounted(loadNotifications)
 </script>
 
 <style scoped>

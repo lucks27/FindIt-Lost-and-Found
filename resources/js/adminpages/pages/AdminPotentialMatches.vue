@@ -7,7 +7,7 @@
                 <p class="page-copy">Use match score, conflict details, and next actions to make clear, defensible
                     decisions.</p>
             </div>
-            <button type="button" class="primary-button">Review matches</button>
+            <button type="button" class="primary-button" @click="loadMatches">Refresh matches</button>
         </header>
 
         <section class="metric-grid" aria-label="Potential match summary metrics">

@@ -120,7 +120,7 @@ const handleLogin = async () => {
             localStorage.setItem('admin_role', 'super_admin');
             localStorage.removeItem('admin_facility_id');
 
-            statusMessage.value = '✅ ' + (response.data.message || 'Login successful! Redirecting to dashboard...');
+            statusMessage.value = '✅ ' + (response.data.message || 'Login successful! Redirecting to welcome page...');
             setTimeout(() => {
                 router.replace({ name: getAdminHomeRouteName() });
             }, 800);

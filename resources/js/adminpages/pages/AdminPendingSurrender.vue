@@ -47,26 +47,92 @@
                 </div>
             </div>
 
-            <div class="table-shell">
-                <div class="empty-state-card" role="status">
+            <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
+            <div v-if="loading" class="loading-state">Loading surrender requests…</div>
+            <div v-else class="table-shell">
+                <div v-if="!visibleRows.length" class="empty-state-card" role="status">
                     <h2>No surrender records to display</h2>
                     <p>As pending surrenders arrive, the queue will highlight urgency, due dates, and received status
                         clearly.</p>
                 </div>
+
+                <table v-else class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Report</th>
+                            <th>Student</th>
+                            <th>Status</th>
+                            <th>Due date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="item in visibleRows" :key="item.id">
+                            <td>{{ item.report?.title || item.report_id }}</td>
+                            <td>{{ item.student?.name || 'Unknown' }}</td>
+                            <td>{{ item.status || 'Pending' }}</td>
+                            <td>{{ item.due_date ? formatDate(item.due_date) : 'TBD' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </section>
     </main>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import api from '@/bootstrap'
 
 const query = ref('')
+const surrenders = ref([])
+const loading = ref(false)
+const errorMessage = ref('')
+
+const metrics = computed(() => {
+    const total = surrenders.value.length
+    const dueSoon = surrenders.value.filter((item) => {
+        const dueDate = item.due_date ? new Date(item.due_date) : null
+        return dueDate && dueDate.getTime() <= Date.now() + 5 * 24 * 60 * 60 * 1000
+    }).length
+    const overdue = surrenders.value.filter((item) => {
+        const dueDate = item.due_date ? new Date(item.due_date) : null
+        return dueDate && dueDate.getTime() < Date.now()
+    }).length
+    const received = surrenders.value.filter((item) => item.received_by_admin_id).length
+    return { total, dueSoon, overdue, received }
+})
 
 const visibleRows = computed(() => {
-    if (!query.value) return []
-    return []
+    const search = query.value.toLowerCase()
+    return surrenders.value.filter((item) => {
+        const text = [item.report?.title, item.student?.name, item.status, item.due_date]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+        return !search || text.includes(search)
+    })
 })
+
+function formatDate(value) {
+    if (!value) return '—'
+    return new Date(value).toLocaleDateString()
+}
+
+async function loadSurrenders() {
+    loading.value = true
+    errorMessage.value = ''
+    try {
+        const response = await api.get('/api/admin/surrenders')
+        surrenders.value = response.data?.data || []
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Failed to load surrender records.'
+        surrenders.value = []
+    } finally {
+        loading.value = false
+    }
+}
+
+onMounted(loadSurrenders)
 </script>
 
 <style scoped>
