@@ -1,7 +1,7 @@
 <template>
     <div class="admin-layout">
         <AdminSidebar :current-page="currentPage" />
-        <AdminHeader :page-title="pageTitle" :title="pageTitle" @toggle-mobile-menu="toggleMobileMenu" />
+        <AdminHeader :page-title="pageCategory" :title="pageTitle" @toggle-mobile-menu="toggleMobileMenu" />
         <main class="admin-main">
             <router-view />
         </main>
@@ -54,6 +54,35 @@ const pageTitle = computed(() => {
             return 'Audit Logs'
         case 'settings':
             return 'Settings'
+        default:
+            return 'Dashboard'
+    }
+})
+
+const pageCategory = computed(() => {
+    switch (currentPage.value) {
+        case 'pending-surrender':
+        case 'item-verification':
+        case 'items':
+        case 'matches':
+        case 'claims':
+        case 'inventory':
+        case 'release':
+            return 'Lost and Found'
+        case 'recognition':
+        case 'fines':
+            return 'Points and Fines'
+        case 'notifications':
+        case 'announcements':
+            return 'Communication'
+        case 'list':
+        case 'reports':
+        case 'audit':
+            return 'Users and Records'
+        case 'profile':
+        case 'settings':
+            return 'Account'
+        case 'dashboard':
         default:
             return 'Dashboard'
     }
