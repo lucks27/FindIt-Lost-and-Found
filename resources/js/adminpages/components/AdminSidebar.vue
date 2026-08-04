@@ -3,8 +3,8 @@
         <div class="sidebar-brand">
             <img :src="logoSrc" alt="SNSU logo" class="brand-logo" />
             <div class="brand-copy">
-                <p class="brand-title">SNSU</p>
-                <p class="brand-subtitle">Lost &amp; Found</p>
+                <p class="brand-title">Surigao Del Norte State University</p>
+                <p class="brand-subtitle">Lost &amp; Found Management</p>
             </div>
         </div>
 
