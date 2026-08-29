@@ -85,6 +85,7 @@ const sections = [
             { label: 'Claims Review', page: 'claims', to: { name: 'superadmin.claims' }, icon: 'M5 4h14v2H5V4zm0 4h14v2H5V8zm0 4h14v6H5v-6z' },
             { label: 'Item Inventory', page: 'inventory', to: { name: 'superadmin.inventory' }, icon: 'M4 4h16v4H4V4zm0 6h10v10H4V10z' },
             { label: 'Item Release', page: 'release', to: { name: 'superadmin.release' }, icon: 'M3 7h18v4H3V7zm0 6h12v4H3v-4z' },
+            { label: 'Completed Returns', page: 'completed-returns', to: { name: 'superadmin.completed-returns' }, icon: 'M5 12l4 4L19 6M4 4h16v16H4V4z' },
         ],
     },
     {

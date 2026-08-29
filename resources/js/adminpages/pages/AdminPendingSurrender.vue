@@ -11,25 +11,10 @@
         </header>
 
         <section class="metric-grid" aria-label="Surrender summary metrics">
-            <article class="metric-card">
-                <span class="metric-label">Pending</span>
-                <strong class="metric-value">{{ metrics.pending }}</strong>
-                <small>Waiting for admin action</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Due soon</span>
-                <strong class="metric-value">{{ metrics.dueSoon }}</strong>
-                <small>Upcoming deadlines</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Overdue</span>
-                <strong class="metric-value">{{ metrics.overdue }}</strong>
-                <small>Escalate and review</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Received</span>
-                <strong class="metric-value">{{ metrics.received }}</strong>
-                <small>Completed handovers</small>
+            <article v-for="metric in metricCards" :key="metric.label" class="metric-card">
+                <span class="metric-label">{{ metric.label }}</span>
+                <strong class="metric-value">{{ metric.value }}</strong>
+                <small>{{ metric.hint }}</small>
             </article>
         </section>
 
@@ -70,12 +55,11 @@
                             <td>{{ item.deadline_at ? formatDate(item.deadline_at) : 'TBD' }}</td>
                             <td>{{ item.received_at ? formatDate(item.received_at) : 'Not yet' }}</td>
                             <td class="action-cell">
-                                <button type="button" class="secondary-button" @click="receiveRequest(item.id)"
-                                    :disabled="String(item.status || '').toLowerCase() !== 'pending'">Receive</button>
-                                <button type="button" class="secondary-button" @click="rejectRequest(item.id)"
-                                    :disabled="String(item.status || '').toLowerCase() !== 'pending'">Reject</button>
-                                <button type="button" class="secondary-button" @click="markOverdue(item.id)"
-                                    :disabled="String(item.status || '').toLowerCase() !== 'pending'">Overdue</button>
+                                <button v-for="action in ROW_ACTIONS" :key="action.key" type="button"
+                                    class="secondary-button" :disabled="!isPending(item)"
+                                    @click="runAction(action.key, item.id)">
+                                    {{ action.label }}
+                                </button>
                             </td>
                         </tr>
                     </tbody>
@@ -89,35 +73,70 @@
 import { computed, onMounted, ref } from 'vue'
 import api from '@/bootstrap'
 
+const DAY_MS = 24 * 60 * 60 * 1000
+const DUE_SOON_WINDOW_MS = 5 * DAY_MS
+
+const ROW_ACTIONS = [
+    { key: 'receive', label: 'Receive', endpoint: 'receive', errorFallback: 'Unable to receive surrender request.' },
+    { key: 'reject', label: 'Reject', endpoint: 'reject', errorFallback: 'Unable to reject surrender request.' },
+    { key: 'overdue', label: 'Overdue', endpoint: 'overdue', errorFallback: 'Unable to mark surrender request overdue.' },
+]
+
 const query = ref('')
 const surrenders = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
 
+function statusOf(item) {
+    return String(item.status || 'pending').toLowerCase()
+}
+
+function isPending(item) {
+    return statusOf(item) === 'pending'
+}
+
+function deadlineTime(item) {
+    return item.deadline_at ? new Date(item.deadline_at).getTime() : null
+}
+
 const metrics = computed(() => {
     const now = Date.now()
-    const pending = surrenders.value.filter((item) => String(item.status || '').toLowerCase() === 'pending').length
-    const dueSoon = surrenders.value.filter((item) => {
-        const deadline = item.deadline_at ? new Date(item.deadline_at).getTime() : null
-        return deadline && deadline <= now + 5 * 24 * 60 * 60 * 1000 && deadline >= now
+    const list = surrenders.value
+
+    const pending = list.filter(isPending).length
+
+    const dueSoon = list.filter((item) => {
+        const deadline = deadlineTime(item)
+        return deadline !== null && deadline >= now && deadline <= now + DUE_SOON_WINDOW_MS
     }).length
-    const overdue = surrenders.value.filter((item) => {
-        const deadline = item.deadline_at ? new Date(item.deadline_at).getTime() : null
-        return deadline && deadline < now
+
+    const overdue = list.filter((item) => {
+        const deadline = deadlineTime(item)
+        return deadline !== null && deadline < now
     }).length
-    const received = surrenders.value.filter((item) => item.received_by_admin_id || String(item.status || '').toLowerCase() === 'received').length
+
+    const received = list.filter((item) => item.received_by_admin_id || statusOf(item) === 'received').length
 
     return { pending, dueSoon, overdue, received }
 })
 
+const metricCards = computed(() => [
+    { label: 'Pending', value: metrics.value.pending, hint: 'Waiting for admin action' },
+    { label: 'Due soon', value: metrics.value.dueSoon, hint: 'Upcoming deadlines' },
+    { label: 'Overdue', value: metrics.value.overdue, hint: 'Escalate and review' },
+    { label: 'Received', value: metrics.value.received, hint: 'Completed handovers' },
+])
+
 const visibleRows = computed(() => {
     const search = query.value.toLowerCase()
+    if (!search) return surrenders.value
+
     return surrenders.value.filter((item) => {
         const text = [item.report?.title, item.report?.student?.name, item.student?.name, item.status, item.deadline_at]
             .filter(Boolean)
             .join(' ')
             .toLowerCase()
-        return !search || text.includes(search)
+        return text.includes(search)
     })
 })
 
@@ -141,33 +160,16 @@ async function loadSurrenders() {
     }
 }
 
-async function receiveRequest(id) {
-    errorMessage.value = ''
-    try {
-        await api.post(`/api/admin/surrenders/${id}/receive`)
-        await loadSurrenders()
-    } catch (error) {
-        errorMessage.value = error.response?.data?.message || 'Unable to receive surrender request.'
-    }
-}
+async function runAction(actionKey, id) {
+    const action = ROW_ACTIONS.find((entry) => entry.key === actionKey)
+    if (!action) return
 
-async function rejectRequest(id) {
     errorMessage.value = ''
     try {
-        await api.post(`/api/admin/surrenders/${id}/reject`)
+        await api.post(`/api/admin/surrenders/${id}/${action.endpoint}`)
         await loadSurrenders()
     } catch (error) {
-        errorMessage.value = error.response?.data?.message || 'Unable to reject surrender request.'
-    }
-}
-
-async function markOverdue(id) {
-    errorMessage.value = ''
-    try {
-        await api.post(`/api/admin/surrenders/${id}/overdue`)
-        await loadSurrenders()
-    } catch (error) {
-        errorMessage.value = error.response?.data?.message || 'Unable to mark surrender request overdue.'
+        errorMessage.value = error.response?.data?.message || action.errorFallback
     }
 }
 
