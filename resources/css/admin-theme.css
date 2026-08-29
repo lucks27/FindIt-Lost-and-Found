@@ -100,3 +100,469 @@ body:has(#admin-app) {
   width: 0;
   height: 0;
 }
+
+:root {
+  --admin-page-surface-top: #dff7e4;
+  --admin-page-surface-mid: #c7efd0;
+  --admin-page-surface-bottom: #8ec89a;
+  --admin-card-top: #1c7d57;
+  --admin-card-bottom: #143f34;
+  --admin-panel-top: #2e7f5c;
+  --admin-panel-bottom: #1c6349;
+  --admin-ink-900: #123c2d;
+  --admin-ink-800: #1e463a;
+  --admin-gold-500: #f4d46c;
+  --admin-gold-600: #e6bd49;
+  --admin-white-soft: #f4f8f6;
+  --admin-text-soft: rgba(235, 243, 238, 0.86);
+  --admin-text-soft-strong: rgba(244, 248, 246, 0.92);
+  --admin-text-dark-soft: rgba(26, 53, 43, 0.86);
+  --admin-card-border: rgba(8, 35, 27, 0.22);
+  --admin-shadow-soft: 0 18px 42px rgba(10, 57, 38, 0.18);
+  --admin-input-bg: rgba(10, 25, 19, 0.72);
+  --admin-input-border: rgba(255, 255, 255, 0.14);
+}
+
+#admin-app .admin-page-body,
+#admin-app .admin-profile-page {
+  background: linear-gradient(180deg, var(--admin-page-surface-top) 0%, var(--admin-page-surface-mid) 35%, var(--admin-page-surface-bottom) 100%);
+  color: var(--admin-ink-900);
+}
+
+#admin-app .admin-page-body .page-header,
+#admin-app .admin-page-body .metric-card,
+#admin-app .admin-page-body .panel-card,
+#admin-app .admin-page-body .report-card,
+#admin-app .admin-page-body .form-card,
+#admin-app .admin-page-body .student-directory-card,
+#admin-app .admin-profile-page .glass-card,
+#admin-app .admin-profile-page .student-directory-card,
+#admin-app .admin-page-body .directory-card {
+  background: linear-gradient(180deg, var(--admin-card-top) 0%, var(--admin-card-bottom) 100%);
+  border: 1px solid var(--admin-card-border);
+  box-shadow: var(--admin-shadow-soft);
+  color: var(--admin-white-soft);
+}
+
+#admin-app .admin-page-body .page-header {
+  border-radius: 24px;
+  padding: 24px 26px;
+  margin-bottom: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06));
+  border: 1px solid rgba(13, 53, 40, 0.12);
+  box-shadow: 0 12px 26px rgba(10, 57, 38, 0.12);
+}
+
+#admin-app .admin-page-body .page-header h1,
+#admin-app .admin-page-body .page-header h2,
+#admin-app .admin-page-body .page-header h3,
+#admin-app .admin-page-body .report-card strong,
+#admin-app .admin-page-body .metric-card strong,
+#admin-app .admin-page-body .panel-card h2,
+#admin-app .admin-page-body .panel-card h3,
+#admin-app .admin-page-body .metric-card .metric-value,
+#admin-app .admin-profile-page .glass-card h2,
+#admin-app .admin-profile-page .card-header h3,
+#admin-app .admin-profile-page .profile-hero h1,
+#admin-app .admin-profile-page .student-name,
+#admin-app .admin-profile-page .info-value,
+#admin-app .admin-page-body .stat-row strong,
+#admin-app .admin-page-body .activity-row strong {
+  color: var(--admin-white-soft);
+}
+
+#admin-app .admin-page-body .page-header h1,
+#admin-app .admin-profile-page .profile-hero h1 {
+  color: var(--admin-ink-900);
+}
+
+#admin-app .admin-page-body .page-kicker,
+#admin-app .admin-page-body .card-label,
+#admin-app .admin-page-body .metric-label,
+#admin-app .admin-page-body .page-label,
+#admin-app .admin-page-body .panel-label,
+#admin-app .admin-page-body .profile-kicker,
+#admin-app .admin-page-body .field-label,
+#admin-app .admin-page-body .status-chip,
+#admin-app .admin-profile-page .role-badge,
+#admin-app .admin-profile-page .info-label,
+#admin-app .admin-page-body .page-kicker,
+#admin-app .admin-page-body .report-card .card-label {
+  color: var(--admin-gold-500);
+}
+
+#admin-app .admin-page-body .page-header .page-copy,
+#admin-app .admin-page-body .panel-card p,
+#admin-app .admin-page-body .report-card p,
+#admin-app .admin-page-body .metric-card small,
+#admin-app .admin-page-body .metric-card p,
+#admin-app .admin-page-body .admin-table td,
+#admin-app .admin-page-body .admin-table th,
+#admin-app .admin-page-body .search-field input,
+#admin-app .admin-page-body .form-grid input,
+#admin-app .admin-page-body input,
+#admin-app .admin-page-body textarea,
+#admin-app .admin-page-body select,
+#admin-app .admin-page-body .status-chip,
+#admin-app .admin-profile-page .profile-hero p,
+#admin-app .admin-profile-page .info-label,
+#admin-app .admin-profile-page .info-value,
+#admin-app .admin-page-body .empty-state-card p,
+#admin-app .admin-page-body .empty-state-card h2,
+#admin-app .admin-page-body .activity-row span,
+#admin-app .admin-page-body .stat-row span {
+  color: var(--admin-text-soft);
+}
+
+#admin-app .admin-page-body .page-header .page-copy,
+#admin-app .admin-page-body .page-header p,
+#admin-app .admin-profile-page .profile-hero p {
+  color: var(--admin-text-dark-soft);
+}
+
+#admin-app .admin-page-body .primary-button,
+#admin-app .admin-page-body .secondary-button,
+#admin-app .admin-page-body .primary-action-btn,
+#admin-app .admin-page-body .chip-button,
+#admin-app .admin-page-body .delete-btn,
+#admin-app .admin-page-body .icon-button,
+#admin-app .admin-profile-page .primary-action-btn,
+#admin-app .admin-profile-page .secondary-action-btn,
+#admin-app .admin-profile-page .delete-btn {
+  font-weight: 700;
+}
+
+#admin-app .admin-page-body .primary-button,
+#admin-app .admin-page-body .primary-action-btn,
+#admin-app .admin-page-body .delete-btn,
+#admin-app .admin-profile-page .primary-action-btn,
+#admin-app .admin-profile-page .delete-btn {
+  background: linear-gradient(135deg, var(--admin-gold-500) 0%, var(--admin-gold-600) 100%);
+  color: var(--admin-ink-900);
+  border: 1px solid rgba(120, 87, 20, 0.24);
+}
+
+#admin-app .admin-page-body .secondary-button,
+#admin-app .admin-page-body .chip-button,
+#admin-app .admin-profile-page .secondary-action-btn,
+#admin-app .admin-profile-page .ghost-btn,
+#admin-app .admin-page-body .icon-button {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--admin-white-soft);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+#admin-app .admin-page-body .metric-card,
+#admin-app .admin-page-body .panel-card,
+#admin-app .admin-page-body .report-card,
+#admin-app .admin-page-body .form-card,
+#admin-app .admin-page-body .student-directory-card,
+#admin-app .admin-profile-page .glass-card {
+  border-radius: 22px;
+}
+
+#admin-app .admin-page-body .metric-card {
+  padding: 18px;
+}
+
+#admin-app .admin-page-body .panel-card,
+#admin-app .admin-page-body .report-card,
+#admin-app .admin-page-body .form-card {
+  padding: 20px 22px;
+}
+
+#admin-app .admin-page-body .admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#admin-app .admin-page-body .admin-table th,
+#admin-app .admin-page-body .admin-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+#admin-app .admin-page-body .admin-table thead th {
+  color: var(--admin-gold-500);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+}
+
+#admin-app .admin-page-body .search-field input,
+#admin-app .admin-page-body .form-grid input,
+#admin-app .admin-page-body .form-grid select,
+#admin-app .admin-page-body .search-field select,
+#admin-app .admin-page-body .toolbar-search input,
+#admin-app .admin-page-body .toolbar-filters select,
+#admin-app .admin-profile-page input,
+#admin-app .admin-profile-page select,
+#admin-app .admin-page-body input,
+#admin-app .admin-page-body textarea,
+#admin-app .admin-page-body select {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--admin-input-border);
+  background: var(--admin-input-bg);
+  color: var(--admin-white-soft);
+  padding: 0.8rem 0.95rem;
+}
+
+#admin-app .admin-page-body .status-chip,
+#admin-app .admin-page-body .status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 86px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--admin-white-soft);
+  font-size: 0.78rem;
+  text-transform: capitalize;
+}
+
+#admin-app .admin-page-body .metric-card .metric-label,
+#admin-app .admin-page-body .metric-card small,
+#admin-app .admin-page-body .metric-card .metric-value,
+#admin-app .admin-page-body .metric-card strong {
+  display: block;
+}
+
+#admin-app .admin-page-body .metric-card .metric-label {
+  margin-bottom: 10px;
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+#admin-app .admin-page-body .metric-card strong,
+#admin-app .admin-page-body .metric-card .metric-value {
+  font-size: clamp(1.8rem, 2vw, 2.2rem);
+  line-height: 1.05;
+  margin-bottom: 6px;
+}
+
+#admin-app .admin-page-body .metric-card small,
+#admin-app .admin-page-body .report-card small,
+#admin-app .admin-page-body .panel-card small {
+  color: var(--admin-text-soft);
+}
+
+#admin-app .admin-page-body .report-card .stat-row,
+#admin-app .admin-page-body .activity-row,
+#admin-app .admin-page-body .toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(12, 58, 43, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#admin-app .admin-page-body .report-card .stat-row + .stat-row,
+#admin-app .admin-page-body .activity-row + .activity-row {
+  margin-top: 10px;
+}
+
+#admin-app .admin-page-body .empty-state-card {
+  padding: 28px 20px;
+  border-radius: 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+#admin-app .admin-page-body .empty-state-card h2,
+#admin-app .admin-page-body .empty-state-card h3 {
+  color: var(--admin-white-soft);
+}
+
+#admin-app .admin-page-body .empty-state-card p {
+  color: rgba(244, 248, 246, 0.8);
+}
+
+#admin-app .admin-page-body .loading-state,
+#admin-app .admin-page-body .inline-alert,
+#admin-app .admin-page-body .error-alert,
+#admin-app .admin-page-body .success-alert {
+  border-radius: 14px;
+}
+
+#admin-app .admin-page-body .inline-alert,
+#admin-app .admin-page-body .error-alert,
+#admin-app .admin-page-body .success-alert {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(16, 44, 36, 0.28);
+  color: var(--admin-white-soft);
+}
+
+#admin-app .admin-page-body .error-alert {
+  border-color: rgba(255, 140, 140, 0.28);
+  color: #ffe4e6;
+}
+
+#admin-app .admin-page-body .success-alert {
+  border-color: rgba(120, 219, 160, 0.26);
+  color: #eafaf0;
+}
+
+#admin-app .admin-page-body a,
+#admin-app .admin-page-body .count-link,
+#admin-app .admin-page-body .action-link,
+#admin-app .admin-profile-page a {
+  color: var(--admin-gold-500);
+}
+
+#admin-app .admin-page-body .count-link,
+#admin-app .admin-page-body .action-link {
+  text-decoration: none;
+}
+
+#admin-app .admin-page-body .count-link:hover,
+#admin-app .admin-page-body .action-link:hover,
+#admin-app .admin-page-body a:hover {
+  color: var(--admin-gold-600);
+}
+
+#admin-app .admin-page-body .toolbar-row,
+#admin-app .admin-page-body .chip-row,
+#admin-app .admin-page-body .header-actions,
+#admin-app .admin-profile-page .header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+#admin-app .admin-page-body .search-field,
+#admin-app .admin-page-body .toolbar-search,
+#admin-app .admin-page-body .form-grid label,
+#admin-app .admin-page-body .form-group,
+#admin-app .admin-profile-page .form-group,
+#admin-app .admin-profile-page .info-group {
+  display: grid;
+  gap: 8px;
+}
+
+#admin-app .admin-page-body .page-header,
+#admin-app .admin-page-body .panel-card,
+#admin-app .admin-page-body .report-card,
+#admin-app .admin-page-body .metric-card,
+#admin-app .admin-page-body .form-card,
+#admin-app .admin-profile-page .glass-card {
+  backdrop-filter: blur(8px);
+}
+
+#admin-app .admin-page-body .page-header h1,
+#admin-app .admin-page-body .page-header .page-copy,
+#admin-app .admin-page-body .page-header .page-kicker,
+#admin-app .admin-profile-page .profile-hero h1,
+#admin-app .admin-profile-page .profile-hero p,
+#admin-app .admin-profile-page .profile-kicker {
+  position: relative;
+  z-index: 1;
+}
+
+#admin-app .admin-page-body .icon-holder,
+#admin-app .admin-page-body .summary-icon,
+#admin-app .admin-page-body .legend-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  width: 48px;
+  height: 48px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+#admin-app .admin-page-body .icon-holder svg,
+#admin-app .admin-page-body .summary-icon svg,
+#admin-app .admin-page-body .legend-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+#admin-app .admin-page-body .icon-holder,
+#admin-app .admin-page-body .summary-icon,
+#admin-app .admin-page-body .legend-icon {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+#admin-app .admin-page-body .icon-holder.icon-gold,
+#admin-app .admin-page-body .legend-icon.lost {
+  background: rgba(94, 133, 255, 0.18);
+  color: #5bb3ff;
+}
+
+#admin-app .admin-page-body .icon-holder.icon-blue,
+#admin-app .admin-page-body .legend-icon.found {
+  background: rgba(18, 190, 175, 0.18);
+  color: #39dfd2;
+}
+
+#admin-app .admin-page-body .icon-holder.icon-purple,
+#admin-app .admin-page-body .legend-icon.verified {
+  background: rgba(134, 99, 255, 0.18);
+  color: #b99bff;
+}
+
+#admin-app .admin-page-body .icon-holder.icon-green,
+#admin-app .admin-page-body .legend-icon.returned {
+  background: rgba(34, 197, 94, 0.18);
+  color: #7bf3a3;
+}
+
+#admin-app .admin-page-body .icon-holder.icon-teal {
+  background: rgba(245, 158, 11, 0.18);
+  color: #ffb74d;
+}
+
+#admin-app .admin-page-body .icon-holder.icon-orange {
+  background: rgba(100, 116, 139, 0.2);
+  color: #a9bed8;
+}
+
+#admin-app .admin-page-body .empty-state-card .sr-only,
+#admin-app .admin-page-body .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 900px) {
+  #admin-app .admin-page-body {
+    padding: 18px;
+  }
+
+  #admin-app .admin-page-body .metric-grid,
+  #admin-app .admin-page-body .report-layout,
+  #admin-app .admin-page-body .student-metrics,
+  #admin-app .admin-profile-page .profile-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  #admin-app .admin-page-body,
+  #admin-app .admin-profile-page {
+    padding: 14px;
+  }
+
+  #admin-app .admin-page-body .metric-grid,
+  #admin-app .admin-page-body .report-layout,
+  #admin-app .admin-page-body .student-metrics,
+  #admin-app .admin-profile-page .profile-layout {
+    grid-template-columns: 1fr;
+  }
+}

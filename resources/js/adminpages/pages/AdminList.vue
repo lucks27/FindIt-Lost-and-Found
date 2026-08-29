@@ -130,7 +130,7 @@
                                 <div>
                                     <div class="student-name">{{ student.name }}</div>
                                     <div class="student-subtext">{{ student.department || student.course || 'No program'
-                                    }}</div>
+                                        }}</div>
                                 </div>
                             </td>
                             <td>{{ student.student_id || '—' }}</td>
@@ -222,7 +222,7 @@
                             <span>Student ID *</span>
                             <input v-model.trim="studentForm.student_id" type="text" placeholder="e.g. 2026-00123" />
                             <span v-if="studentErrors.student_id" class="field-error">{{ studentErrors.student_id
-                            }}</span>
+                                }}</span>
                         </label>
                     </div>
 
@@ -235,7 +235,7 @@
                                 <option v-for="course in COURSES" :key="course" :value="course">{{ course }}</option>
                             </select>
                             <span v-if="studentErrors.course_base" class="field-error">{{ studentErrors.course_base
-                            }}</span>
+                                }}</span>
                         </label>
 
                         <label v-if="needsMajorSelection">
@@ -256,7 +256,7 @@
                                 </option>
                             </select>
                             <span v-if="studentErrors.concentration" class="field-error">{{ studentErrors.concentration
-                            }}</span>
+                                }}</span>
                         </label>
 
                         <label>
@@ -266,7 +266,7 @@
                                 <option v-for="year in YEAR_LEVELS" :key="year" :value="year">{{ year }}</option>
                             </select>
                             <span v-if="studentErrors.year_level" class="field-error">{{ studentErrors.year_level
-                            }}</span>
+                                }}</span>
                         </label>
 
                         <label>
@@ -276,7 +276,7 @@
                                 <option v-for="dept in DEPARTMENTS" :key="dept" :value="dept">{{ dept }}</option>
                             </select>
                             <span v-if="studentErrors.department" class="field-error">{{ studentErrors.department
-                            }}</span>
+                                }}</span>
                         </label>
                     </div>
 
@@ -332,17 +332,17 @@
                         <div class="detail-row"><span>Course</span><strong>{{ selectedStudent.course || '—' }}</strong>
                         </div>
                         <div class="detail-row"><span>Year level</span><strong>{{ selectedStudent.year_level || '—'
-                        }}</strong></div>
+                                }}</strong></div>
                         <div class="detail-row"><span>Department</span><strong>{{ selectedStudent.department || '—'
-                        }}</strong></div>
+                                }}</strong></div>
                         <div class="detail-row"><span>Email</span><strong>{{ selectedStudent.email || '—' }}</strong>
                         </div>
                         <div class="detail-row"><span>Status</span><strong>{{ capitalize(selectedStudent.account_status
                             || 'active') }}</strong></div>
                         <div class="detail-row"><span>Created</span><strong>{{ formatDate(selectedStudent.created_at)
-                        }}</strong></div>
+                                }}</strong></div>
                         <div class="detail-row"><span>Updated</span><strong>{{ formatDate(selectedStudent.updated_at)
-                        }}</strong></div>
+                                }}</strong></div>
                         <div v-if="selectedStudent.recognition_points !== undefined" class="detail-row">
                             <span>Recognition points</span><strong>{{ selectedStudent.recognition_points }}</strong>
                         </div>
@@ -809,18 +809,17 @@ onMounted(loadListData)
     display: block;
     min-height: 100%;
     padding: 24px 24px 32px;
-    background: transparent;
-    color: #f8f4ea;
     position: relative;
+    background: linear-gradient(180deg, #dff7e4 0%, #c7efd0 35%, #8ec89a 100%);
+    color: #123c2d;
 }
 
 .student-management-page::before {
     content: '';
     position: absolute;
     inset: 0;
-    background:
-        radial-gradient(circle at top left, rgba(246, 214, 109, 0.08), transparent 20%),
-        radial-gradient(circle at top right, rgba(255, 255, 255, 0.04), transparent 18%);
+    background: radial-gradient(circle at top left, rgba(18, 114, 72, 0.08), transparent 22%),
+        radial-gradient(circle at top right, rgba(16, 95, 67, 0.06), transparent 18%);
     pointer-events: none;
 }
 
@@ -839,19 +838,19 @@ onMounted(loadListData)
     font-size: 12px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: rgba(248, 244, 234, 0.7);
+    color: #c7961d;
 }
 
 .page-header h1 {
     margin: 0;
     font-size: clamp(28px, 4vw, 38px);
     line-height: 1.05;
-    color: #f8f4ea;
+    color: #123c2d;
 }
 
 .page-header p {
     margin: 0;
-    color: rgba(248, 244, 234, 0.82);
+    color: rgba(26, 53, 43, 0.86);
     max-width: 760px;
 }
 
@@ -885,9 +884,9 @@ onMounted(loadListData)
 .ghost-btn,
 .pagination-btn,
 .icon-button {
-    background: rgba(243, 212, 106, 0.12);
-    color: #f8f4ea;
-    border: 1px solid rgba(243, 212, 106, 0.28);
+    background: rgba(10, 31, 24, 0.08);
+    color: #123c2d;
+    border: 1px solid rgba(18, 60, 45, 0.2);
 }
 
 .secondary-action-btn,
@@ -904,7 +903,7 @@ onMounted(loadListData)
 .icon-button:hover,
 .delete-btn:hover {
     transform: translateY(-1px);
-    filter: brightness(1.18);
+    filter: brightness(1.08);
 }
 
 .secondary-action-btn {
@@ -929,20 +928,20 @@ onMounted(loadListData)
 }
 
 .metric-card {
-    background: linear-gradient(180deg, rgba(243, 212, 106, 0.16), rgba(255, 255, 255, 0.04));
-    border: 1px solid rgba(243, 212, 106, 0.24);
+    background: linear-gradient(180deg, #1c7d57 0%, #143f34 100%);
+    border: 1px solid rgba(8, 35, 27, 0.22);
     border-radius: 22px;
     padding: 20px;
     min-height: 120px;
     display: grid;
     gap: 10px;
-    color: #f8f4ea;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    color: #f4f8f6;
+    box-shadow: 0 18px 42px rgba(10, 57, 38, 0.18);
 }
 
 .metric-card span {
     font-size: 12px;
-    color: #f3d46a;
+    color: #f4d46c;
     text-transform: uppercase;
     letter-spacing: 0.12em;
 }
@@ -955,16 +954,16 @@ onMounted(loadListData)
 
 .metric-card p {
     margin: 0;
-    color: rgba(248, 244, 234, 0.78);
+    color: rgba(244, 248, 246, 0.82);
     font-size: 14px;
     line-height: 1.5;
 }
 
 .student-directory-card {
-    background: rgba(255, 255, 255, 0.06);
+    background: linear-gradient(180deg, #2d7f5b 0%, #1c6349 100%);
     border-radius: 28px;
-    box-shadow: 0 22px 44px rgba(8, 15, 18, 0.18);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 18px 42px rgba(10, 57, 38, 0.16);
+    border: 1px solid rgba(7, 34, 26, 0.22);
     padding: 24px;
     backdrop-filter: blur(16px);
 }
@@ -992,11 +991,11 @@ onMounted(loadListData)
 .student-form input,
 .student-form select {
     width: 100%;
-    border: 1px solid rgba(243, 212, 106, 0.26);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 14px;
     padding: 12px 14px;
-    background: rgba(243, 212, 106, 0.08);
-    color: #f8f4ea;
+    background: rgba(10, 25, 19, 0.72);
+    color: #f4f8f6;
     font-size: 14px;
 }
 
@@ -1005,7 +1004,7 @@ onMounted(loadListData)
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: rgba(248, 244, 234, 0.72);
+    color: #f4d46c;
 }
 
 .toolbar-filters {
@@ -1023,7 +1022,7 @@ onMounted(loadListData)
 }
 
 .result-count {
-    color: #f8f4ea;
+    color: #f4f8f6;
     font-weight: 700;
 }
 
@@ -1037,9 +1036,9 @@ onMounted(loadListData)
     padding: 16px 18px;
     margin-bottom: 18px;
     font-weight: 700;
-    background: rgba(255, 255, 255, 0.06);
-    color: #f8f4ea;
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(16, 44, 36, 0.3);
+    color: #f4f8f6;
+    border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .success-alert {
@@ -1060,9 +1059,9 @@ onMounted(loadListData)
     gap: 12px;
     align-items: center;
     padding: 28px;
-    color: #f8f4ea;
+    color: #f4f8f6;
     font-weight: 700;
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(12, 58, 43, 0.1);
     border-radius: 22px;
 }
 
@@ -1077,22 +1076,22 @@ onMounted(loadListData)
 
 .empty-state-card {
     padding: 42px 24px;
-    border: 1px dashed rgba(255, 255, 255, 0.14);
+    border: 1px dashed rgba(255, 255, 255, 0.18);
     border-radius: 22px;
     text-align: center;
-    color: rgba(248, 244, 234, 0.78);
-    background: rgba(255, 255, 255, 0.03);
+    color: rgba(244, 248, 246, 0.82);
+    background: rgba(12, 58, 43, 0.1);
 }
 
 .empty-state-card h3 {
     margin: 0 0 10px;
     font-size: 20px;
-    color: #f8f4ea;
+    color: #f4f8f6;
 }
 
 .empty-state-card p {
     margin: 0;
-    color: rgba(248, 244, 234, 0.72);
+    color: rgba(244, 248, 246, 0.8);
 }
 
 .admin-table {
@@ -1104,7 +1103,7 @@ onMounted(loadListData)
 .admin-table th,
 .admin-table td {
     padding: 16px 18px;
-    border-bottom: 1px solid rgba(16, 49, 24, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     vertical-align: middle;
 }
 
@@ -1113,12 +1112,12 @@ onMounted(loadListData)
     font-size: 12px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: rgba(248, 244, 234, 0.88);
-    background: rgba(243, 212, 106, 0.08);
+    color: #f4d46c;
+    background: rgba(12, 58, 43, 0.12);
 }
 
 .admin-table tbody tr:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.04);
 }
 
 .student-cell {
@@ -1140,13 +1139,13 @@ onMounted(loadListData)
 
 .student-name {
     font-weight: 700;
-    color: #f8f4ea;
+    color: #f4f8f6;
 }
 
 .student-subtext {
     margin-top: 5px;
     font-size: 13px;
-    color: rgba(248, 244, 234, 0.72);
+    color: rgba(244, 248, 246, 0.8);
 }
 
 .status-badge {
@@ -1168,7 +1167,7 @@ onMounted(loadListData)
 
 .status-inactive {
     background: rgba(255, 255, 255, 0.08);
-    color: rgba(248, 244, 234, 0.8);
+    color: rgba(244, 248, 246, 0.82);
     border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
@@ -1178,7 +1177,7 @@ onMounted(loadListData)
 }
 
 .status-pending {
-    background: rgba(246, 214, 109, 0.1);
+    background: rgba(246, 214, 109, 0.12);
     color: #f3d46a;
 }
 
@@ -1218,7 +1217,7 @@ onMounted(loadListData)
 }
 
 .pagination-summary {
-    color: rgba(248, 244, 234, 0.8);
+    color: rgba(25, 52, 42, 0.8);
     font-size: 14px;
 }
 
@@ -1232,8 +1231,8 @@ onMounted(loadListData)
 .pagination-btn {
     padding: 10px 14px;
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.08);
-    color: #f8f4ea;
+    background: rgba(10, 25, 19, 0.08);
+    color: #123c2d;
 }
 
 .pagination-btn.active {
@@ -1245,15 +1244,15 @@ onMounted(loadListData)
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    color: #f8f4ea;
+    color: #123c2d;
     font-weight: 600;
 }
 
 .rows-per-page select {
     min-width: 80px;
-    background: rgba(255, 255, 255, 0.08);
-    color: #f8f4ea;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(10, 25, 19, 0.08);
+    color: #123c2d;
+    border: 1px solid rgba(18, 60, 45, 0.2);
 }
 
 .modal-overlay {
