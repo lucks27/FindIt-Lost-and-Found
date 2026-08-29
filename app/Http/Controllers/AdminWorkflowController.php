@@ -350,7 +350,7 @@ class AdminWorkflowController extends Controller
         }
 
         $items = PotentialMatch::query()
-            ->with(['sourceReport.student', 'matchedReport.student'])
+            ->with(['lostReport.student', 'foundReport.student'])
             ->latest()
             ->get();
 
@@ -453,14 +453,12 @@ class AdminWorkflowController extends Controller
 
         $summary = [
             'total_reports' => Report::count(),
-            'open_reports' => Report::whereIn('status', ['pending_approval', 'pending_surrender', 'pending_verification', 'verified', 'ready_for_release', 'under_claim_review'])->count(),
-            'lost_reports' => Report::where('type', 'lost')->count(),
-            'found_reports' => Report::where('type', 'found')->count(),
-            'total_claims' => ClaimReview::count(),
-            'total_releases' => ItemRelease::count(),
-            'active_surrenders' => SurrenderRequest::where('status', 'pending')->count(),
-            'total_point_rules' => PointRule::count(),
-            'student_count' => Student::count(),
+            'pending_surrenders' => SurrenderRequest::where('status', 'pending')->count(),
+            'pending_reports' => Report::where('type', 'lost')->whereIn('status', ['pending_approval', 'correction_requested'])->count(),
+            'pending_verifications' => ItemVerification::where('status', 'pending')->count(),
+            'mobile_posts' => Report::whereNotNull('published_at')->count(),
+            'potential_matches' => PotentialMatch::where('status', 'pending')->count(),
+            'archived_items' => Report::whereIn('status', ['rejected', 'claimed', 'unclaimed', 'completed_return', 'archived'])->count(),
         ];
 
         $recentActivity = [
@@ -469,12 +467,6 @@ class AdminWorkflowController extends Controller
                 'type' => 'report',
                 'label' => "Report '{$report->title}' ({$report->status})",
                 'when' => $report->created_at?->toDateTimeString(),
-            ])->all(),
-            ...ClaimReview::with(['report', 'claimantStudent'])->latest()->take(3)->get()->map(fn($item) => [
-                'id' => 'claim-' . $item->id,
-                'type' => 'claim',
-                'label' => "Claim review for '{$item->report?->title}' ({$item->review_status})",
-                'when' => $item->reviewed_at?->toDateTimeString() ?? $item->created_at?->toDateTimeString(),
             ])->all(),
         ];
 
@@ -1037,13 +1029,13 @@ class AdminWorkflowController extends Controller
 
                 $report->update(['status' => 'ready_for_release']);
 
-                $matchingLostReports = PotentialMatch::where('matched_report_id', $report->id)
-                    ->with('sourceReport')
+                $matchingLostReports = PotentialMatch::where('found_report_id', $report->id)
+                    ->with('lostReport')
                     ->get();
 
                 foreach ($matchingLostReports as $match) {
-                    if ($match->sourceReport && $match->sourceReport->type === 'lost') {
-                        $match->sourceReport->update(['status' => 'under_claim_review']);
+                    if ($match->lostReport && $match->lostReport->type === 'lost') {
+                        $match->lostReport->update(['status' => 'under_claim_review']);
                     }
                 }
 
@@ -1270,13 +1262,13 @@ class AdminWorkflowController extends Controller
                     }
                 }
 
-                $matchingLostReports = PotentialMatch::where('matched_report_id', $report->id)
-                    ->with('sourceReport')
+                $matchingLostReports = PotentialMatch::where('found_report_id', $report->id)
+                    ->with('lostReport')
                     ->get();
 
                 foreach ($matchingLostReports as $match) {
-                    if ($match->sourceReport && $match->sourceReport->type === 'lost') {
-                        $match->sourceReport->update(['status' => 'completed_return']);
+                    if ($match->lostReport && $match->lostReport->type === 'lost') {
+                        $match->lostReport->update(['status' => 'completed_return']);
                     }
                 }
 

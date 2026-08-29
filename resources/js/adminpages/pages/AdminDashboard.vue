@@ -26,9 +26,9 @@
                                     <path d="M12 2l3 3H9l3-3zm-3 7h6l-3 9-3-9z" />
                                 </svg>
                             </div>
-                            <strong>{{ metrics.openReports }}</strong>
+                            <strong>{{ metrics.pendingSurrenders }}</strong>
                         </div>
-                        <p>Open workflow</p>
+                        <p>Pending surrender</p>
                         <router-link class="count-link" :to="{ name: 'superadmin.pending-surrender' }">Go to
                             queue</router-link>
                     </article>
@@ -40,24 +40,10 @@
                                     <path d="M6 3l12 5v10l-12 5L4 17V7l2-4zm1.5 3.2v11.6L15 18V6L7.5 6.2z" />
                                 </svg>
                             </div>
-                            <strong>{{ metrics.foundReports }}</strong>
+                            <strong>{{ metrics.pendingReports }}</strong>
                         </div>
-                        <p>Found reports</p>
-                        <router-link class="count-link" :to="{ name: 'superadmin.mobile-posts' }">Post mobile</router-link>
-                    </article>
-
-                    <article class="count-card">
-                        <div class="count-top">
-                            <div class="icon-holder icon-purple">
-                                <svg viewBox="0 0 24 24">
-                                    <path
-                                        d="M12 2l7 4v6c0 5-4 9-7 9s-7-4-7-9V6l7-4zm0 2.18L6 7.05V12c0 3.78 2.69 6.95 6 7.9 3.31-.95 6-4.12 6-7.9V7.05l-6-2.87z" />
-                                </svg>
-                            </div>
-                            <strong>{{ metrics.totalClaims }}</strong>
-                        </div>
-                        <p>Claim reviews</p>
-                        <router-link class="count-link" :to="{ name: 'superadmin.archive' }">Open archive</router-link>
+                        <p>Pending reports</p>
+                        <router-link class="count-link" :to="{ name: 'superadmin.pending-report' }">Review reports</router-link>
                     </article>
 
                     <article class="count-card">
@@ -67,10 +53,10 @@
                                     <path d="M9 12l2 2 4-4M4 12a8 8 0 1 1 16 0 8 8 0 0 1-16 0z" />
                                 </svg>
                             </div>
-                            <strong>{{ metrics.totalReleases }}</strong>
+                            <strong>{{ metrics.pendingVerifications }}</strong>
                         </div>
-                        <p>Completed releases</p>
-                        <router-link class="count-link" :to="{ name: 'superadmin.archive' }">View archive</router-link>
+                        <p>Item verification</p>
+                        <router-link class="count-link" :to="{ name: 'superadmin.item-verification' }">Open verification</router-link>
                     </article>
 
                     <article class="count-card">
@@ -80,11 +66,10 @@
                                     <path d="M5 12l4 4 10-10" />
                                 </svg>
                             </div>
-                            <strong>{{ metrics.activeSurrenders }}</strong>
+                            <strong>{{ metrics.mobilePosts }}</strong>
                         </div>
-                        <p>Active surrenders</p>
-                        <router-link class="count-link" :to="{ name: 'superadmin.pending-surrender' }">Open
-                            queue</router-link>
+                        <p>Posted to mobile</p>
+                        <router-link class="count-link" :to="{ name: 'superadmin.mobile-posts' }">Manage posts</router-link>
                     </article>
 
                     <article class="count-card">
@@ -94,10 +79,21 @@
                                     <path d="M6 4h12v4H6V4zm0 6h12v10H6V10zm2 2v6h2v-6H8zm4 0v6h2v-6h-2z" />
                                 </svg>
                             </div>
-                            <strong>{{ metrics.studentCount }}</strong>
+                            <strong>{{ metrics.potentialMatches }}</strong>
                         </div>
-                        <p>Students tracked</p>
-                        <router-link class="count-link" :to="{ name: 'superadmin.list' }">Manage students</router-link>
+                        <p>Potential matches</p>
+                        <router-link class="count-link" :to="{ name: 'superadmin.matches' }">Review matches</router-link>
+                    </article>
+
+                    <article class="count-card">
+                        <div class="count-top">
+                            <div class="icon-holder icon-purple">
+                                <svg viewBox="0 0 24 24"><path d="M4 5h16v4H4V5zm2 6h12v8H6v-8zm3 2h6" /></svg>
+                            </div>
+                            <strong>{{ metrics.archivedItems }}</strong>
+                        </div>
+                        <p>Archived items</p>
+                        <router-link class="count-link" :to="{ name: 'superadmin.archive' }">Open archive</router-link>
                     </article>
                 </section>
 
@@ -197,13 +193,16 @@ const metrics = computed(() => {
     const summary = dashboard.value.summary || {}
     return {
         totalReports: Number(summary.total_reports || 0),
-        openReports: Number(summary.open_reports || 0),
-        lostReports: Number(summary.lost_reports || 0),
-        foundReports: Number(summary.found_reports || 0),
-        totalClaims: Number(summary.total_claims || 0),
-        totalReleases: Number(summary.total_releases || 0),
-        activeSurrenders: Number(summary.active_surrenders || 0),
-        studentCount: Number(summary.student_count || 0),
+        pendingSurrenders: Number(summary.pending_surrenders || 0),
+        pendingReports: Number(summary.pending_reports || 0),
+        pendingVerifications: Number(summary.pending_verifications || 0),
+        mobilePosts: Number(summary.mobile_posts || 0),
+        potentialMatches: Number(summary.potential_matches || 0),
+        archivedItems: Number(summary.archived_items || 0),
+        openReports: Number(summary.pending_surrenders || 0) + Number(summary.pending_reports || 0),
+        lostReports: Number(summary.pending_reports || 0),
+        foundReports: Number(summary.pending_verifications || 0),
+        totalReleases: Number(summary.archived_items || 0),
     }
 })
 
@@ -302,7 +301,7 @@ onMounted(loadDashboard)
 
 .count-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 18px;
 }
 
