@@ -1,5 +1,5 @@
 <template>
-    <aside class="admin-sidebar">
+    <aside :class="['admin-sidebar', { 'mobile-open': mobileOpen }]">
         <div class="sidebar-brand">
             <img :src="logoSrc" alt="SNSU logo" class="brand-logo" />
             <div class="brand-copy">
@@ -11,7 +11,7 @@
         <nav class="sidebar-menu" aria-label="Admin navigation">
             <div class="nav-section">
                 <router-link :to="{ name: 'superadmin.dashboard' }" class="menu-link"
-                    :class="{ active: currentPage === 'dashboard' }">
+                    :class="{ active: currentPage === 'dashboard' }" @click="closeMenuIfMobile">
                     <span class="menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-4v-6H8v6H4a1 1 0 0 1-1-1z" />
                         </svg></span>
@@ -29,7 +29,7 @@
                 <div v-show="openSection === section.id" class="section-links">
                     <template v-for="item in section.items" :key="item.label">
                         <router-link v-if="!item.action" :to="item.to" class="menu-link"
-                            :class="{ active: currentPage === item.page }">
+                            :class="{ active: currentPage === item.page }" @click="closeMenuIfMobile">
                             <span class="menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true">
                                     <path :d="item.icon" />
                                 </svg></span>
@@ -63,8 +63,13 @@ const props = defineProps({
         type: String,
         default: '/assets/logo.png',
     },
+    mobileOpen: {
+        type: Boolean,
+        default: false,
+    },
 })
 
+const emit = defineEmits(['close-mobile-menu'])
 const router = useRouter()
 const openSection = ref('dashboard')
 
@@ -127,11 +132,18 @@ function toggleSection(sectionId) {
     openSection.value = openSection.value === sectionId ? '' : sectionId
 }
 
+function closeMenuIfMobile() {
+    if (window.innerWidth <= 1024) {
+        emit('close-mobile-menu')
+    }
+}
+
 function handleLogout() {
     localStorage.removeItem('adminToken')
     localStorage.removeItem('admin_id')
     localStorage.removeItem('admin_role')
     localStorage.removeItem('admin_facility_id')
+    closeMenuIfMobile()
     router.push({ name: 'superadmin.login' })
 }
 
@@ -173,7 +185,7 @@ watch(
     gap: 12px;
     background: linear-gradient(180deg, rgba(8, 20, 10, 0.98), rgba(11, 28, 13, 0.98));
     border-right: 1px solid rgba(255, 255, 255, 0.06);
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 .sidebar-brand {
@@ -310,44 +322,8 @@ watch(
     padding-left: 7px;
 }
 
-.sidebar-footer {
-    display: grid;
-    gap: 4px;
-    padding: 10px 8px 2px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.settings-link {
-    display: block;
-    padding: 8px 10px;
-    border-radius: 10px;
-    color: rgba(247, 242, 230, 0.9);
-    text-decoration: none;
-    font-size: 12px;
-}
-
-.settings-link.active,
-.settings-link:hover {
-    background: rgba(217, 185, 104, 0.14);
-    color: #f7f2e6;
-}
-
 .action-item {
     text-align: left;
-}
-
-.admin-sidebar {
-    grid-column: 1;
-    grid-row: 1 / 3;
-    width: 100%;
-    height: 100vh;
-    padding: 16px 12px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    background: linear-gradient(180deg, rgba(8, 20, 10, 0.98), rgba(11, 28, 13, 0.98));
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
-    overflow-y: auto;
 }
 
 @media (max-width: 1024px) {
@@ -358,6 +334,12 @@ watch(
         z-index: 1000;
         transform: translateX(-100%);
         transition: transform 0.2s ease;
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 18px 0 30px rgba(2, 8, 5, 0.24);
+    }
+
+    .admin-sidebar.mobile-open {
+        transform: translateX(0);
     }
 }
 </style>

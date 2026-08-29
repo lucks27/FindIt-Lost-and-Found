@@ -1,6 +1,11 @@
 <template>
-    <div class="admin-layout">
-        <AdminSidebar :current-page="currentPage" />
+    <div :class="['admin-layout', { 'mobile-sidebar-open': mobileSidebarOpen }]">
+        <div v-if="mobileSidebarOpen" class="mobile-sidebar-backdrop" @click="closeMobileMenu" aria-hidden="true" />
+        <AdminSidebar
+            :current-page="currentPage"
+            :mobile-open="mobileSidebarOpen"
+            @close-mobile-menu="closeMobileMenu"
+        />
         <AdminHeader :page-title="pageCategory" :title="pageTitle" @toggle-mobile-menu="toggleMobileMenu" />
         <main class="admin-main">
             <router-view />
@@ -100,10 +105,15 @@ const pageCategory = computed(() => {
 function toggleMobileMenu() {
     mobileSidebarOpen.value = !mobileSidebarOpen.value
 }
+
+function closeMobileMenu() {
+    mobileSidebarOpen.value = false
+}
 </script>
 
 <style scoped>
 .admin-layout {
+    position: relative;
     width: 100vw;
     height: 100vh;
     display: grid;
@@ -113,6 +123,10 @@ function toggleMobileMenu() {
     background: radial-gradient(circle at 12% 8%, rgba(217, 185, 104, 0.15), transparent 34%),
         radial-gradient(circle at 84% 6%, rgba(247, 242, 230, 0.1), transparent 24%),
         linear-gradient(180deg, rgba(7, 23, 12, 0.96) 0%, rgba(11, 33, 17, 0.96) 46%, rgba(8, 24, 13, 0.98) 100%);
+}
+
+.mobile-sidebar-backdrop {
+    display: none;
 }
 
 .admin-main {
@@ -132,6 +146,15 @@ function toggleMobileMenu() {
 
     .admin-main {
         grid-column: 1;
+    }
+
+    .mobile-sidebar-backdrop {
+        position: fixed;
+        inset: 0;
+        display: block;
+        background: rgba(4, 10, 7, 0.5);
+        backdrop-filter: blur(2px);
+        z-index: 900;
     }
 }
 </style>

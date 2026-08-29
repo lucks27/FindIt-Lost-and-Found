@@ -4,7 +4,6 @@
 
         <div class="admin-login-shell">
             <section class="admin-login-branding">
-                <img src="/assets/ESENESYU.png" alt="SNSU background emblem" class="hero-mark" />
                 <p class="eyebrow">SNSU Campus Lost & Found System</p>
                 <h1>{{ loginTitle }}</h1>
                 <p class="brand-copy">
