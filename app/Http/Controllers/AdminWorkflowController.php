@@ -151,7 +151,7 @@ class AdminWorkflowController extends Controller
         ]);
     }
 
-    public function indexLostFoundItems(Request $request)
+    public function indexPendingReports(Request $request)
     {
         $admin = Auth::guard('admin')->user();
 
@@ -160,8 +160,8 @@ class AdminWorkflowController extends Controller
         }
 
         $query = Report::query()
-            ->where('type', 'found')
-            ->whereIn('status', ['pending_verification', 'verified', 'under_claim_review', 'ready_for_release']);
+            ->where('type', 'lost')
+            ->whereIn('status', ['pending_approval', 'correction_requested']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
@@ -177,11 +177,98 @@ class AdminWorkflowController extends Controller
             });
         }
 
-        $items = $query->with(['student', 'surrenderRequest', 'itemVerification', 'claimReview'])->latest()->get();
+        $items = $query->with('student')->latest()->get();
 
         return response()->json([
             'status' => 'success',
             'data' => $items,
+        ]);
+    }
+
+    public function indexMobilePostItems(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $items = Report::query()
+            ->whereIn('type', ['lost', 'found'])
+            ->whereIn('status', ['pending_approval', 'approved', 'pending_surrender', 'pending_verification', 'verified'])
+            ->with('student')
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $items,
+        ]);
+    }
+
+    public function indexArchive(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $items = Report::query()
+            ->whereIn('status', ['rejected', 'claimed', 'unclaimed', 'completed_return', 'archived'])
+            ->with('student')
+            ->latest()
+            ->get();
+
+        return response()->json(['status' => 'success', 'data' => $items]);
+    }
+
+    public function restoreArchiveItem($id)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $report = Report::findOrFail($id);
+        $report->update([
+            'status' => $report->type === 'lost' ? 'pending_approval' : 'pending_surrender',
+            'archived_at' => null,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Item restored to its workflow queue.',
+            'data' => $report->fresh('student'),
+        ]);
+    }
+
+    public function publishMobileItem($id)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $report = Report::findOrFail($id);
+        $isVisible = ($report->type === 'lost' && $report->status === 'approved')
+            || ($report->type === 'found' && $report->status === 'verified');
+
+        if (!$isVisible) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'This report must be approved or verified before it can be posted to mobile.',
+            ], 422);
+        }
+
+        $report->update(['published_at' => Carbon::now()]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Item posted to mobile successfully.',
+            'data' => $report->fresh('student'),
         ]);
     }
 
@@ -235,25 +322,6 @@ class AdminWorkflowController extends Controller
         ], 201);
     }
 
-    public function indexClaimReviews(Request $request)
-    {
-        $admin = Auth::guard('admin')->user();
-
-        if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
-        }
-
-        $items = ClaimReview::query()
-            ->with(['report.student', 'claimantStudent', 'reviewedByAdmin'])
-            ->latest()
-            ->get();
-
-        return response()->json([
-            'status' => 'success',
-            'data' => $items,
-        ]);
-    }
-
     public function indexItemVerifications(Request $request)
     {
         $admin = Auth::guard('admin')->user();
@@ -264,25 +332,6 @@ class AdminWorkflowController extends Controller
 
         $items = ItemVerification::query()
             ->with(['report.student', 'verifierAdmin'])
-            ->latest()
-            ->get();
-
-        return response()->json([
-            'status' => 'success',
-            'data' => $items,
-        ]);
-    }
-
-    public function indexItemReleases(Request $request)
-    {
-        $admin = Auth::guard('admin')->user();
-
-        if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
-        }
-
-        $items = ItemRelease::query()
-            ->with(['report.student', 'claimantStudent', 'approvedByAdmin'])
             ->latest()
             ->get();
 
@@ -436,26 +485,6 @@ class AdminWorkflowController extends Controller
                 'recent_activity' => $recentActivity,
             ]
         ]);
-    }
-
-    public function indexCompletedReturns(Request $request)
-    {
-        $admin = Auth::guard('admin')->user();
-
-        if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
-        }
-
-        $items = ItemRelease::query()
-            ->with(['report.student', 'claimantStudent', 'approvedByAdmin'])
-            ->where(function ($query) {
-                $query->whereIn('status', ['released', 'completed', 'returned'])
-                    ->orWhereNotNull('released_at');
-            })
-            ->latest()
-            ->get();
-
-        return response()->json(['status' => 'success', 'data' => $items]);
     }
 
     public function indexPointRules(Request $request)

@@ -17,19 +17,16 @@ const AdminProfilePage = () => import("@/adminpages/pages/AdminProfile.vue");
 const AdminStudentManagementPage = () => import("@/adminpages/pages/AdminList.vue");
 const AdminPendingSurrenderPage = () => import("@/adminpages/pages/AdminPendingSurrender.vue");
 const AdminItemVerificationPage = () => import("@/adminpages/pages/AdminItemVerification.vue");
-const AdminLostFoundItemsPage = () => import("@/adminpages/pages/AdminLostFoundItems.vue");
-const AdminLostReportApprovalPage = () => import("@/adminpages/pages/AdminLostReportApproval.vue");
-const AdminCompletedReturnsPage = () => import("@/adminpages/pages/AdminCompletedReturns.vue");
-const AdminPointRulesPage = () => import("@/adminpages/pages/AdminPointRules.vue");
+const AdminMobilePostsPage = () => import("@/adminpages/pages/AdminMobilePosts.vue");
+const AdminPendingReportPage = () => import("@/adminpages/pages/AdminPendingReport.vue");
+const AdminArchivePage = () => import("@/adminpages/pages/AdminArchive.vue");
 const AdminPotentialMatchesPage = () => import("@/adminpages/pages/AdminPotentialMatches.vue");
-const AdminClaimsReviewPage = () => import("@/adminpages/pages/AdminClaimsReview.vue");
-const AdminItemInventoryPage = () => import("@/adminpages/pages/AdminItemInventory.vue");
-const AdminItemReleasePage = () => import("@/adminpages/pages/AdminItemRelease.vue");
+const AdminReportsDashboard = () => import("@/adminpages/pages/AdminDashboard.vue");
+const AdminPointRulesPage = () => import("@/adminpages/pages/AdminPointRules.vue");
 const AdminRecognitionPointsPage = () => import("@/adminpages/pages/AdminRecognitionPoints.vue");
 const AdminEventFinesPage = () => import("@/adminpages/pages/AdminEventFines.vue");
 const AdminNotificationsPage = () => import("@/adminpages/pages/AdminNotifications.vue");
 const AdminReportsPage = () => import("@/adminpages/pages/AdminReports.vue");
-const AdminReportsDashboard = () => import("@/adminpages/pages/AdminDashboard.vue");
 
 const routes = [
   // FIX: Dynamic redirect based on actual auth status
@@ -62,22 +59,19 @@ const routes = [
     children: [
       { path: "", redirect: { name: "superadmin.dashboard" } },
       { path: "dashboard", name: "superadmin.dashboard", component: AdminReportsDashboard },
-      { path: "reports", name: "superadmin.reports", component: AdminReportsPage },
-      { path: "report-approval", name: "superadmin.report-approval", component: AdminLostReportApprovalPage },
-      { path: "completed-returns", name: "superadmin.completed-returns", component: AdminCompletedReturnsPage },
-      { path: "point-rules", name: "superadmin.point-rules", component: AdminPointRulesPage },
-      { path: "profile", name: "superadmin.profile", component: AdminProfilePage },
-      { path: "list", name: "superadmin.list", component: AdminStudentManagementPage },
       { path: "pending-surrender", name: "superadmin.pending-surrender", component: AdminPendingSurrenderPage },
+      { path: "pending-report", name: "superadmin.pending-report", component: AdminPendingReportPage },
       { path: "item-verification", name: "superadmin.item-verification", component: AdminItemVerificationPage },
-      { path: "items", name: "superadmin.items", component: AdminLostFoundItemsPage },
+      { path: "mobile-posts", name: "superadmin.mobile-posts", component: AdminMobilePostsPage },
       { path: "matches", name: "superadmin.matches", component: AdminPotentialMatchesPage },
-      { path: "claims", name: "superadmin.claims", component: AdminClaimsReviewPage },
-      { path: "inventory", name: "superadmin.inventory", component: AdminItemInventoryPage },
-      { path: "release", name: "superadmin.release", component: AdminItemReleasePage },
+      { path: "archive", name: "superadmin.archive", component: AdminArchivePage },
       { path: "recognition", name: "superadmin.recognition", component: AdminRecognitionPointsPage },
+      { path: "point-rules", name: "superadmin.point-rules", component: AdminPointRulesPage },
       { path: "fines", name: "superadmin.fines", component: AdminEventFinesPage },
       { path: "notifications", name: "superadmin.notifications", component: AdminNotificationsPage },
+      { path: "reports", name: "superadmin.reports", component: AdminReportsPage },
+      { path: "list", name: "superadmin.list", component: AdminStudentManagementPage },
+      { path: "profile", name: "superadmin.profile", component: AdminProfilePage },
     ],
   },
   {

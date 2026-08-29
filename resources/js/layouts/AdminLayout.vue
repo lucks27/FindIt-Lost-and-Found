@@ -37,20 +37,14 @@ const pageTitle = computed(() => {
             return 'Pending Surrender'
         case 'item-verification':
             return 'Item Verification'
-        case 'items':
-            return 'Lost & Found Items'
-        case 'report-approval':
-            return 'Report Approval'
-        case 'completed-returns':
-            return 'Completed Returns'
+        case 'pending-report':
+            return 'Pending Report'
+        case 'mobile-posts':
+            return 'Post Mobile'
+        case 'archive':
+            return 'Archive'
         case 'matches':
             return 'Potential Match'
-        case 'claims':
-            return 'Claims Review'
-        case 'inventory':
-            return 'Item Inventory'
-        case 'release':
-            return 'Item Release'
         case 'recognition':
             return 'Recognition Points'
         case 'point-rules':
@@ -59,8 +53,12 @@ const pageTitle = computed(() => {
             return 'Event Fine Management'
         case 'notifications':
             return 'Notifications'
-        case 'settings':
-            return 'Settings'
+        case 'reports':
+            return 'Analytics & Reports'
+        case 'list':
+            return 'Student Management'
+        case 'profile':
+            return 'Profile'
         default:
             return 'Dashboard'
     }
@@ -70,13 +68,10 @@ const pageCategory = computed(() => {
     switch (currentPage.value) {
         case 'pending-surrender':
         case 'item-verification':
-        case 'items':
-        case 'report-approval':
-        case 'completed-returns':
+        case 'pending-report':
+        case 'mobile-posts':
         case 'matches':
-        case 'claims':
-        case 'inventory':
-        case 'release':
+        case 'archive':
             return 'Lost and Found'
         case 'recognition':
         case 'point-rules':
@@ -84,11 +79,10 @@ const pageCategory = computed(() => {
             return 'Points and Fines'
         case 'notifications':
             return 'Communication'
-        case 'list':
         case 'reports':
+        case 'list':
             return 'Users and Records'
         case 'profile':
-        case 'settings':
             return 'Account'
         case 'dashboard':
         default:

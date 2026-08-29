@@ -79,13 +79,11 @@ const sections = [
         label: 'Lost and Found',
         items: [
             { label: 'Pending Surrender', page: 'pending-surrender', to: { name: 'superadmin.pending-surrender' }, icon: 'M4 5h16v4H4V5zm0 6h16v8H4v-8z' },
+            { label: 'Pending Report', page: 'pending-report', to: { name: 'superadmin.pending-report' }, icon: 'M5 4h14v16H5V4zm3 4h8M8 12h8M8 16h5' },
             { label: 'Item Verification', page: 'item-verification', to: { name: 'superadmin.item-verification' }, icon: 'M12 2l-7 6v14h14V8l-7-6zM7 18v-6.5l5-2.5 5 2.5V18H7z' },
-            { label: 'Lost & Found Items', page: 'items', to: { name: 'superadmin.items' }, icon: 'M20 4H4v16h16V4zm-2 14H6V6h12v12z' },
+            { label: 'Post Mobile', page: 'mobile-posts', to: { name: 'superadmin.mobile-posts' }, icon: 'M4 4h16v16H4V4zm3 8h10m-5-5v10' },
             { label: 'Potential Match', page: 'matches', to: { name: 'superadmin.matches' }, icon: 'M7 4h10l-1 4H8L7 4zm-2 6h14v2H5v-2zm0 4h14v6H5v-6z' },
-            { label: 'Claims Review', page: 'claims', to: { name: 'superadmin.claims' }, icon: 'M5 4h14v2H5V4zm0 4h14v2H5V8zm0 4h14v6H5v-6z' },
-            { label: 'Item Inventory', page: 'inventory', to: { name: 'superadmin.inventory' }, icon: 'M4 4h16v4H4V4zm0 6h10v10H4V10z' },
-            { label: 'Item Release', page: 'release', to: { name: 'superadmin.release' }, icon: 'M3 7h18v4H3V7zm0 6h12v4H3v-4z' },
-            { label: 'Completed Returns', page: 'completed-returns', to: { name: 'superadmin.completed-returns' }, icon: 'M5 12l4 4L19 6M4 4h16v16H4V4z' },
+            { label: 'Archive', page: 'archive', to: { name: 'superadmin.archive' }, icon: 'M4 5h16v4H4V5zm2 6h12v8H6v-8zm3 2h6' },
         ],
     },
     {

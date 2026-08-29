@@ -43,7 +43,7 @@
                             <strong>{{ metrics.foundReports }}</strong>
                         </div>
                         <p>Found reports</p>
-                        <router-link class="count-link" :to="{ name: 'superadmin.items' }">Open inventory</router-link>
+                        <router-link class="count-link" :to="{ name: 'superadmin.mobile-posts' }">Post mobile</router-link>
                     </article>
 
                     <article class="count-card">
@@ -57,7 +57,7 @@
                             <strong>{{ metrics.totalClaims }}</strong>
                         </div>
                         <p>Claim reviews</p>
-                        <router-link class="count-link" :to="{ name: 'superadmin.claims' }">Review claims</router-link>
+                        <router-link class="count-link" :to="{ name: 'superadmin.archive' }">Open archive</router-link>
                     </article>
 
                     <article class="count-card">
@@ -70,8 +70,7 @@
                             <strong>{{ metrics.totalReleases }}</strong>
                         </div>
                         <p>Completed releases</p>
-                        <router-link class="count-link" :to="{ name: 'superadmin.completed-returns' }">View
-                            returns</router-link>
+                        <router-link class="count-link" :to="{ name: 'superadmin.archive' }">View archive</router-link>
                     </article>
 
                     <article class="count-card">
