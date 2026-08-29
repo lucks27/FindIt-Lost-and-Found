@@ -1,19 +1,25 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --admin-forest-950: #091a10;
-  --admin-forest-900: #103019;
-  --admin-forest-800: #174224;
-  --admin-forest-700: #205d2f;
+  --admin-forest-950: #071d15;
+  --admin-forest-900: #0d3528;
+  --admin-forest-800: #114f39;
+  --admin-forest-700: #1b7a4e;
+  --admin-green-600: #1d9b60;
+  --admin-green-500: #29b46d;
+  --admin-green-400: #4ed28b;
+  --admin-green-300: #8fe1aa;
+  --admin-green-200: #c7f0d4;
+  --admin-green-100: #e2f8e8;
   --admin-sand-100: #f7f2e6;
   --admin-sand-200: #eae0c7;
-  --admin-gold-400: #d9b968;
-  --admin-gold-500: #c79e3b;
+  --admin-gold-400: #edd078;
+  --admin-gold-500: #d9b968;
   --admin-white: #ffffff;
-  --admin-ink: #1c2a1d;
-  --admin-muted: #627567;
+  --admin-ink: #123c2d;
+  --admin-muted: #4b6d5a;
   --admin-danger: #d45d5d;
-  --admin-shadow: 0 24px 80px rgba(7, 18, 9, 0.28);
+  --admin-shadow: 0 24px 80px rgba(4, 29, 21, 0.28);
 }
 
 html, body, #app {
@@ -29,8 +35,8 @@ body {
   font-weight: 400;
   letter-spacing: 0.01em;
   text-rendering: optimizeLegibility;
-  background: var(--admin-forest-950);
-  color: var(--admin-white);
+  background: linear-gradient(180deg, #0a311f 0%, #0f5238 42%, #0a2f24 100%);
+  color: var(--admin-ink);
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -38,7 +44,7 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: var(--admin-white);
+  color: var(--admin-ink);
 }
 
 p, button, input, textarea, select, label {
@@ -47,9 +53,9 @@ p, button, input, textarea, select, label {
 
 body:has(#admin-app) {
   background:
-    radial-gradient(circle at top left, rgba(217, 185, 104, 0.18), transparent 24%),
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.08), transparent 22%),
-    linear-gradient(180deg, #0c2114 0%, #123118 45%, #091b11 100%);
+    radial-gradient(circle at top left, rgba(237, 208, 120, 0.22), transparent 24%),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.1), transparent 20%),
+    linear-gradient(180deg, #dff7e4 0%, #bde9c4 20%, #1c8b57 48%, #0d4132 100%);
 }
 
 #admin-app,

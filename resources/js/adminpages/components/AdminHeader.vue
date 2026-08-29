@@ -147,9 +147,9 @@ onBeforeUnmount(() => {
     padding: 0 18px;
     height: 60px;
     min-height: 60px;
-    background: linear-gradient(90deg, rgba(8, 22, 12, 0.98), rgba(14, 34, 18, 0.98));
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+    background: linear-gradient(90deg, #1f8c5d 0%, #176d4c 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 8px 20px rgba(11, 51, 37, 0.18);
     overflow: visible;
 }
 
@@ -166,8 +166,8 @@ onBeforeUnmount(() => {
     height: 38px;
     border: 0;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.08);
-    color: #f7f2e6;
+    background: rgba(255, 255, 255, 0.12);
+    color: #f4f8f3;
     cursor: pointer;
     align-items: center;
     justify-content: center;
@@ -191,7 +191,7 @@ onBeforeUnmount(() => {
     margin: 0;
     font-size: 16px;
     line-height: 1.1;
-    color: #f7f2e6;
+    color: #ecf8ef;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -209,8 +209,8 @@ onBeforeUnmount(() => {
     height: 38px;
     border: 0;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.08);
-    color: #f7f2e6;
+    background: rgba(255, 255, 255, 0.12);
+    color: #f4f8f3;
     cursor: pointer;
     display: grid;
     place-items: center;
@@ -251,8 +251,8 @@ onBeforeUnmount(() => {
     min-width: 0;
     border: 0;
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.06);
-    color: #f7f2e6;
+    background: rgba(7, 45, 35, 0.12);
+    color: #ecf8ef;
     cursor: pointer;
 }
 
@@ -260,7 +260,7 @@ onBeforeUnmount(() => {
     width: 38px;
     height: 38px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.12);
     color: #f7f2e6;
     font-size: 12px;
     font-weight: 800;
@@ -289,11 +289,12 @@ onBeforeUnmount(() => {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    color: #eefaf2;
 }
 
 .profile-email {
     font-size: 10px;
-    color: rgba(247, 242, 230, 0.72);
+    color: rgba(238, 250, 242, 0.76);
     text-align: left;
     white-space: nowrap;
     overflow: hidden;
@@ -317,9 +318,9 @@ onBeforeUnmount(() => {
     min-width: 140px;
     padding: 6px;
     border-radius: 12px;
-    background: rgba(8, 22, 12, 0.98);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+    background: rgba(17, 107, 71, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 12px 24px rgba(10, 41, 29, 0.2);
     z-index: 2000;
     transform-origin: top right;
 }
@@ -328,7 +329,7 @@ onBeforeUnmount(() => {
     font-size: 10px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: rgba(247, 242, 230, 0.72);
+    color: rgba(238, 250, 242, 0.76);
     padding: 8px 10px 4px;
 }
 
@@ -355,7 +356,7 @@ onBeforeUnmount(() => {
     border-radius: 8px;
     padding: 8px 10px;
     background: transparent;
-    color: #f7f2e6;
+    color: #edf9f0;
     text-align: left;
     cursor: pointer;
     font-size: 12px;

@@ -181,8 +181,8 @@ watch(
     display: flex;
     flex-direction: column;
     gap: 12px;
-    background: linear-gradient(180deg, rgba(8, 20, 10, 0.98), rgba(11, 28, 13, 0.98));
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    background: linear-gradient(180deg, #1d9a62 0%, #166f4e 100%);
+    border-right: 1px solid rgba(255, 255, 255, 0.14);
     overflow-y: auto;
 }
 
@@ -198,7 +198,7 @@ watch(
     width: 42px;
     height: 42px;
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.12);
     padding: 8px;
     object-fit: contain;
 }
@@ -212,14 +212,14 @@ watch(
     font-size: 14px;
     font-weight: 800;
     letter-spacing: 0.04em;
-    color: #f7f4e9;
+    color: #ecf8ef;
 }
 
 .brand-subtitle {
     margin: 2px 0 0;
     font-size: 10px;
     line-height: 1.3;
-    color: rgba(247, 242, 230, 0.72);
+    color: rgba(236, 248, 239, 0.78);
 }
 
 .sidebar-menu {
@@ -243,7 +243,7 @@ watch(
     border: 0;
     border-radius: 10px;
     background: transparent;
-    color: #f7f2e6;
+    color: #ecf8ef;
     font-size: 11px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -273,7 +273,7 @@ watch(
 }
 
 .section-links::-webkit-scrollbar-thumb {
-    background: rgba(217, 185, 104, 0.35);
+    background: rgba(17, 60, 45, 0.25);
     border-radius: 999px;
 }
 
@@ -288,7 +288,7 @@ watch(
     width: 100%;
     padding: 8px 10px;
     border-radius: 10px;
-    color: rgba(247, 242, 230, 0.9);
+    color: rgba(236, 248, 239, 0.9);
     text-decoration: none;
     font-size: 12px;
     transition: background 0.2s ease, color 0.2s ease;
@@ -311,8 +311,8 @@ watch(
 
 .menu-link:hover,
 .menu-link.active {
-    background: rgba(217, 185, 104, 0.14);
-    color: #f7f2e6;
+    background: rgba(9, 57, 42, 0.12);
+    color: #f4f9f4;
 }
 
 .menu-link.active {

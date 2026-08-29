@@ -12,10 +12,6 @@
                         from the verified backend summary endpoint.
                     </p>
                 </div>
-
-                <div class="topbar-actions">
-                    <button type="button" class="panel-button" @click="loadDashboard">Refresh dashboard</button>
-                </div>
             </header>
 
             <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
@@ -124,19 +120,39 @@
                             </div>
                             <div class="chart-legend">
                                 <div class="legend-item">
-                                    <span><i class="legend-dot lost"></i>Lost reports</span>
+                                    <span class="legend-item-label">
+                                        <span class="legend-icon lost" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24"><path d="M12 8v5m0 3h.01M10.29 3.86 1.82 17.47A2 2 0 0 0 3.53 20h16.94a2 2 0 0 0 1.71-2.53L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                                        </span>
+                                        Lost reports
+                                    </span>
                                     <strong>{{ metrics.lostReports }}</strong>
                                 </div>
                                 <div class="legend-item">
-                                    <span><i class="legend-dot found"></i>Found reports</span>
+                                    <span class="legend-item-label">
+                                        <span class="legend-icon found" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24"><path d="M9.5 11.5l2 2 5-6M5 12a7 7 0 1 0 14 0 7 7 0 0 0-14 0z"/></svg>
+                                        </span>
+                                        Found reports
+                                    </span>
                                     <strong>{{ metrics.foundReports }}</strong>
                                 </div>
                                 <div class="legend-item">
-                                    <span><i class="legend-dot verified"></i>Open reports</span>
+                                    <span class="legend-item-label">
+                                        <span class="legend-icon verified" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24"><path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
+                                        </span>
+                                        Open reports
+                                    </span>
                                     <strong>{{ metrics.openReports }}</strong>
                                 </div>
                                 <div class="legend-item">
-                                    <span><i class="legend-dot returned"></i>Releases recorded</span>
+                                    <span class="legend-item-label">
+                                        <span class="legend-icon returned" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24"><path d="M5 8.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v5.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8.5zm3 7h8m-5-3v6M4 18h16"/></svg>
+                                        </span>
+                                        Releases recorded
+                                    </span>
                                     <strong>{{ metrics.totalReleases }}</strong>
                                 </div>
                             </div>
@@ -223,18 +239,16 @@ onMounted(loadDashboard)
     min-height: 100%;
     height: 100%;
     padding: 24px 28px;
-    background: radial-gradient(circle at top left, rgba(6, 32, 18, 0.45), transparent 24%),
-        radial-gradient(circle at bottom right, rgba(23, 74, 42, 0.35), transparent 28%),
-        linear-gradient(180deg, #08160f 0%, #0d2518 40%, #102f20 100%);
-    color: #eef4e8;
+    background: linear-gradient(180deg, #d6f3dc 0%, #c0e8c9 36%, #9dd0a4 100%);
+    color: #123c2d;
     overflow: auto;
 }
 
 .page-bg {
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at 15% 20%, rgba(148, 213, 166, 0.14), transparent 22%),
-        radial-gradient(circle at 85% 15%, rgba(102, 217, 194, 0.1), transparent 18%);
+    background: radial-gradient(circle at 15% 20%, rgba(18, 114, 72, 0.09), transparent 22%),
+        radial-gradient(circle at 85% 15%, rgba(16, 95, 67, 0.05), transparent 18%);
     pointer-events: none;
     z-index: 0;
 }
@@ -253,7 +267,7 @@ onMounted(loadDashboard)
 
 .dashboard-topbar {
     display: grid;
-    grid-template-columns: 1.35fr 0.65fr;
+    grid-template-columns: 1fr;
     gap: 24px;
     align-items: center;
 }
@@ -265,47 +279,26 @@ onMounted(loadDashboard)
 
 .page-label {
     margin: 0;
-    color: rgba(146, 219, 170, 0.9);
+    color: #c7961d;
     letter-spacing: 0.24em;
     text-transform: uppercase;
     font-size: 12px;
+    font-weight: 700;
 }
 
 .dashboard-topbar h1 {
     margin: 0;
     font-size: clamp(34px, 3vw, 52px);
     line-height: 1.06;
+    color: #123c2d;
 }
 
 .page-description {
     margin: 0;
     max-width: 700px;
-    color: rgba(244, 250, 241, 0.82);
+    color: rgba(26, 53, 43, 0.86);
     font-size: 15px;
     line-height: 1.75;
-}
-
-.topbar-actions {
-    display: flex;
-    align-items: center;
-    justify-content: end;
-    gap: 14px;
-    flex-wrap: wrap;
-}
-
-.panel-button {
-    padding: 12px 20px;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.08);
-    color: #f7f4e9;
-    cursor: pointer;
-    font-weight: 700;
-    transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-.panel-button:hover {
-    background: rgba(255, 255, 255, 0.14);
 }
 
 .count-grid {
@@ -317,15 +310,15 @@ onMounted(loadDashboard)
 .count-card {
     padding: 24px;
     border-radius: 24px;
-    background: rgba(18, 38, 28, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 20px 55px rgba(0, 0, 0, 0.28);
+    background: linear-gradient(180deg, #1f7853 0%, #144d3a 100%);
+    border: 1px solid rgba(8, 35, 27, 0.22);
+    box-shadow: 0 18px 42px rgba(10, 57, 38, 0.18);
     transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .count-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(146, 219, 170, 0.22);
+    border-color: rgba(255, 255, 255, 0.18);
 }
 
 .count-top {
@@ -342,49 +335,58 @@ onMounted(loadDashboard)
     border-radius: 16px;
     display: grid;
     place-items: center;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(8, 42, 31, 0.42);
+    color: #f4f8f6;
 }
 
 .icon-holder svg {
     width: 26px;
     height: 26px;
-    fill: #eef4e8;
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 0.5;
 }
 
 .icon-gold {
-    background: rgba(212, 180, 103, 0.18);
+    background: rgba(64, 125, 255, 0.18);
+    color: #5bb3ff;
 }
 
 .icon-blue {
-    background: rgba(84, 153, 255, 0.14);
+    background: rgba(18, 190, 175, 0.18);
+    color: #39dfd2;
 }
 
 .icon-purple {
-    background: rgba(167, 125, 241, 0.14);
+    background: rgba(134, 99, 255, 0.18);
+    color: #b99bff;
 }
 
 .icon-green {
-    background: rgba(136, 212, 166, 0.18);
+    background: rgba(34, 197, 94, 0.18);
+    color: #7bf3a3;
 }
 
 .icon-teal {
-    background: rgba(57, 182, 140, 0.16);
+    background: rgba(245, 158, 11, 0.18);
+    color: #ffb74d;
 }
 
 .icon-orange {
-    background: rgba(244, 158, 66, 0.16);
+    background: rgba(100, 116, 139, 0.2);
+    color: #a9bed8;
 }
 
 .count-card strong {
     margin: 0;
     font-size: 38px;
     line-height: 1;
-    color: #f8f8f2;
+    color: #f5f9f6;
 }
 
 .count-card p {
     margin: 0;
-    color: rgba(255, 255, 255, 0.78);
+    color: rgba(236, 243, 239, 0.82);
     font-size: 14px;
     line-height: 1.5;
 }
@@ -396,7 +398,7 @@ onMounted(loadDashboard)
     margin-top: 16px;
     font-size: 13px;
     font-weight: 700;
-    color: #b4e386;
+    color: #f7d868;
     text-decoration: none;
 }
 
@@ -409,9 +411,9 @@ onMounted(loadDashboard)
 .panel {
     padding: 28px;
     border-radius: 28px;
-    background: rgba(12, 32, 23, 0.94);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 20px 55px rgba(0, 0, 0, 0.24);
+    background: linear-gradient(180deg, #2d7f5b 0%, #1c6349 100%);
+    border: 1px solid rgba(7, 34, 26, 0.22);
+    box-shadow: 0 18px 42px rgba(10, 57, 38, 0.16);
 }
 
 .panel-header {
@@ -426,7 +428,7 @@ onMounted(loadDashboard)
     margin: 0;
     font-size: 12px;
     text-transform: uppercase;
-    color: rgba(146, 219, 170, 0.9);
+    color: #f4d46c;
     letter-spacing: 0.22em;
 }
 
@@ -434,6 +436,7 @@ onMounted(loadDashboard)
     margin: 0;
     font-size: 20px;
     line-height: 1.2;
+    color: #f5f9f6;
 }
 
 .chart-row {
@@ -456,20 +459,20 @@ onMounted(loadDashboard)
     position: absolute;
     inset: 24px;
     border-radius: 50%;
-    background: rgba(11, 27, 19, 0.96);
+    background: rgba(233, 247, 236, 0.96);
 }
 
 .pie-inner {
     position: absolute;
     inset: 64px;
     border-radius: 50%;
-    background: rgba(11, 27, 19, 0.96);
+    background: rgba(233, 247, 236, 0.96);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
-    color: #eef4e8;
+    color: #123c2d;
 }
 
 .pie-inner strong {
@@ -479,7 +482,7 @@ onMounted(loadDashboard)
 
 .pie-inner span {
     font-size: 13px;
-    color: rgba(255, 255, 255, 0.72);
+    color: rgba(18, 60, 45, 0.72);
 }
 
 .chart-legend {
@@ -493,37 +496,60 @@ onMounted(loadDashboard)
     justify-content: space-between;
     padding: 12px 14px;
     border-radius: 18px;
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(12, 58, 43, 0.1);
 }
 
 .legend-item span {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: rgba(255, 255, 255, 0.86);
+    color: rgba(244, 248, 245, 0.9);
     font-size: 14px;
 }
 
-.legend-dot {
+.legend-item strong {
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.legend-item-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.legend-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    flex-shrink: 0;
+    background: rgba(18, 60, 45, 0.08);
+}
+
+.legend-icon svg {
     width: 12px;
     height: 12px;
-    border-radius: 50%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
-.legend-dot.lost {
-    background: #af635f;
+.legend-icon.lost {
+    color: #af635f;
 }
 
-.legend-dot.found {
-    background: #4fb8a9;
+.legend-icon.found {
+    color: #4fb8a9;
 }
 
-.legend-dot.verified {
-    background: #c0d66d;
+.legend-icon.verified {
+    color: #b7bf48;
 }
 
-.legend-dot.returned {
-    background: #7dd9c2;
+.legend-icon.returned {
+    color: #7dd9c2;
 }
 
 .activity-list {
@@ -537,18 +563,18 @@ onMounted(loadDashboard)
 .activity-row {
     padding: 16px 18px;
     border-radius: 20px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(12, 58, 43, 0.1);
+    border: 1px solid rgba(17, 67, 48, 0.12);
 }
 
 .activity-body p {
     margin: 0 0 4px;
     font-weight: 700;
-    color: #f7f4e9;
+    color: #f4f8f6;
 }
 
 .activity-body small {
-    color: rgba(255, 255, 255, 0.72);
+    color: rgba(233, 239, 236, 0.8);
 }
 
 @media (max-width: 1200px) {
