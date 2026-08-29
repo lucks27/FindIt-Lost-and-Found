@@ -101,7 +101,6 @@ const sections = [
         label: 'Communication',
         items: [
             { label: 'Notifications', page: 'notifications', to: { name: 'superadmin.notifications' }, icon: 'M4 4h16v12H4V4zm2 2v8h12V6H6zm1 10h10v2H7v-2z' },
-            { label: 'Announcements', page: 'announcements', to: { name: 'superadmin.announcements' }, icon: 'M5 4h14v4H5V4zm0 6h10v10H5V10z' },
         ],
     },
     {
@@ -110,7 +109,6 @@ const sections = [
         items: [
             { label: 'Student Management', page: 'list', to: { name: 'superadmin.list' }, icon: 'M5 5h14v4H5V5zm0 6h10v4H5v-4zm0 6h14v2H5v-2z' },
             { label: 'Analytics & Reports', page: 'reports', to: { name: 'superadmin.reports' }, icon: 'M4 4h16v16H4zM7 15h2v-4H7zm4 0h2V7h-2zm4 0h2v-8h-2z' },
-            { label: 'Audit Logs', page: 'audit', to: { name: 'superadmin.audit' }, icon: 'M4 4h16v2H4V4zm0 4h16v2H4V8zm0 4h12v2H4v-2zm0 4h8v2H4v-2z' },
         ],
     },
     {

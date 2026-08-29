@@ -59,10 +59,6 @@ const pageTitle = computed(() => {
             return 'Event Fine Management'
         case 'notifications':
             return 'Notifications'
-        case 'announcements':
-            return 'Announcements'
-        case 'audit':
-            return 'Audit Logs'
         case 'settings':
             return 'Settings'
         default:
@@ -87,11 +83,9 @@ const pageCategory = computed(() => {
         case 'fines':
             return 'Points and Fines'
         case 'notifications':
-        case 'announcements':
             return 'Communication'
         case 'list':
         case 'reports':
-        case 'audit':
             return 'Users and Records'
         case 'profile':
         case 'settings':

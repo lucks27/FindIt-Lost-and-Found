@@ -70,11 +70,6 @@ Route::middleware('auth:admin')->group(function () {
     Route::delete('/admin/students/{id}', [AdminAuthController::class, 'deleteStudentRecord']);
     Route::get('/admin/list', [App\Http\Controllers\AdminWorkflowController::class, 'listStudents']);
 
-    Route::get('/admin/audit-logs', [App\Http\Controllers\AdminWorkflowController::class, 'indexAuditLogs']);
-    Route::get('/admin/audit-logs/export', [App\Http\Controllers\AdminWorkflowController::class, 'exportAuditLogs']);
-
-    Route::get('/admin/announcements', [App\Http\Controllers\AdminWorkflowController::class, 'indexAnnouncements']);
-    Route::post('/admin/announcements', [App\Http\Controllers\AdminWorkflowController::class, 'storeAnnouncement']);
     Route::get('/admin/items', [App\Http\Controllers\AdminWorkflowController::class, 'indexLostFoundItems']);
     Route::get('/admin/dashboard', [App\Http\Controllers\AdminWorkflowController::class, 'dashboardMetrics']);
     Route::get('/admin/completed-returns', [App\Http\Controllers\AdminWorkflowController::class, 'indexCompletedReturns']);
@@ -86,11 +81,6 @@ Route::middleware('auth:admin')->group(function () {
     Route::post('/admin/notifications/{id}/mark-read', [App\Http\Controllers\AdminWorkflowController::class, 'markAdminNotificationRead']);
 
     Route::get('/admin/notifications', [App\Http\Controllers\AdminWorkflowController::class, 'indexAdminNotifications']);
-
-    Route::put('/admin/announcements/{id}', [App\Http\Controllers\AdminWorkflowController::class, 'updateAnnouncement']);
-    Route::delete('/admin/announcements/{id}', [App\Http\Controllers\AdminWorkflowController::class, 'deleteAnnouncement']);
-    Route::post('/admin/announcements/{id}/publish', [App\Http\Controllers\AdminWorkflowController::class, 'publishAnnouncement']);
-    Route::post('/admin/announcements/{id}/unpublish', [App\Http\Controllers\AdminWorkflowController::class, 'unpublishAnnouncement']);
 
     Route::post('/admin/reports/{id}/approve', [App\Http\Controllers\AdminWorkflowController::class, 'approveLostReport']);
     Route::post('/admin/reports/{id}/reject', [App\Http\Controllers\AdminWorkflowController::class, 'rejectLostReport']);
