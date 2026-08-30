@@ -197,7 +197,6 @@ class AdminWorkflowController extends Controller
         }
 
         $items = VisiblePostedItem::query()
-            ->where('is_visible', true)
             ->with(['report.student', 'report.images'])
             ->latest('posted_at')
             ->get()
@@ -216,8 +215,10 @@ class AdminWorkflowController extends Controller
                     'status' => $report->status,
                     'location' => $report->location,
                     'published_at' => $report->published_at,
+                    'is_visible' => (bool) $visibleItem->is_visible,
                     'student' => $report->student ? $report->student->toArray() : null,
                     'student_name' => $report->student?->full_name,
+                    'images' => $report->images ? $report->images->toArray() : [],
                     'item' => $report,
                 ];
             })
@@ -330,6 +331,66 @@ class AdminWorkflowController extends Controller
         ]);
     }
 
+    public function toggleMobilePostVisibility(Request $request, $id)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $validated = $request->validate([
+            'is_visible' => 'required|boolean',
+        ]);
+
+        $visibleItem = VisiblePostedItem::firstOrCreate(['report_id' => $id]);
+        $visibleItem->update([
+            'is_visible' => $validated['is_visible'],
+            'posted_by_admin_id' => $admin->id,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => $validated['is_visible'] ? 'Mobile post is now visible.' : 'Mobile post is now hidden.',
+            'data' => $visibleItem->fresh(),
+        ]);
+    }
+
+    public function archiveMobilePost($id)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $report = Report::findOrFail($id);
+
+        VisiblePostedItem::where('report_id', $report->id)->delete();
+
+        $report->update([
+            'status' => $report->type === 'lost' ? 'archived' : 'archived',
+            'published_at' => null,
+        ]);
+
+        $archiveItem = ArchiveItem::updateOrCreate(
+            ['report_id' => $report->id],
+            [
+                'status' => $report->status,
+                'archive_type' => 'mobile_archive',
+                'reason' => 'Archived from mobile posts by admin.',
+                'archived_by_admin_id' => $admin->id,
+                'archived_at' => Carbon::now(),
+            ]
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Item archived from mobile posts.',
+            'data' => $archiveItem,
+        ]);
+    }
+
     public function indexAdminNotifications(Request $request)
     {
         $admin = Auth::guard('admin')->user();
@@ -389,7 +450,7 @@ class AdminWorkflowController extends Controller
         }
 
         $items = ItemVerification::query()
-            ->with(['report.student', 'verifierAdmin'])
+            ->with(['report.student', 'report.images', 'report.category', 'verifierAdmin'])
             ->latest()
             ->get();
 
