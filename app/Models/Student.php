@@ -16,7 +16,7 @@ class Student extends Authenticatable
     protected $primaryKey = 'id';
 
     protected $fillable = [
-        'student_number',
+        'student_id_number',
         'first_name',
         'middle_name',
         'last_name',

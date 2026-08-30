@@ -25,7 +25,7 @@ return new class extends Migration {
         if (!Schema::hasTable('students')) {
             Schema::create('students', function (Blueprint $table) {
                 $table->id();
-                $table->string('student_number')->unique();
+                $table->string('student_id_number')->unique();
                 $table->string('first_name');
                 $table->string('middle_name')->nullable();
                 $table->string('last_name');

@@ -42,7 +42,7 @@ class AdminWorkflowController extends Controller
             ->get()
             ->map(function (Student $student) {
                 return array_merge($student->toArray(), [
-                    'recognition_points' => $student->rewards()->sum('amount') ?? 0,
+                    'recognition_points' => 0,
                 ]);
             });
 
@@ -561,9 +561,8 @@ class AdminWorkflowController extends Controller
         }
 
         $students = Student::query()
-            ->withSum('pointTransactions as recognition_points', 'amount')
+            ->withSum('pointTransactions as recognition_points', 'points')
             ->withCount('reports')
-            ->withCount('rewards')
             ->latest()
             ->get()
             ->map(function (Student $student) {
@@ -572,9 +571,9 @@ class AdminWorkflowController extends Controller
                     'student_id' => $student->student_id,
                     'name' => $student->name,
                     'email' => $student->email,
-                    'recognition_points' => (int) ($student->recognition_points ?? $student->point_transactions_sum_amount ?? 0),
+                    'recognition_points' => (int) ($student->recognition_points ?? $student->point_transactions_sum_points ?? 0),
                     'report_count' => $student->reports_count,
-                    'reward_count' => $student->rewards_count,
+                    'reward_count' => 0,
                 ];
             });
 

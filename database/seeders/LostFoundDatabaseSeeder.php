@@ -44,7 +44,7 @@ class LostFoundDatabaseSeeder extends Seeder
         }
 
         Student::firstOrCreate(
-            ['student_number' => '2026-0001'],
+            ['student_id_number' => '2026-0001'],
             [
                 'first_name' => 'Test',
                 'last_name' => 'Student',

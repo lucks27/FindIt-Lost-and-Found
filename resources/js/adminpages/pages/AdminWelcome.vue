@@ -116,12 +116,14 @@ defineProps({
     object-fit: contain;
 }
 
-.welcome-kicker {
+.welcome-copy .welcome-kicker {
     margin: 20px 0 10px;
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.18em;
-    color: #d9b968;
+    color: #ffd45a;
+    font-weight: 800;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 .welcome-copy h1 {
@@ -129,6 +131,7 @@ defineProps({
     font-size: clamp(34px, 4.2vw, 56px);
     line-height: 1.02;
     max-width: 620px;
+    color: #ffffff;
 }
 
 .welcome-copy p {
@@ -215,6 +218,7 @@ defineProps({
     display: block;
     margin-top: 8px;
     font-size: 24px;
+    color: #ffffff;
 }
 
 @media (max-width: 960px) {

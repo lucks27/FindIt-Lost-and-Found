@@ -29,7 +29,7 @@ class AdminReturnWorkflowApiTest extends TestCase
         ]);
 
         $finder = Student::create([
-            'student_number' => '2026-0001',
+            'student_id_number' => '2026-0001',
             'first_name' => 'Finder',
             'last_name' => 'Student',
             'course' => 'Computer Science',
@@ -41,7 +41,7 @@ class AdminReturnWorkflowApiTest extends TestCase
         ]);
 
         $owner = Student::create([
-            'student_number' => '2026-0002',
+            'student_id_number' => '2026-0002',
             'first_name' => 'Owner',
             'last_name' => 'Student',
             'course' => 'Computer Science',

@@ -17,7 +17,7 @@ class ReportWorkflowApiTest extends TestCase
     public function test_student_can_create_lost_and_found_reports_with_workflow_statuses(): void
     {
         $student = Student::create([
-            'student_number' => '2026-0001',
+            'student_id_number' => '2026-0001',
             'first_name' => 'Test',
             'last_name' => 'Student',
             'course' => 'Computer Science',
@@ -74,7 +74,7 @@ class ReportWorkflowApiTest extends TestCase
     public function test_student_can_submit_potential_match_for_approved_and_verified_reports(): void
     {
         $owner = Student::create([
-            'student_number' => '2026-0002',
+            'student_id_number' => '2026-0002',
             'first_name' => 'Owner',
             'last_name' => 'Student',
             'course' => 'Computer Science',
@@ -86,7 +86,7 @@ class ReportWorkflowApiTest extends TestCase
         ]);
 
         $finder = Student::create([
-            'student_number' => '2026-0003',
+            'student_id_number' => '2026-0003',
             'first_name' => 'Finder',
             'last_name' => 'Student',
             'course' => 'Computer Science',

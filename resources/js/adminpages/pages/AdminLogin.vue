@@ -200,6 +200,7 @@ const handleLogin = async () => {
     font-size: clamp(38px, 6vw, 72px);
     line-height: 1;
     max-width: 720px;
+    color: #ffffff;
 }
 
 .brand-copy {

@@ -75,8 +75,8 @@
                     </thead>
                     <tbody>
                         <tr v-for="item in visibleRows" :key="item.id">
-                            <td>{{ item.source_report?.title || item.source_report_id }}</td>
-                            <td>{{ item.matched_report?.title || item.matched_report_id }}</td>
+                            <td>{{ item.lost_report?.title || item.lost_report_id }}</td>
+                            <td>{{ item.found_report?.title || item.found_report_id }}</td>
                             <td>{{ item.score }}</td>
                             <td><span class="status-chip">{{ formatStatus(item.status) }}</span></td>
                             <td>{{ item.notes || '—' }}</td>
@@ -122,7 +122,7 @@ const visibleRows = computed(() => {
     return matches.value.filter((item) => {
         const status = String(item.status || '').toLowerCase()
         const matchesStatus = activeStatus.value === 'all' || status === activeStatus.value
-        const matchesSearch = !search || [item.source_report?.title, item.matched_report?.title, item.notes, item.score]
+        const matchesSearch = !search || [item.lost_report?.title, item.found_report?.title, item.notes, item.score]
             .filter(Boolean)
             .join(' ')
             .toLowerCase()
