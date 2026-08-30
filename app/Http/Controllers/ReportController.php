@@ -6,10 +6,12 @@ use App\Models\DeviceToken;
 use App\Models\Notification;
 use App\Models\PotentialMatch;
 use App\Models\Report;
+use App\Models\ReportImage;
 use App\Models\Reward;
 use App\Models\SurrenderRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ReportController extends Controller
@@ -55,7 +57,7 @@ class ReportController extends Controller
             });
         }
 
-        $reports = $query->with('student')->latest()->paginate(20);
+        $reports = $query->with(['student', 'images'])->latest()->paginate(20);
 
         return response()->json(['status' => 'success', 'data' => $reports]);
     }
@@ -64,7 +66,7 @@ class ReportController extends Controller
     {
         $user = $request->user();
         $reports = Report::where('student_id', $user->id)
-            ->with('rewards')
+            ->with(['student', 'rewards', 'images'])
             ->latest()
             ->get();
 
@@ -73,7 +75,7 @@ class ReportController extends Controller
 
     public function show(Request $request, $id)
     {
-        $report = Report::with(['student', 'rewards'])->findOrFail($id);
+        $report = Report::with(['student', 'rewards', 'images'])->findOrFail($id);
         $user = $request->user();
 
         if ($report->student_id !== $user->id) {
@@ -105,6 +107,13 @@ class ReportController extends Controller
             'reward_type' => 'nullable|in:reward,fine',
             'image' => 'nullable|string|max:255',
             'metadata' => 'nullable|array',
+            'images' => 'required|array|min:1',
+            'images.*' => 'required|file|image|max:5120',
+        ], [
+            'images.required' => 'At least one image is required to submit a report.',
+            'images.min' => 'At least one image is required to submit a report.',
+            'images.*.image' => 'All files must be valid images.',
+            'images.*.max' => 'Images must not exceed 5MB each.',
         ]);
 
         $status = $validated['type'] === 'lost' ? 'pending_approval' : 'pending_surrender';
@@ -112,7 +121,27 @@ class ReportController extends Controller
         $report = Report::create(array_merge($validated, [
             'student_id' => $user->id,
             'status' => $status,
+            'requires_images' => true,
         ]));
+
+        // Store uploaded images
+        if ($request->hasFile('images')) {
+            $isPrimary = true;
+            foreach ($request->file('images') as $imageFile) {
+                $path = $imageFile->store('report-images', 'public');
+
+                ReportImage::create([
+                    'report_id' => $report->id,
+                    'file_path' => $path,
+                    'original_name' => $imageFile->getClientOriginalName(),
+                    'mime_type' => $imageFile->getMimeType(),
+                    'file_size' => $imageFile->getSize(),
+                    'is_primary' => $isPrimary,
+                ]);
+
+                $isPrimary = false;
+            }
+        }
 
         if ($status === 'pending_surrender') {
             SurrenderRequest::create([
@@ -147,7 +176,89 @@ class ReportController extends Controller
             ]);
         }
 
-        return response()->json(['status' => 'success', 'message' => 'Report created successfully.', 'data' => $report], 201);
+        $report->load(['student', 'images']);
+        return response()->json(['status' => 'success', 'message' => 'Report created successfully. Images uploaded.', 'data' => $report], 201);
+    }
+
+    public function uploadImages(Request $request, $reportId)
+    {
+        $user = $request->user();
+        $report = Report::findOrFail($reportId);
+
+        // Verify ownership
+        if ($report->student_id !== $user->id) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'images' => 'required|array|min:1',
+            'images.*' => 'required|file|image|max:5120',
+        ], [
+            'images.required' => 'At least one image is required.',
+            'images.min' => 'At least one image is required.',
+            'images.*.image' => 'All files must be valid images.',
+            'images.*.max' => 'Images must not exceed 5MB each.',
+        ]);
+
+        $uploadedImages = [];
+        $isPrimary = !$report->images()->exists();
+
+        foreach ($request->file('images') as $imageFile) {
+            $path = $imageFile->store('report-images', 'public');
+
+            $image = ReportImage::create([
+                'report_id' => $report->id,
+                'file_path' => $path,
+                'original_name' => $imageFile->getClientOriginalName(),
+                'mime_type' => $imageFile->getMimeType(),
+                'file_size' => $imageFile->getSize(),
+                'is_primary' => $isPrimary,
+            ]);
+
+            $uploadedImages[] = $image;
+            $isPrimary = false;
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Images uploaded successfully.',
+            'data' => $uploadedImages,
+        ], 201);
+    }
+
+    public function deleteImage(Request $request, $reportId, $imageId)
+    {
+        $user = $request->user();
+        $report = Report::findOrFail($reportId);
+
+        // Verify ownership
+        if ($report->student_id !== $user->id) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 403);
+        }
+
+        $image = ReportImage::where('report_id', $report->id)->findOrFail($imageId);
+
+        // Check if this is the last image and report requires images
+        if ($report->requires_images && $report->images()->count() === 1) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Cannot delete the last image. Reports must have at least one image.',
+            ], 422);
+        }
+
+        // Delete file from storage
+        Storage::disk('public')->delete($image->file_path);
+        $image->delete();
+
+        // If deleted image was primary, make the next one primary
+        if ($image->is_primary) {
+            $nextImage = $report->images()->first();
+            if ($nextImage) {
+                $nextImage->update(['is_primary' => true]);
+            }
+        }
+
+        return response()->json(['status' => 'success', 'message' => 'Image deleted successfully.']);
     }
 
     public function matches(Request $request, $id)

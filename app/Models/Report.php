@@ -32,6 +32,7 @@ class Report extends Model
         'published_at',
         'completed_at',
         'archived_at',
+        'requires_images',
     ];
 
     protected $casts = [
@@ -43,9 +44,18 @@ class Report extends Model
         'archived_at' => 'datetime',
     ];
 
+    protected $appends = [
+        'student_full_name',
+    ];
+
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
+    }
+
+    public function images(): HasMany
+    {
+        return $this->hasMany(ReportImage::class);
     }
 
     public function rewards(): HasMany
@@ -81,5 +91,13 @@ class Report extends Model
     public function scopeOpen($query)
     {
         return $query->where('status', 'pending_approval');
+    }
+
+    /**
+     * Get the student's full name.
+     */
+    public function getStudentFullNameAttribute(): string
+    {
+        return $this->student?->full_name ?? 'Unknown Student';
     }
 }

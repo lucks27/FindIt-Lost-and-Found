@@ -34,6 +34,10 @@ class Student extends Authenticatable
         'remember_token',
     ];
 
+    protected $appends = [
+        'full_name',
+    ];
+
     // --- ADD THIS SECTION HERE ---
     protected $casts = [
         'password' => 'hashed',
@@ -81,5 +85,21 @@ class Student extends Authenticatable
         }
 
         $this->attributes['password'] = Hash::needsRehash($value) ? Hash::make($value) : $value;
+    }
+
+    /**
+     * Get the student's full name (first name to last name).
+     */
+    public function getFullNameAttribute(): string
+    {
+        $names = [$this->first_name];
+
+        if ($this->middle_name) {
+            $names[] = $this->middle_name;
+        }
+
+        $names[] = $this->last_name;
+
+        return implode(' ', $names);
     }
 }
