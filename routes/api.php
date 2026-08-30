@@ -71,6 +71,7 @@ Route::middleware('auth:admin')->group(function () {
     Route::put('/admin/students/{id}', [AdminAuthController::class, 'updateStudentRecord']);
     Route::delete('/admin/students/{id}', [AdminAuthController::class, 'deleteStudentRecord']);
     Route::get('/admin/list', [App\Http\Controllers\AdminWorkflowController::class, 'listStudents']);
+    Route::get('/admin/categories', [App\Http\Controllers\AdminWorkflowController::class, 'indexItemCategories']);
 
     Route::get('/admin/pending-reports', [App\Http\Controllers\AdminWorkflowController::class, 'indexPendingReports']);
     Route::get('/admin/archive', [App\Http\Controllers\AdminWorkflowController::class, 'indexArchive']);

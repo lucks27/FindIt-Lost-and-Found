@@ -113,7 +113,7 @@
                             <span class="report-type-badge" :class="selectedSurrender.report?.type">{{
                                 selectedSurrender.report?.type }}</span>
                             <span class="status-badge" :class="selectedSurrender.status">{{ selectedSurrender.status
-                            }}</span>
+                                }}</span>
                         </div>
                     </div>
 
@@ -146,22 +146,22 @@
                                 <div class="info-row">
                                     <span class="info-label">Student ID:</span>
                                     <span class="info-value">{{ selectedSurrender.report?.student?.student_id_number
-                                    }}</span>
+                                        }}</span>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-label">Department:</span>
                                     <span class="info-value">{{ selectedSurrender.report?.student?.department || 'N/A'
-                                    }}</span>
+                                        }}</span>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-label">Course:</span>
                                     <span class="info-value">{{ selectedSurrender.report?.student?.course || 'N/A'
-                                    }}</span>
+                                        }}</span>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-label">Year Level:</span>
                                     <span class="info-value">{{ selectedSurrender.report?.student?.year_level || 'N/A'
-                                    }}</span>
+                                        }}</span>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-label">Email:</span>
@@ -189,17 +189,17 @@
                                 <div class="info-row">
                                     <span class="info-label">Category:</span>
                                     <span class="info-value">{{ selectedSurrender.report?.category?.name || 'N/A'
-                                        }}</span>
+                                    }}</span>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-label">Location Found ({{ selectedSurrender.report?.type
-                                        }}):</span>
+                                    }}):</span>
                                     <span class="info-value">{{ selectedSurrender.report?.location }}</span>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-label">Date Found:</span>
                                     <span class="info-value">{{ formatDate(selectedSurrender.report?.date_occurred)
-                                    }}</span>
+                                        }}</span>
                                 </div>
                             </div>
                         </div>
@@ -226,7 +226,7 @@
                                     <span class="info-label">Status:</span>
                                     <span class="status-badge" :class="selectedSurrender.status">{{
                                         selectedSurrender.status
-                                    }}</span>
+                                        }}</span>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-label">Deadline:</span>
@@ -410,7 +410,7 @@ async function loadSurrenders() {
 
 async function loadCategories() {
     try {
-        const response = await api.get('/api/categories')
+        const response = await api.get('/api/admin/categories')
         categories.value = normalizeListPayload(response.data)
     } catch (error) {
         console.error('Failed to load categories:', error)

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\AdminAnnouncement;
+use App\Models\ArchiveItem;
 use App\Models\AuditLog;
 use App\Models\ClaimReview;
 use App\Models\EventFine;
+use App\Models\ItemCategory;
 use App\Models\ItemRelease;
 use App\Models\ItemVerification;
 use App\Models\Notification;
@@ -16,6 +18,7 @@ use App\Models\Report;
 use App\Models\Student;
 use App\Models\SurrenderRequest;
 use App\Models\AdminSetting;
+use App\Models\VisiblePostedItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -193,12 +196,33 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $items = Report::query()
-            ->whereIn('type', ['lost', 'found'])
-            ->whereIn('status', ['pending_approval', 'approved', 'pending_surrender', 'pending_verification', 'verified'])
-            ->with('student')
-            ->latest()
-            ->get();
+        $items = VisiblePostedItem::query()
+            ->where('is_visible', true)
+            ->with(['report.student', 'report.images'])
+            ->latest('posted_at')
+            ->get()
+            ->map(function (VisiblePostedItem $visibleItem) {
+                $report = $visibleItem->report;
+
+                if (!$report) {
+                    return null;
+                }
+
+                return [
+                    'id' => $report->id,
+                    'report_id' => $report->id,
+                    'title' => $report->title,
+                    'type' => $report->type,
+                    'status' => $report->status,
+                    'location' => $report->location,
+                    'published_at' => $report->published_at,
+                    'student' => $report->student ? $report->student->toArray() : null,
+                    'student_name' => $report->student?->full_name,
+                    'item' => $report,
+                ];
+            })
+            ->filter()
+            ->values();
 
         return response()->json([
             'status' => 'success',
@@ -214,11 +238,33 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $items = Report::query()
-            ->whereIn('status', ['rejected', 'claimed', 'unclaimed', 'completed_return', 'archived'])
-            ->with('student')
-            ->latest()
-            ->get();
+        $items = ArchiveItem::query()
+            ->with(['report.student', 'report.images'])
+            ->latest('archived_at')
+            ->get()
+            ->map(function (ArchiveItem $archiveItem) {
+                $report = $archiveItem->report;
+
+                if (!$report) {
+                    return null;
+                }
+
+                return [
+                    'id' => $report->id,
+                    'report_id' => $report->id,
+                    'title' => $report->title,
+                    'type' => $report->type,
+                    'status' => $report->status,
+                    'student' => $report->student ? $report->student->toArray() : null,
+                    'student_name' => $report->student?->full_name,
+                    'archived_at' => $archiveItem->archived_at,
+                    'archive_type' => $archiveItem->archive_type,
+                    'reason' => $archiveItem->reason,
+                    'item' => $report,
+                ];
+            })
+            ->filter()
+            ->values();
 
         return response()->json(['status' => 'success', 'data' => $items]);
     }
@@ -232,6 +278,8 @@ class AdminWorkflowController extends Controller
         }
 
         $report = Report::findOrFail($id);
+        ArchiveItem::where('report_id', $report->id)->delete();
+
         $report->update([
             'status' => $report->type === 'lost' ? 'pending_approval' : 'pending_surrender',
             'archived_at' => null,
@@ -264,6 +312,16 @@ class AdminWorkflowController extends Controller
         }
 
         $report->update(['published_at' => Carbon::now()]);
+
+        VisiblePostedItem::updateOrCreate(
+            ['report_id' => $report->id],
+            [
+                'post_type' => 'public',
+                'is_visible' => true,
+                'posted_at' => Carbon::now(),
+                'posted_by_admin_id' => $admin->id,
+            ]
+        );
 
         return response()->json([
             'status' => 'success',
@@ -357,6 +415,24 @@ class AdminWorkflowController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $items,
+        ]);
+    }
+
+    public function indexItemCategories(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $categories = ItemCategory::query()
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $categories,
         ]);
     }
 
@@ -711,6 +787,20 @@ class AdminWorkflowController extends Controller
         return response()->json(['status' => 'success', 'message' => 'Announcement unpublished successfully.', 'data' => $item]);
     }
 
+    private function syncArchiveRecord(Report $report, string $archiveType = 'completed', ?string $reason = null): void
+    {
+        ArchiveItem::updateOrCreate(
+            ['report_id' => $report->id],
+            [
+                'status' => $report->status,
+                'archive_type' => $archiveType,
+                'reason' => $reason,
+                'archived_by_admin_id' => auth('admin')->id(),
+                'archived_at' => Carbon::now(),
+            ]
+        );
+    }
+
     public function approveLostReport($id)
     {
         $admin = Auth::guard('admin')->user();
@@ -735,6 +825,7 @@ class AdminWorkflowController extends Controller
 
         $report = Report::findOrFail($id);
         $report->update(['status' => 'rejected']);
+        $this->syncArchiveRecord($report, 'rejected', 'Rejected by admin review.');
 
         return response()->json(['status' => 'success', 'message' => 'Report rejected successfully.', 'data' => $report]);
     }
@@ -842,6 +933,12 @@ class AdminWorkflowController extends Controller
 
         $surrender = SurrenderRequest::findOrFail($id);
         $surrender->update(['status' => 'rejected']);
+
+        $report = $surrender->report()->first();
+        if ($report) {
+            $report->update(['status' => 'rejected']);
+            $this->syncArchiveRecord($report, 'rejected', 'Rejected surrender request.');
+        }
 
         return response()->json(['status' => 'success', 'message' => 'Surrender request rejected.', 'data' => $surrender]);
     }
@@ -974,6 +1071,7 @@ class AdminWorkflowController extends Controller
                 ]);
 
                 $report->update(['status' => 'rejected']);
+                $this->syncArchiveRecord($report, 'rejected', $validated['notes']);
 
                 Notification::create([
                     'student_id' => $report->student_id,

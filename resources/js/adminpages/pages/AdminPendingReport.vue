@@ -108,7 +108,7 @@
                         <h2>Report Details</h2>
                         <div class="modal-badges">
                             <span class="report-type-badge" :class="selectedReport.type">{{ selectedReport.type
-                            }}</span>
+                                }}</span>
                             <span class="status-badge" :class="selectedReport.status">{{ selectedReport.status }}</span>
                         </div>
                     </div>
@@ -216,7 +216,7 @@
                                 <div class="info-row">
                                     <span class="info-label">Status:</span>
                                     <span class="status-badge" :class="selectedReport.status">{{ selectedReport.status
-                                    }}</span>
+                                        }}</span>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-label">Submitted:</span>
@@ -350,7 +350,7 @@ async function loadReports() {
 
 async function loadCategories() {
     try {
-        const response = await api.get('/api/categories')
+        const response = await api.get('/api/admin/categories')
         categories.value = normalizeListPayload(response.data)
     } catch (error) {
         console.error('Failed to load categories:', error)
