@@ -53,6 +53,11 @@ class Report extends Model
         return $this->belongsTo(Student::class);
     }
 
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ItemCategory::class);
+    }
+
     public function images(): HasMany
     {
         return $this->hasMany(ReportImage::class);

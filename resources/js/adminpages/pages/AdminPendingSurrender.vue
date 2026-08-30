@@ -2,70 +2,266 @@
     <main class="admin-page-body">
         <header class="page-header">
             <div>
-                <p class="page-kicker">Pending surrender</p>
-                <h1>Track found-item surrender intake</h1>
-                <p class="page-copy">Use the real surrender queue to receive, reject, or escalate items based on the
-                    backend status flags and deadline fields.</p>
+                <p class="page-kicker">Pending Surrender</p>
+                <h1>Track Found-Item Surrender Intake</h1>
+                <p class="page-copy">Use the surrender queue to receive and reject items based on backend status
+                    flags and deadline fields.</p>
             </div>
-            <button type="button" class="primary-button" @click="loadSurrenders">Refresh queue</button>
+            <button type="button" class="primary-button" @click="loadSurrenders">Refresh</button>
         </header>
 
-        <section class="metric-grid" aria-label="Surrender summary metrics">
-            <article v-for="metric in metricCards" :key="metric.label" class="metric-card">
-                <span class="metric-label">{{ metric.label }}</span>
-                <strong class="metric-value">{{ metric.value }}</strong>
-                <small>{{ metric.hint }}</small>
-            </article>
-        </section>
-
-        <section class="panel-card">
-            <div class="toolbar-row">
+        <section class="filter-toolbar">
+            <div class="search-section">
                 <label class="search-field">
                     <span class="sr-only">Search surrender records</span>
-                    <input v-model.trim="query" type="search" placeholder="Search item, student, or deadline"
+                    <input v-model.trim="searchQuery" type="search" placeholder="Search by title, student, location..."
                         aria-label="Search surrender records" />
                 </label>
             </div>
 
-            <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
-            <div v-if="loading" class="loading-state">Loading surrender requests…</div>
-            <div v-else class="table-shell">
-                <div v-if="!visibleRows.length" class="empty-state-card" role="status">
-                    <h2>No surrender records to display</h2>
-                    <p>As pending surrenders arrive, the queue will show the report title, linked student, status, and
-                        deadline.</p>
-                </div>
-
-                <table v-else class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>Report</th>
-                            <th>Student</th>
-                            <th>Status</th>
-                            <th>Deadline</th>
-                            <th>Received</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="item in visibleRows" :key="item.id">
-                            <td>{{ item.report?.title || item.report_id }}</td>
-                            <td>{{ item.student?.name || item.report?.student?.name || 'Unknown' }}</td>
-                            <td><span class="status-chip">{{ item.status || 'pending' }}</span></td>
-                            <td>{{ item.deadline_at ? formatDate(item.deadline_at) : 'TBD' }}</td>
-                            <td>{{ item.received_at ? formatDate(item.received_at) : 'Not yet' }}</td>
-                            <td class="action-cell">
-                                <button v-for="action in ROW_ACTIONS" :key="action.key" type="button"
-                                    class="secondary-button" :disabled="!isPending(item)"
-                                    @click="runAction(action.key, item.id)">
-                                    {{ action.label }}
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="filter-section">
+                <label class="filter-label">
+                    <span>Category:</span>
+                    <select v-model="selectedCategory">
+                        <option value="">All Categories</option>
+                        <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                            {{ cat.name }}
+                        </option>
+                    </select>
+                </label>
             </div>
         </section>
+
+        <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
+        <div v-if="loading" class="loading-state">Loading surrender requests…</div>
+
+        <template v-else>
+            <div v-if="!filteredSurrenders.length" class="empty-state-card" role="status">
+                <h2>No surrender records to display</h2>
+                <p>As pending surrenders arrive, the queue will show the report title, linked student, status, and
+                    deadline.</p>
+            </div>
+
+            <div v-else class="surrender-grid">
+                <article v-for="item in filteredSurrenders" :key="item.id" class="report-card surrender-card">
+                    <div class="card-image-container">
+                        <img :src="getReportImage(item.report)" :alt="item.report?.title || 'SNSU logo'"
+                            class="card-image" :class="{ 'fallback-image': !item.report?.images?.length }" />
+                    </div>
+
+                    <div class="card-content">
+                        <div class="card-header">
+                            <span class="report-type-badge" :class="item.report?.type">{{ item.report?.type }}</span>
+                            <span class="status-badge" :class="item.status">{{ item.status }}</span>
+                        </div>
+
+                        <h3 class="card-title">{{ item.report?.title }}</h3>
+                        <p class="card-student">{{ item.report?.student_full_name }}</p>
+
+                        <div class="card-meta">
+                            <span class="meta-item">
+                                <strong>Location:</strong> {{ item.report?.location }}
+                            </span>
+                            <span class="meta-item">
+                                <strong>Deadline:</strong> {{ formatDate(item.deadline_at) }}
+                            </span>
+                            <span v-if="item.received_at" class="meta-item received">
+                                <strong>✓ Received:</strong> {{ formatDate(item.received_at) }}
+                            </span>
+                        </div>
+
+                        <div class="card-actions">
+                            <button type="button" class="action-btn view-btn" @click="openDetailModal(item)">
+                                <svg viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                                </svg>
+                                View
+                            </button>
+                            <button v-if="isPending(item)" type="button" class="action-btn approve-btn"
+                                @click="hasSurrenderRecord(item) ? runAction('approve', item.id) : openDetailModal(item)">
+                                Approve
+                            </button>
+                            <button v-if="isPending(item)" type="button" class="action-btn reject-btn"
+                                @click="hasSurrenderRecord(item) ? runAction('reject', item.id) : openDetailModal(item)">
+                                Reject
+                            </button>
+                            <button v-if="isPending(item)" type="button" class="action-btn details-btn"
+                                @click="openDetailModal(item)">
+                                Request Details
+                            </button>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </template>
+
+        <!-- Detail Modal -->
+        <transition name="modal-fade">
+            <div v-if="selectedSurrender" class="modal-overlay" @click.self="closeDetailModal">
+                <div class="modal-content">
+                    <button type="button" class="modal-close" @click="closeDetailModal">
+                        <svg viewBox="0 0 24 24">
+                            <path
+                                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" />
+                        </svg>
+                    </button>
+
+                    <div class="modal-header">
+                        <h2>Request Details</h2>
+                        <div class="modal-badges">
+                            <span class="report-type-badge" :class="selectedSurrender.report?.type">{{
+                                selectedSurrender.report?.type }}</span>
+                            <span class="status-badge" :class="selectedSurrender.status">{{ selectedSurrender.status
+                            }}</span>
+                        </div>
+                    </div>
+
+                    <div class="modal-scroll">
+                        <!-- Image Section -->
+                        <div class="modal-section">
+                            <h3>Item Image</h3>
+                            <div class="modal-image-container">
+                                <img :src="getReportImage(selectedSurrender.report)"
+                                    :alt="selectedSurrender.report?.title || 'SNSU logo'" class="modal-image"
+                                    :class="{ 'fallback-image': !selectedSurrender.report?.images?.length }" />
+                            </div>
+                            <div v-if="selectedSurrender.report?.images?.length > 1" class="image-thumbnails">
+                                <button v-for="(img, idx) in selectedSurrender.report.images" :key="idx" type="button"
+                                    class="thumbnail" @click="currentImageIndex = idx"
+                                    :class="{ active: currentImageIndex === idx }">
+                                    <img :src="`/storage/${img.file_path}`" :alt="`Image ${idx + 1}`" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Student Information -->
+                        <div class="modal-section">
+                            <h3>Found By (Student)</h3>
+                            <div class="student-info">
+                                <div class="info-row">
+                                    <span class="info-label">Name:</span>
+                                    <span class="info-value">{{ selectedSurrender.report?.student_full_name }}</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Student ID:</span>
+                                    <span class="info-value">{{ selectedSurrender.report?.student?.student_id_number
+                                    }}</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Department:</span>
+                                    <span class="info-value">{{ selectedSurrender.report?.student?.department || 'N/A'
+                                    }}</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Course:</span>
+                                    <span class="info-value">{{ selectedSurrender.report?.student?.course || 'N/A'
+                                    }}</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Year Level:</span>
+                                    <span class="info-value">{{ selectedSurrender.report?.student?.year_level || 'N/A'
+                                    }}</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Email:</span>
+                                    <span class="info-value">{{ selectedSurrender.report?.student?.email }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Item Information -->
+                        <div class="modal-section">
+                            <h3>Item Information</h3>
+                            <div class="student-info">
+                                <div class="info-row">
+                                    <span class="info-label">Title:</span>
+                                    <span class="info-value">{{ selectedSurrender.report?.title }}</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Description:</span>
+                                    <span class="info-value">{{ selectedSurrender.report?.description }}</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Color:</span>
+                                    <span class="info-value">{{ selectedSurrender.report?.color || 'N/A' }}</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Category:</span>
+                                    <span class="info-value">{{ selectedSurrender.report?.category?.name || 'N/A'
+                                        }}</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Location Found ({{ selectedSurrender.report?.type
+                                        }}):</span>
+                                    <span class="info-value">{{ selectedSurrender.report?.location }}</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Date Found:</span>
+                                    <span class="info-value">{{ formatDate(selectedSurrender.report?.date_occurred)
+                                    }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Additional Details -->
+                        <div v-if="selectedSurrender.report?.additional_details" class="modal-section">
+                            <h3>Additional Details</h3>
+                            <p class="detail-text">{{ selectedSurrender.report.additional_details }}</p>
+                        </div>
+
+                        <!-- Private Details (Admin Only) -->
+                        <div v-if="selectedSurrender.report?.private_identifying_details"
+                            class="modal-section private-section">
+                            <h3>🔒 Private Identifying Details</h3>
+                            <p class="private-notice">Only visible to admin and item owner</p>
+                            <p class="detail-text">{{ selectedSurrender.report.private_identifying_details }}</p>
+                        </div>
+
+                        <!-- Surrender Timeline -->
+                        <div class="modal-section">
+                            <h3>Surrender Timeline</h3>
+                            <div class="student-info">
+                                <div class="info-row">
+                                    <span class="info-label">Status:</span>
+                                    <span class="status-badge" :class="selectedSurrender.status">{{
+                                        selectedSurrender.status
+                                    }}</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Deadline:</span>
+                                    <span class="info-value">{{ formatDateTime(selectedSurrender.deadline_at) }}</span>
+                                </div>
+                                <div v-if="selectedSurrender.received_at" class="info-row">
+                                    <span class="info-label">Received:</span>
+                                    <span class="info-value">{{ formatDateTime(selectedSurrender.received_at) }}</span>
+                                </div>
+                                <div v-if="selectedSurrender.notes" class="info-row">
+                                    <span class="info-label">Notes:</span>
+                                    <span class="info-value">{{ selectedSurrender.notes }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal Actions -->
+                    <div class="modal-actions">
+                        <button v-if="isPending(selectedSurrender)" type="button" class="action-btn approve-btn"
+                            @click="hasSurrenderRecord(selectedSurrender) ? runAction('approve', selectedSurrender.id) : null">
+                            Approve Request
+                        </button>
+                        <button v-if="isPending(selectedSurrender)" type="button" class="action-btn reject-btn"
+                            @click="hasSurrenderRecord(selectedSurrender) ? runAction('reject', selectedSurrender.id) : null">
+                            Reject Request
+                        </button>
+                        <button v-if="isPending(selectedSurrender)" type="button" class="action-btn details-btn"
+                            @click="hasSurrenderRecord(selectedSurrender) ? runAction('request-details', selectedSurrender.id) : null">
+                            Request More Details
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </transition>
     </main>
 </template>
 
@@ -73,76 +269,128 @@
 import { computed, onMounted, ref } from 'vue'
 import api from '@/bootstrap'
 
-const DAY_MS = 24 * 60 * 60 * 1000
-const DUE_SOON_WINDOW_MS = 5 * DAY_MS
-
-const ROW_ACTIONS = [
-    { key: 'receive', label: 'Receive', endpoint: 'receive', errorFallback: 'Unable to receive surrender request.' },
-    { key: 'reject', label: 'Reject', endpoint: 'reject', errorFallback: 'Unable to reject surrender request.' },
-    { key: 'overdue', label: 'Overdue', endpoint: 'overdue', errorFallback: 'Unable to mark surrender request overdue.' },
-]
-
-const query = ref('')
 const surrenders = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
+const searchQuery = ref('')
+const selectedCategory = ref('')
+const categories = ref([])
+const selectedSurrender = ref(null)
+const currentImageIndex = ref(0)
+const fallbackImage = '/images/snsu-logo.png'
+
+function normalizeListPayload(payload) {
+    if (Array.isArray(payload)) return payload
+    if (Array.isArray(payload?.data)) return payload.data
+    if (Array.isArray(payload?.items)) return payload.items
+    if (Array.isArray(payload?.records)) return payload.records
+    return []
+}
+
+function getImageUrl(imagePath) {
+    if (!imagePath) return fallbackImage
+    if (typeof imagePath === 'string') {
+        const normalized = imagePath.trim()
+        if (!normalized) return fallbackImage
+        if (/^https?:\/\//i.test(normalized) || /^data:|^blob:/i.test(normalized) || normalized.startsWith('/')) {
+            return normalized
+        }
+        if (normalized.startsWith('storage/')) {
+            return `/${normalized}`
+        }
+        return `/storage/${normalized}`
+    }
+    return fallbackImage
+}
+
+function getReportImage(report, index = 0) {
+    const images = Array.isArray(report?.images) ? report.images : []
+    const image = images[index] || images[0]
+    if (!image) return fallbackImage
+    return getImageUrl(image.file_path || image.path || image.url)
+}
 
 function statusOf(item) {
     return String(item.status || 'pending').toLowerCase()
 }
 
+function hasSurrenderRecord(item) {
+    return item?.has_surrender_record !== false
+}
+
 function isPending(item) {
-    return statusOf(item) === 'pending'
+    const itemStatus = statusOf(item)
+    const reportStatus = String(item?.report?.status || '').toLowerCase()
+
+    return itemStatus === 'pending'
+        || itemStatus === 'overdue'
+        || reportStatus === 'pending'
+        || reportStatus === 'pending_surrender'
+        || reportStatus === 'published'
+        || reportStatus === 'approved'
 }
 
 function deadlineTime(item) {
     return item.deadline_at ? new Date(item.deadline_at).getTime() : null
 }
 
-const metrics = computed(() => {
-    const now = Date.now()
-    const list = surrenders.value
+function getDeadlineClass(item) {
+    if (isPending(item)) return 'pending'
+    return 'neutral'
+}
 
-    const pending = list.filter(isPending).length
+function getDeadlineText(item) {
+    if (isPending(item)) return 'Pending'
+    if (!deadlineTime(item)) return 'No deadline'
+    return 'On track'
+}
 
-    const dueSoon = list.filter((item) => {
-        const deadline = deadlineTime(item)
-        return deadline !== null && deadline >= now && deadline <= now + DUE_SOON_WINDOW_MS
-    }).length
+const filteredSurrenders = computed(() => {
+    let filtered = surrenders.value.filter(item => isPending(item))
 
-    const overdue = list.filter((item) => {
-        const deadline = deadlineTime(item)
-        return deadline !== null && deadline < now
-    }).length
+    // Filter by search query
+    if (searchQuery.value) {
+        const query = searchQuery.value.toLowerCase()
+        filtered = filtered.filter(item =>
+            item.report?.title?.toLowerCase().includes(query) ||
+            item.report?.student_full_name?.toLowerCase().includes(query) ||
+            item.report?.location?.toLowerCase().includes(query) ||
+            item.status?.toLowerCase().includes(query)
+        )
+    }
 
-    const received = list.filter((item) => item.received_by_admin_id || statusOf(item) === 'received').length
+    // Filter by category
+    if (selectedCategory.value) {
+        filtered = filtered.filter(item => item.report?.category_id === parseInt(selectedCategory.value))
+    }
 
-    return { pending, dueSoon, overdue, received }
-})
-
-const metricCards = computed(() => [
-    { label: 'Pending', value: metrics.value.pending, hint: 'Waiting for admin action' },
-    { label: 'Due soon', value: metrics.value.dueSoon, hint: 'Upcoming deadlines' },
-    { label: 'Overdue', value: metrics.value.overdue, hint: 'Escalate and review' },
-    { label: 'Received', value: metrics.value.received, hint: 'Completed handovers' },
-])
-
-const visibleRows = computed(() => {
-    const search = query.value.toLowerCase()
-    if (!search) return surrenders.value
-
-    return surrenders.value.filter((item) => {
-        const text = [item.report?.title, item.report?.student?.name, item.student?.name, item.status, item.deadline_at]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase()
-        return text.includes(search)
+    filtered.sort((a, b) => {
+        const aTime = a.deadline_at ? new Date(a.deadline_at).getTime() : Number.MAX_SAFE_INTEGER
+        const bTime = b.deadline_at ? new Date(b.deadline_at).getTime() : Number.MAX_SAFE_INTEGER
+        return aTime - bTime
     })
+
+    return filtered
 })
 
 function formatDate(value) {
     if (!value) return '—'
-    return new Date(value).toLocaleDateString()
+    return new Date(value).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    })
+}
+
+function formatDateTime(value) {
+    if (!value) return '—'
+    return new Date(value).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    })
 }
 
 async function loadSurrenders() {
@@ -151,7 +399,7 @@ async function loadSurrenders() {
 
     try {
         const response = await api.get('/api/admin/surrenders')
-        surrenders.value = response.data?.data || []
+        surrenders.value = normalizeListPayload(response.data)
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Failed to load surrender records.'
         surrenders.value = []
@@ -160,20 +408,49 @@ async function loadSurrenders() {
     }
 }
 
-async function runAction(actionKey, id) {
-    const action = ROW_ACTIONS.find((entry) => entry.key === actionKey)
-    if (!action) return
-
-    errorMessage.value = ''
+async function loadCategories() {
     try {
-        await api.post(`/api/admin/surrenders/${id}/${action.endpoint}`)
-        await loadSurrenders()
+        const response = await api.get('/api/categories')
+        categories.value = normalizeListPayload(response.data)
     } catch (error) {
-        errorMessage.value = error.response?.data?.message || action.errorFallback
+        console.error('Failed to load categories:', error)
     }
 }
 
-onMounted(loadSurrenders)
+function openDetailModal(item) {
+    selectedSurrender.value = item
+    currentImageIndex.value = 0
+}
+
+function closeDetailModal() {
+    selectedSurrender.value = null
+    currentImageIndex.value = 0
+}
+
+async function runAction(actionKey, id) {
+    const actionMap = {
+        approve: 'receive',
+        reject: 'reject',
+        'request-details': 'request-details',
+    }
+
+    const endpoint = actionMap[actionKey]
+    if (!endpoint) return
+
+    errorMessage.value = ''
+    try {
+        await api.post(`/api/admin/surrenders/${id}/${endpoint}`)
+        await loadSurrenders()
+        closeDetailModal()
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Unable to update surrender request.'
+    }
+}
+
+onMounted(() => {
+    loadSurrenders()
+    loadCategories()
+})
 </script>
 
 <style scoped>
@@ -184,22 +461,17 @@ onMounted(loadSurrenders)
     background: radial-gradient(circle at top left, rgba(80, 130, 82, 0.16), transparent 30%), #0f2112;
 }
 
-.page-header,
-.panel-card,
-.metric-card {
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
-}
-
 .page-header {
     display: flex;
-    align-items: flex-start;
     justify-content: space-between;
+    align-items: flex-start;
     gap: 20px;
     padding: 20px 22px;
     border-radius: 20px;
-    margin-bottom: 18px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
 }
 
 .page-kicker {
@@ -212,48 +484,47 @@ onMounted(loadSurrenders)
 
 .page-header h1 {
     margin: 0;
-    font-size: clamp(1.9rem, 3vw, 2.6rem);
+    font-size: clamp(1.6rem, 2.5vw, 2.2rem);
     color: #fbf7eb;
 }
 
 .page-copy {
     margin: 8px 0 0;
-    max-width: 720px;
+    max-width: 700px;
     color: #bcc0a7;
     line-height: 1.6;
 }
 
-.primary-button,
-.chip-button {
-    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
-}
-
 .primary-button {
     border: none;
-    border-radius: 14px;
-    padding: 0.86rem 1.2rem;
+    border-radius: 10px;
+    padding: 0.75rem 1.5rem;
     background: #c49d3b;
     color: #131b10;
     font-weight: 700;
     cursor: pointer;
-    min-width: 152px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
 }
 
-.primary-button:hover,
-.chip-button:hover {
-    transform: translateY(-1px);
+.primary-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(196, 157, 59, 0.3);
 }
 
 .metric-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 14px;
-    margin-bottom: 18px;
+    margin-bottom: 24px;
 }
 
 .metric-card {
     padding: 18px;
     border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
 }
 
 .metric-label {
@@ -276,81 +547,56 @@ onMounted(loadSurrenders)
     color: #9fa58d;
 }
 
-.panel-card {
-    padding: 18px;
-    border-radius: 20px;
-}
-
-.toolbar-row {
+.filter-toolbar {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
     gap: 16px;
-    margin-bottom: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
 }
 
-.search-field {
-    width: min(420px, 100%);
+.search-section,
+.filter-section {
+    flex: 1;
+    min-width: 200px;
 }
 
-.search-field input {
+.search-field,
+.filter-label {
+    display: block;
+    width: 100%;
+}
+
+.search-field input,
+.filter-label select {
     width: 100%;
     padding: 0.9rem 1rem;
-    border-radius: 14px;
+    border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(14, 29, 18, 0.95);
     color: #eef1e5;
+    font-size: 0.95rem;
+}
+
+.search-field input::placeholder {
+    color: rgba(238, 241, 229, 0.5);
 }
 
 .search-field input:focus,
-.chip-button:focus-visible,
-.primary-button:focus-visible {
+.filter-label select:focus {
     outline: none;
-    box-shadow: 0 0 0 4px rgba(196, 157, 59, 0.18);
+    border-color: #c49d3b;
+    box-shadow: 0 0 0 3px rgba(196, 157, 59, 0.15);
 }
 
-.chip-row {
+.filter-label {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    align-items: center;
+    gap: 10px;
 }
 
-.chip-button {
-    padding: 0.7rem 0.95rem;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.04);
-    color: #dde2c9;
-    cursor: pointer;
-}
-
-.chip-button.active {
-    background: rgba(196, 157, 59, 0.16);
-    border-color: rgba(196, 157, 59, 0.38);
-    color: #f6cf77;
-}
-
-.table-shell {
-    border-radius: 16px;
-    overflow: hidden;
-}
-
-.empty-state-card {
-    padding: 42px 18px;
-    text-align: center;
-    border: 1px dashed rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.03);
-}
-
-.empty-state-card h2 {
-    margin: 0 0 10px;
-    font-size: 1.2rem;
-    color: #f8f5e8;
-}
-
-.empty-state-card p {
-    margin: 0;
-    color: #b0b59b;
+.filter-label span {
+    color: #bcc0a7;
+    font-weight: 600;
 }
 
 .sr-only {
@@ -365,25 +611,627 @@ onMounted(loadSurrenders)
     border: 0;
 }
 
-@media (max-width: 900px) {
+.inline-alert {
+    padding: 14px 16px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-weight: 600;
+}
+
+.error-alert {
+    background: rgba(220, 38, 38, 0.15);
+    border: 1px solid rgba(220, 38, 38, 0.3);
+    color: #ff8a80;
+}
+
+.loading-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: #bcc0a7;
+}
+
+.empty-state-card {
+    padding: 42px 18px;
+    text-align: center;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    background: linear-gradient(135deg, #2d6a4f 0%, #1f5233 100%);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+.empty-state-card h2 {
+    margin: 0 0 10px;
+    font-size: 1.2rem;
+    color: #ffffff;
+}
+
+.empty-state-card p {
+    margin: 0;
+    color: #e8f5e9;
+}
+
+.surrender-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+}
+
+.report-card,
+.surrender-card {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.report-card:hover,
+.surrender-card:hover {
+    border-color: rgba(196, 157, 59, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.3);
+}
+
+.card-image-container {
+    width: 100%;
+    height: 200px;
+    background: rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    position: relative;
+}
+
+.card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.fallback-image {
+    object-fit: contain;
+    padding: 18px;
+    background: linear-gradient(135deg, rgba(80, 130, 82, 0.18), rgba(30, 97, 54, 0.18));
+}
+
+.card-content {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.card-header {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.report-type-badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.report-type-badge.lost {
+    background: rgba(220, 38, 38, 0.2);
+    color: #ff9999;
+}
+
+.report-type-badge.found {
+    background: rgba(34, 197, 94, 0.2);
+    color: #86efac;
+}
+
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: capitalize;
+}
+
+.status-badge.pending {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+
+.status-badge.due-soon {
+    background: rgba(220, 38, 38, 0.2);
+    color: #ff9999;
+}
+
+.status-badge.received {
+    background: rgba(34, 197, 94, 0.2);
+    color: #86efac;
+}
+
+.status-badge.rejected {
+    background: rgba(220, 38, 38, 0.2);
+    color: #ff9999;
+}
+
+.card-title {
+    margin: 0 0 6px;
+    font-size: 1.1rem;
+    color: #fbf7eb;
+    line-height: 1.3;
+}
+
+.card-student {
+    margin: 0 0 12px;
+    font-size: 0.9rem;
+    color: #bcc0a7;
+}
+
+.card-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+    flex: 1;
+}
+
+.meta-item {
+    font-size: 0.85rem;
+    color: #9fa58d;
+    line-height: 1.4;
+}
+
+.meta-item strong {
+    color: #bcc0a7;
+}
+
+.meta-item.received {
+    color: #86efac;
+}
+
+.deadline-indicator {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.deadline-indicator.pending {
+    background: rgba(34, 197, 94, 0.15);
+    color: #86efac;
+}
+
+.deadline-indicator.due-soon {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+.deadline-indicator.neutral {
+    background: rgba(255, 255, 255, 0.05);
+    color: #bcc0a7;
+}
+
+.card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: auto;
+}
+
+.action-btn {
+    padding: 0.6rem 1rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.view-btn {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.view-btn svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+}
+
+.view-btn:hover {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+.approve-btn,
+.receive-btn {
+    background: rgba(34, 197, 94, 0.2);
+    color: #86efac;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.approve-btn:hover,
+.receive-btn:hover {
+    background: rgba(34, 197, 94, 0.3);
+    border-color: rgba(34, 197, 94, 0.5);
+}
+
+.reject-btn {
+    background: rgba(220, 38, 38, 0.2);
+    color: #ff9999;
+    border: 1px solid rgba(220, 38, 38, 0.3);
+}
+
+.reject-btn:hover {
+    background: rgba(220, 38, 38, 0.3);
+    border-color: rgba(220, 38, 38, 0.5);
+}
+
+.details-btn {
+    background: #f59e0b;
+    color: #131b10;
+    border: none;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+}
+
+.details-btn:hover {
+    background: #d97706;
+    transform: translateY(-2px);
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal-content {
+    background: #0f2112;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    max-width: 900px;
+    width: 100%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: slideUp 0.3s ease;
+}
+
+.modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    color: #eef1e5;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.modal-close svg {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+}
+
+.modal-header {
+    padding: 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.6rem;
+    color: #fbf7eb;
+}
+
+.modal-badges {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.modal-scroll {
+    overflow-y: auto;
+    flex: 1;
+    padding: 24px;
+}
+
+.modal-section {
+    margin-bottom: 28px;
+}
+
+.modal-section:last-of-type {
+    margin-bottom: 0;
+}
+
+.modal-section h3 {
+    margin: 0 0 16px;
+    font-size: 1.1rem;
+    color: #f8f5e8;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 12px;
+}
+
+.modal-image-container {
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.3);
+    max-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.image-thumbnails {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+
+.thumbnail {
+    width: 80px;
+    height: 80px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    cursor: pointer;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.thumbnail:hover {
+    border-color: rgba(196, 157, 59, 0.5);
+}
+
+.thumbnail.active {
+    border-color: #c49d3b;
+    box-shadow: 0 0 0 2px rgba(196, 157, 59, 0.2);
+}
+
+.student-info {
+    display: grid;
+    gap: 12px;
+}
+
+.info-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 16px;
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.info-label {
+    color: #bcc0a7;
+    font-weight: 600;
+}
+
+.info-value {
+    color: #fbf7eb;
+    word-break: break-word;
+}
+
+.detail-text {
+    color: #dde2c9;
+    line-height: 1.6;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.private-section {
+    background: rgba(220, 38, 38, 0.1);
+    border: 1px solid rgba(220, 38, 38, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.private-section h3 {
+    color: #ff9999;
+    border: none;
+    padding: 0;
+    margin: 0 0 8px;
+}
+
+.private-notice {
+    color: #ff9999;
+    font-size: 0.85rem;
+    margin: 0 0 12px;
+    font-style: italic;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    padding: 20px 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.modal-actions .action-btn {
+    flex: 1;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+    opacity: 0;
+}
+
+@media (max-width: 1200px) {
     .metric-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .page-header,
-    .toolbar-row {
-        flex-direction: column;
-        align-items: stretch;
+    .surrender-grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+
+    .modal-content {
+        max-width: 95vw;
+    }
+
+    .info-row {
+        grid-template-columns: 120px 1fr;
+        gap: 12px;
     }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+    .admin-page-body {
+        padding: 16px;
+    }
+
+    .page-header {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .filter-toolbar {
+        flex-direction: column;
+    }
+
     .metric-grid {
         grid-template-columns: 1fr;
     }
 
-    .admin-page-body {
+    .surrender-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .modal-scroll {
         padding: 16px;
+    }
+
+    .modal-actions {
+        flex-direction: column;
+    }
+
+    .info-row {
+        grid-template-columns: 100px 1fr;
+        gap: 10px;
+        font-size: 0.9rem;
+    }
+
+    .card-actions {
+        flex-direction: row;
+    }
+
+    .action-btn {
+        flex: 1;
+    }
+}
+
+@media (max-width: 480px) {
+    .modal-content {
+        border-radius: 12px;
+    }
+
+    .modal-header h2 {
+        font-size: 1.3rem;
+    }
+
+    .modal-badges {
+        margin-top: 8px;
+    }
+
+    .report-type-badge,
+    .status-badge {
+        font-size: 0.7rem;
+        padding: 3px 8px;
+    }
+
+    .info-row {
+        grid-template-columns: 80px 1fr;
+        font-size: 0.85rem;
+    }
+
+    .thumbnail {
+        width: 60px;
+        height: 60px;
     }
 }
 </style>

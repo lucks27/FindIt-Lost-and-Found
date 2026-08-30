@@ -161,7 +161,7 @@ class AdminWorkflowController extends Controller
 
         $query = Report::query()
             ->where('type', 'lost')
-            ->whereIn('status', ['pending_approval', 'correction_requested']);
+            ->whereIn('status', ['pending', 'pending_approval', 'correction_requested']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
@@ -177,7 +177,7 @@ class AdminWorkflowController extends Controller
             });
         }
 
-        $items = $query->with('student')->latest()->get();
+        $items = $query->with(['student', 'images'])->latest()->get();
 
         return response()->json([
             'status' => 'success',
@@ -368,10 +368,57 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $items = SurrenderRequest::query()
-            ->with(['report.student', 'student', 'receivedByAdmin'])
+        $surrenderItems = SurrenderRequest::query()
+            ->whereHas('report', function ($reportQuery) {
+                $reportQuery->where('type', 'found')
+                    ->whereIn('status', ['pending', 'pending_surrender', 'published', 'approved']);
+            })
+            ->whereNotIn('status', ['received', 'rejected'])
+            ->with(['report.student', 'report.category', 'report.images', 'student', 'receivedByAdmin'])
             ->latest()
-            ->get();
+            ->get()
+            ->map(function (SurrenderRequest $surrender) {
+                $payload = $surrender->toArray();
+                $payload['has_surrender_record'] = true;
+                return $payload;
+            })
+            ->all();
+
+        $reportItems = Report::query()
+            ->where('type', 'found')
+            ->whereIn('status', ['pending', 'pending_surrender', 'published', 'approved'])
+            ->whereDoesntHave('surrenderRequest')
+            ->with(['student', 'category', 'images'])
+            ->latest()
+            ->get()
+            ->map(function (Report $report) {
+                return [
+                    'id' => $report->id,
+                    'report_id' => $report->id,
+                    'student_id' => $report->student_id,
+                    'status' => $report->status,
+                    'deadline_at' => $report->created_at?->copy()->addDays(3)->toDateTimeString(),
+                    'received_at' => null,
+                    'received_by_admin_id' => null,
+                    'notes' => null,
+                    'has_surrender_record' => false,
+                    'report' => $report->toArray(),
+                    'student' => $report->student?->toArray(),
+                    'receivedByAdmin' => null,
+                ];
+            })
+            ->all();
+
+        $items = array_merge($surrenderItems, $reportItems);
+        usort($items, function ($left, $right) {
+            $leftDeadline = data_get($left, 'deadline_at');
+            $rightDeadline = data_get($right, 'deadline_at');
+
+            $leftTime = $leftDeadline ? strtotime($leftDeadline) : PHP_INT_MAX;
+            $rightTime = $rightDeadline ? strtotime($rightDeadline) : PHP_INT_MAX;
+
+            return $leftTime <=> $rightTime;
+        });
 
         return response()->json([
             'status' => 'success',
@@ -453,8 +500,11 @@ class AdminWorkflowController extends Controller
 
         $summary = [
             'total_reports' => Report::count(),
-            'pending_surrenders' => SurrenderRequest::where('status', 'pending')->count(),
-            'pending_reports' => Report::where('type', 'lost')->whereIn('status', ['pending_approval', 'correction_requested'])->count(),
+            'pending_surrenders' => SurrenderRequest::whereHas('report', function ($reportQuery) {
+                $reportQuery->where('type', 'found')
+                    ->whereIn('status', ['pending_surrender', 'published', 'approved']);
+            })->whereNotIn('status', ['received', 'rejected'])->count(),
+            'pending_reports' => Report::where('type', 'lost')->whereIn('status', ['pending', 'pending_approval', 'correction_requested'])->count(),
             'pending_verifications' => ItemVerification::where('status', 'pending')->count(),
             'mobile_posts' => Report::whereNotNull('published_at')->count(),
             'potential_matches' => PotentialMatch::where('status', 'pending')->count(),
@@ -794,6 +844,32 @@ class AdminWorkflowController extends Controller
         $surrender->update(['status' => 'rejected']);
 
         return response()->json(['status' => 'success', 'message' => 'Surrender request rejected.', 'data' => $surrender]);
+    }
+
+    public function requestSurrenderDetails(Request $request, $id)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $validated = $request->validate([
+            'message' => 'nullable|string|max:1000',
+        ]);
+
+        $surrender = SurrenderRequest::findOrFail($id);
+        $message = $validated['message'] ?? 'Requesting more details for this surrender request.';
+
+        $surrender->update([
+            'notes' => trim($surrender->notes ? $surrender->notes . "\n" : '') . $message,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'More details requested successfully.',
+            'data' => $surrender->fresh(),
+        ]);
     }
 
     public function markSurrenderOverdue($id)

@@ -93,6 +93,7 @@ Route::middleware('auth:admin')->group(function () {
 
     Route::post('/admin/surrenders/{id}/receive', [App\Http\Controllers\AdminWorkflowController::class, 'receiveSurrenderRequest']);
     Route::post('/admin/surrenders/{id}/reject', [App\Http\Controllers\AdminWorkflowController::class, 'rejectSurrenderRequest']);
+    Route::post('/admin/surrenders/{id}/request-details', [App\Http\Controllers\AdminWorkflowController::class, 'requestSurrenderDetails']);
     Route::post('/admin/surrenders/{id}/overdue', [App\Http\Controllers\AdminWorkflowController::class, 'markSurrenderOverdue']);
 
     Route::post('/admin/verifications/{id}/verify', [App\Http\Controllers\AdminWorkflowController::class, 'verifyItem']);
