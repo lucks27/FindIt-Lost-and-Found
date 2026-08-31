@@ -15,7 +15,9 @@ class Report extends Model
     protected $fillable = [
         'student_id',
         'category_id',
+        'category',
         'type',
+        'report_type',
         'title',
         'description',
         'color',
@@ -34,6 +36,7 @@ class Report extends Model
         'completed_at',
         'archived_at',
         'requires_images',
+        'metadata',
     ];
 
     protected $casts = [
@@ -47,6 +50,8 @@ class Report extends Model
 
     protected $appends = [
         'student_full_name',
+        'report_type',
+        'category',
     ];
 
     public function student(): BelongsTo
@@ -105,5 +110,24 @@ class Report extends Model
     public function getStudentFullNameAttribute(): string
     {
         return $this->student?->full_name ?? 'Unknown Student';
+    }
+
+    public function getReportTypeAttribute(): string
+    {
+        return $this->attributes['report_type'] ?? $this->attributes['type'] ?? 'unknown';
+    }
+
+    public function getCategoryAttribute(): ?string
+    {
+        if (!empty($this->attributes['category'])) {
+            return $this->attributes['category'];
+        }
+
+        if (!empty($this->attributes['category_id'])) {
+            $relation = $this->category()->first();
+            return $relation?->name;
+        }
+
+        return null;
     }
 }

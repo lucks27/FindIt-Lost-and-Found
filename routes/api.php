@@ -103,6 +103,11 @@ Route::middleware('auth:admin')->group(function () {
     Route::post('/admin/verifications/{id}/reject', [App\Http\Controllers\AdminWorkflowController::class, 'rejectVerification']);
     Route::post('/admin/verifications/{id}/request-details', [App\Http\Controllers\AdminWorkflowController::class, 'requestVerificationDetails']);
 
+    Route::post('/admin/claims/{id}/approve', [App\Http\Controllers\AdminWorkflowController::class, 'approveClaim']);
+    Route::post('/admin/claims/{id}/reject', [App\Http\Controllers\AdminWorkflowController::class, 'rejectClaim']);
+    Route::post('/admin/claims/{id}/request-info', [App\Http\Controllers\AdminWorkflowController::class, 'requestClaimInformation']);
+    Route::post('/admin/releases/{id}/complete', [App\Http\Controllers\AdminWorkflowController::class, 'completeItemRelease']);
+
     Route::put('/admin/matches/{id}/confirm', [App\Http\Controllers\AdminWorkflowController::class, 'confirmPotentialMatch']);
     Route::put('/admin/matches/{id}/reject', [App\Http\Controllers\AdminWorkflowController::class, 'rejectPotentialMatch']);
 

@@ -60,6 +60,7 @@ class AdminReturnWorkflowApiTest extends TestCase
             'location' => 'Library',
             'date_occurred' => now()->subDay()->toDateString(),
             'status' => 'pending_surrender',
+            'published_at' => now(),
         ]);
 
         SurrenderRequest::create([
@@ -68,6 +69,8 @@ class AdminReturnWorkflowApiTest extends TestCase
             'status' => 'pending',
             'deadline_at' => now()->addDays(3),
         ]);
+
+        $report->refresh();
 
         $receiveResponse = $this->actingAs($admin, 'admin')
             ->postJson('/api/admin/surrenders/' . $report->surrenderRequest->id . '/receive');

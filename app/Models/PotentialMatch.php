@@ -13,6 +13,8 @@ class PotentialMatch extends Model
     protected $fillable = [
         'lost_report_id',
         'found_report_id',
+        'source_report_id',
+        'matched_report_id',
         'score',
         'status',
         'review_notes',

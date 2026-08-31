@@ -111,15 +111,9 @@
 
         <template v-else>
             <!-- Empty state -->
-            <section v-if="
+            <div v-if="
                 !filteredSurrenders.length
             " class="empty-state-card" role="status">
-                <div class="empty-icon">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M5 7h14v12H5zM8 4h8v3H8zM8 11h8M8 15h5" />
-                    </svg>
-                </div>
-
                 <h2>
                     No pending surrender records
                 </h2>
@@ -129,138 +123,137 @@
                     the current filters. New surrender
                     requests will appear here.
                 </p>
-            </section>
+            </div>
 
-            <template v-else>
-                <!-- Cards -->
-                <section class="surrender-grid" aria-label="Pending surrender records">
-                    <article v-for="item in paginatedSurrenders" :key="item.id" class="report-card">
-                        <!-- Image -->
-                        <button type="button" class="card-image-button" :aria-label="`View ${item.report
-                            ?.title ||
-                            'surrender request'
-                            }`
-                            " @click="
-                                openDetailModal(
-                                    item
-                                )
-                                ">
-                            <img :src="getReportImage(
-                                item.report
+            <!-- Cards -->
+            <section v-else class="surrender-grid" aria-label="Pending surrender records">
+                <article v-for="item in paginatedSurrenders" :key="item.id" class="report-card">
+                    <!-- Image -->
+                    <button type="button" class="card-image-button" :aria-label="`View ${item.report
+                        ?.title ||
+                        'surrender request'
+                        }`
+                        " @click="
+                            openDetailModal(
+                                item
                             )
-                                " :alt="item.report?.title ||
-                                    'SNSU logo'
-                                    " class="card-image" :class="{
-                                        'fallback-image':
-                                            !item.report
-                                                ?.images
-                                                ?.length
-                                    }" />
+                            ">
+                        <img :src="getReportImage(
+                            item.report
+                        )
+                            " :alt="item.report?.title ||
+                                'SNSU logo'
+                                " class="card-image" :class="{
+                                            'fallback-image':
+                                                !item.report
+                                                    ?.images
+                                                    ?.length
+                                        }" />
 
-                            <span class="image-view-chip">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
+                        <span class="image-view-chip">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
 
-                                    <circle cx="12" cy="12" r="2.5" />
-                                </svg>
+                                <circle cx="12" cy="12" r="2.5" />
+                            </svg>
 
-                                View
+                            View
+                        </span>
+                    </button>
+
+                    <!-- Card content -->
+                    <div class="card-content">
+                        <!-- Badges -->
+                        <div class="card-header">
+                            <span class="report-type-badge" :class="item.report
+                                ?.type
+                                ">
+                                {{
+                                    item.report
+                                        ?.type ||
+                                    'Report'
+                                }}
                             </span>
-                        </button>
 
-                        <!-- Card content -->
-                        <div class="card-content">
-                            <!-- Badges -->
-                            <div class="card-header">
-                                <span class="report-type-badge" :class="item.report
-                                    ?.type
-                                    ">
+                            <span class="status-badge" :class="statusOf(
+                                item
+                            )
+                                ">
+                                {{
+                                    item.status ||
+                                    'pending'
+                                }}
+                            </span>
+                        </div>
+
+                        <!-- Title -->
+                        <h3 class="card-title">
+                            {{
+                                item.report
+                                    ?.title ||
+                                'Untitled item'
+                            }}
+                        </h3>
+
+                        <p class="card-student">
+                            {{
+                                item.report
+                                    ?.student_full_name ||
+                                'Unknown student'
+                            }}
+                        </p>
+
+                        <!-- Metadata -->
+                        <dl class="card-meta">
+                            <div>
+                                <dt>
+                                    Location
+                                </dt>
+
+                                <dd>
                                     {{
                                         item.report
-                                            ?.type ||
-                                        'Report'
+                                            ?.location ||
+                                        '—'
                                     }}
-                                </span>
-
-                                <span class="status-badge" :class="statusOf(
-                                    item
-                                )
-                                    ">
-                                    {{
-                                        item.status ||
-                                        'pending'
-                                    }}
-                                </span>
+                                </dd>
                             </div>
 
-                            <!-- Title -->
-                            <h3 class="card-title">
-                                {{
-                                    item.report
-                                        ?.title ||
-                                    'Untitled item'
-                                }}
-                            </h3>
+                            <div>
+                                <dt>
+                                    Deadline
+                                </dt>
 
-                            <p class="card-student">
-                                {{
-                                    item.report
-                                        ?.student_full_name ||
-                                    'Unknown student'
-                                }}
-                            </p>
+                                <dd>
+                                    {{
+                                        formatDate(
+                                            item.deadline_at
+                                        )
+                                    }}
+                                </dd>
+                            </div>
 
-                            <!-- Metadata -->
-                            <dl class="card-meta">
-                                <div>
-                                    <dt>
-                                        Location
-                                    </dt>
+                            <div>
+                                <dt>
+                                    Time Found
+                                </dt>
 
-                                    <dd>
-                                        {{
-                                            item.report
-                                                ?.location ||
-                                            '—'
-                                        }}
-                                    </dd>
-                                </div>
+                                <dd>
+                                    {{
+                                        item.report?.time_found ||
+                                        '—'
+                                    }}
+                                </dd>
+                            </div>
+                        </dl>
 
-                                <div>
-                                    <dt>
-                                        Deadline
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            formatDate(
-                                                item.deadline_at
-                                            )
-                                        }}
-                                    </dd>
-                                </div>
-
-                                <div>
-                                    <dt>
-                                        Time Found
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            item.report?.time_found ||
-                                            '—'
-                                        }}
-                                    </dd>
-                                </div>
-                            </dl>
-
-                            <!-- Card actions -->
-                            <div class="card-actions">
-                                <button v-if="
-                                    isPending(
-                                        item
-                                    )
-                                " type="button" class="
+                        <!-- Card actions -->
+                        <div class="card-actions">
+                            <button v-if="
+                                isPending(
+                                    item
+                                )
+                            " type="button" class="
                                         action-btn
                                         approve-btn
                                     " @click="
@@ -275,14 +268,14 @@
                                                 item
                                             )
                                         ">
-                                    Approve
-                                </button>
+                                Approve
+                            </button>
 
-                                <button v-if="
-                                    isPending(
-                                        item
-                                    )
-                                " type="button" class="
+                            <button v-if="
+                                isPending(
+                                    item
+                                )
+                            " type="button" class="
                                         action-btn
                                         reject-btn
                                     " @click="
@@ -297,87 +290,86 @@
                                                 item
                                             )
                                         ">
-                                    Reject
-                                </button>
-                            </div>
+                                Reject
+                            </button>
                         </div>
-                    </article>
-                </section>
+                    </div>
+                </article>
+            </section>
 
-                <!-- Pagination -->
-                <nav class="pagination-bar" aria-label="Surrender record pages">
-                    <p class="pagination-info">
-                        Showing
+            <!-- Pagination -->
+            <nav class="pagination-bar" aria-label="Surrender record pages">
+                <p class="pagination-info">
+                    Showing
 
-                        <strong>
-                            {{ pageStart }}
-                        </strong>
+                    <strong>
+                        {{ pageStart }}
+                    </strong>
 
-                        –
+                    –
 
-                        <strong>
-                            {{ pageEnd }}
-                        </strong>
+                    <strong>
+                        {{ pageEnd }}
+                    </strong>
 
-                        of
+                    of
 
-                        <strong>
-                            {{
-                                filteredSurrenders.length
-                            }}
-                        </strong>
-                    </p>
+                    <strong>
+                        {{
+                            filteredSurrenders.length
+                        }}
+                    </strong>
+                </p>
 
-                    <div class="pagination-controls">
-                        <button type="button" class="page-button" :disabled="currentPage ===
-                            1
-                            " @click="
-                                goToPage(1)
-                                ">
-                            First
-                        </button>
+                <div class="pagination-controls">
+                    <button type="button" class="page-button" :disabled="currentPage ===
+                        1
+                        " @click="
+                            goToPage(1)
+                            ">
+                        First
+                    </button>
 
-                        <button type="button" class="
+                    <button type="button" class="
                                 page-button
                                 icon-page-button
                             " :disabled="currentPage ===
                                 1
                                 " aria-label="Previous page" @click="goPrevious">
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="m15 6-6 6 6 6" />
-                            </svg>
-                        </button>
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m15 6-6 6 6 6" />
+                        </svg>
+                    </button>
 
-                        <span class="page-status">
-                            Page
-                            {{ currentPage }}
-                            of
-                            {{ totalPages }}
-                        </span>
+                    <span class="page-status">
+                        Page
+                        {{ currentPage }}
+                        of
+                        {{ totalPages }}
+                    </span>
 
-                        <button type="button" class="
+                    <button type="button" class="
                                 page-button
                                 icon-page-button
                             " :disabled="currentPage ===
                                 totalPages
                                 " aria-label="Next page" @click="goNext">
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="m9 6 6 6-6 6" />
-                            </svg>
-                        </button>
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m9 6 6 6-6 6" />
+                        </svg>
+                    </button>
 
-                        <button type="button" class="page-button" :disabled="currentPage ===
-                            totalPages
-                            " @click="
-                                goToPage(
-                                    totalPages
-                                )
-                                ">
-                            Last
-                        </button>
-                    </div>
-                </nav>
-            </template>
+                    <button type="button" class="page-button" :disabled="currentPage ===
+                        totalPages
+                        " @click="
+                            goToPage(
+                                totalPages
+                            )
+                            ">
+                        Last
+                    </button>
+                </div>
+            </nav>
         </template>
 
         <!-- DETAIL MODAL -->
@@ -2696,118 +2688,23 @@ onMounted(() => {
 ===================================================== */
 
 .empty-state-card {
-    display:
-        grid;
-
-    min-height:
-        250px;
-
-    place-items:
-        center;
-
-    align-content:
-        center;
-
-    padding:
-        28px;
-
-    border:
-        1px solid rgba(196,
-            157,
-            59,
-            0.24);
-
-    border-radius:
-        12px;
-
-    background:
-        #15291a;
-
-    text-align:
-        center;
-}
-
-.empty-icon {
-    display:
-        grid;
-
-    width:
-        62px;
-
-    height:
-        62px;
-
-    margin-bottom:
-        14px;
-
-    place-items:
-        center;
-
-    border-radius:
-        16px;
-
-    background:
-        rgba(22,
-            93,
-            49,
-            0.15);
-
-    color:
-        #4ade80;
-}
-
-.empty-icon svg {
-    width:
-        30px;
-
-    height:
-        30px;
-
-    fill:
-        none;
-
-    stroke:
-        currentColor;
-
-    stroke-width:
-        1.8;
-
-    stroke-linecap:
-        round;
-
-    stroke-linejoin:
-        round;
+    padding: 42px 18px;
+    text-align: center;
+    border: 1px solid rgba(132, 170, 112, 0.45);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(34, 64, 41, 0.9), rgba(17, 28, 20, 0.88));
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
 .empty-state-card h2 {
-    margin:
-        0 0 8px;
-
-    color:
-        #f8f5e8;
-
-    font-size:
-        1rem;
-
-    font-weight:
-        700;
+    margin: 0 0 10px;
+    font-size: 1.2rem;
+    color: #f8f5e8;
 }
 
 .empty-state-card p {
-    max-width:
-        560px;
-
-    margin:
-        0;
-
-    color:
-        #a8af98;
-
-    font-size:
-        0.78rem;
-
-    line-height:
-        1.5;
+    margin: 0;
+    color: #b0b59b;
 }
 
 /* =====================================================

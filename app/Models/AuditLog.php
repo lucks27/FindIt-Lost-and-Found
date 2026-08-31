@@ -10,15 +10,20 @@ class AuditLog extends Model
 {
     use HasFactory;
 
+    public $timestamps = false;
+
     protected $fillable = [
         'actor_type',
         'actor_id',
+        'actor_admin_id',
         'action',
         'subject_type',
         'subject_id',
+        'subject_label',
         'description',
         'old_values',
         'new_values',
+        'details',
         'ip_address',
         'user_agent',
     ];
@@ -26,6 +31,7 @@ class AuditLog extends Model
     protected $casts = [
         'old_values' => 'array',
         'new_values' => 'array',
+        'details' => 'array',
     ];
 
     public function actorAdmin(): BelongsTo

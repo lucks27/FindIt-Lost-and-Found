@@ -8,6 +8,7 @@ use App\Models\Report;
 use App\Models\SurrenderRequest;
 use App\Models\Student;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class ReportWorkflowApiTest extends TestCase
@@ -29,24 +30,26 @@ class ReportWorkflowApiTest extends TestCase
         ]);
 
         $lostResponse = $this->actingAs($student, 'sanctum')
-            ->postJson('/api/reports', [
+            ->post('/api/reports', [
                 'type' => 'lost',
                 'title' => 'Lost Notebook',
                 'description' => 'Blue notebook with stickers',
                 'location' => 'Library',
                 'date_occurred' => now()->subDay()->toDateString(),
+                'images' => [UploadedFile::fake()->image('notebook.jpg')],
             ]);
 
         $lostResponse->assertCreated()
             ->assertJsonPath('data.status', 'pending_approval');
 
         $foundResponse = $this->actingAs($student, 'sanctum')
-            ->postJson('/api/reports', [
+            ->post('/api/reports', [
                 'type' => 'found',
                 'title' => 'Found Calculator',
                 'description' => 'Black scientific calculator',
                 'location' => 'Auditorium',
                 'date_occurred' => now()->subHours(4)->toDateString(),
+                'images' => [UploadedFile::fake()->image('calculator.jpg')],
             ]);
 
         $foundResponse->assertCreated()
@@ -54,13 +57,13 @@ class ReportWorkflowApiTest extends TestCase
 
         $this->assertDatabaseHas('reports', [
             'id' => $lostResponse->json('data.id'),
-            'report_type' => 'lost',
+            'type' => 'lost',
             'status' => 'pending_approval',
         ]);
 
         $this->assertDatabaseHas('reports', [
             'id' => $foundResponse->json('data.id'),
-            'report_type' => 'found',
+            'type' => 'found',
             'status' => 'pending_surrender',
         ]);
 

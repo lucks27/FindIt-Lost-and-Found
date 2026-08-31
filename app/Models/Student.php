@@ -36,6 +36,7 @@ class Student extends Authenticatable
 
     protected $appends = [
         'full_name',
+        'name',
     ];
 
     // --- ADD THIS SECTION HERE ---
@@ -101,5 +102,14 @@ class Student extends Authenticatable
         $names[] = $this->last_name;
 
         return implode(' ', $names);
+    }
+
+    public function getNameAttribute(): string
+    {
+        return $this->full_name ?? trim(implode(' ', array_filter([
+            $this->first_name,
+            $this->middle_name,
+            $this->last_name,
+        ], fn ($value) => $value !== null && $value !== '')));
     }
 }

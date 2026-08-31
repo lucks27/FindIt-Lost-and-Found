@@ -421,8 +421,10 @@ onMounted(loadVerifications)
 .empty-state-card {
     padding: 42px 18px;
     text-align: center;
-    border: 1px dashed rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(132, 170, 112, 0.45);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(34, 64, 41, 0.9), rgba(17, 28, 20, 0.88));
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
 .empty-state-card h2 {

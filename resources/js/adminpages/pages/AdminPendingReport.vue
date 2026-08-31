@@ -37,7 +37,7 @@
         <template v-else>
             <div v-if="!filteredReports.length" class="empty-state-card" role="status">
                 <h2>No pending reports</h2>
-                <p>New lost item reports will appear here for review.</p>
+                <p>Review and approval actions will appear here as lost item reports arrive.</p>
             </div>
 
             <div v-else class="reports-grid">
@@ -108,7 +108,7 @@
                         <h2>Report Details</h2>
                         <div class="modal-badges">
                             <span class="report-type-badge" :class="selectedReport.type">{{ selectedReport.type
-                                }}</span>
+                            }}</span>
                             <span class="status-badge" :class="selectedReport.status">{{ selectedReport.status }}</span>
                         </div>
                     </div>
@@ -216,7 +216,7 @@
                                 <div class="info-row">
                                     <span class="info-label">Status:</span>
                                     <span class="status-badge" :class="selectedReport.status">{{ selectedReport.status
-                                        }}</span>
+                                    }}</span>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-label">Submitted:</span>
@@ -530,21 +530,21 @@ onMounted(() => {
 .empty-state-card {
     padding: 42px 18px;
     text-align: center;
-    border: 2px dashed rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
-    background: linear-gradient(135deg, #2d6a4f 0%, #1f5233 100%);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(132, 170, 112, 0.45);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(34, 64, 41, 0.9), rgba(17, 28, 20, 0.88));
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
 .empty-state-card h2 {
     margin: 0 0 10px;
     font-size: 1.2rem;
-    color: #ffffff;
+    color: #f8f5e8;
 }
 
 .empty-state-card p {
     margin: 0;
-    color: #e8f5e9;
+    color: #b0b59b;
 }
 
 .reports-grid {

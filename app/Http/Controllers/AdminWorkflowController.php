@@ -637,6 +637,7 @@ class AdminWorkflowController extends Controller
 
         $summary = [
             'total_reports' => Report::count(),
+            'open_reports' => Report::whereIn('status', ['pending', 'pending_approval', 'pending_surrender', 'pending_verification', 'correction_requested'])->count(),
             'pending_surrenders' => SurrenderRequest::whereHas('report', function ($reportQuery) {
                 $reportQuery->where('type', 'found')
                     ->whereIn('status', ['pending_surrender', 'published', 'approved']);
@@ -646,6 +647,9 @@ class AdminWorkflowController extends Controller
             'mobile_posts' => Report::whereNotNull('published_at')->count(),
             'potential_matches' => PotentialMatch::where('status', 'pending')->count(),
             'archived_items' => Report::whereIn('status', ['rejected', 'claimed', 'unclaimed', 'completed_return', 'archived'])->count(),
+            'total_claims' => ClaimReview::count(),
+            'total_releases' => ItemRelease::count(),
+            'points_awarded' => PointTransaction::sum('points'),
         ];
 
         $recentActivity = [
@@ -765,6 +769,44 @@ class AdminWorkflowController extends Controller
             });
 
         return response()->json(['status' => 'success', 'data' => $students]);
+    }
+
+    public function indexClaimReviews(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $items = ClaimReview::query()
+            ->with(['report.student', 'claimantStudent', 'reviewedByAdmin'])
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $items,
+        ]);
+    }
+
+    public function indexItemReleases(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $items = ItemRelease::query()
+            ->with(['report.student', 'claimantStudent', 'approvedByAdmin'])
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $items,
+        ]);
     }
 
     public function markAdminNotificationRead($id)
