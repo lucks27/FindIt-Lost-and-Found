@@ -104,7 +104,7 @@
                             <div class="detail-row">
                                 <span class="detail-label">Verifier</span>
                                 <span class="detail-value">{{ selectedVerification.verifier_admin?.name || 'Pending'
-                                }}</span>
+                                    }}</span>
                             </div>
                             <div class="detail-row">
                                 <span class="detail-label">Status</span>
@@ -112,11 +112,12 @@
                             </div>
                             <div class="detail-row full-row">
                                 <span class="detail-label">Description</span>
-                                <span class="detail-value">{{ selectedVerification.report?.description || 'No description provided.' }}</span>
+                                <span class="detail-value">{{ verificationDescription }}</span>
                             </div>
+
                             <div class="detail-row full-row">
                                 <span class="detail-label">Notes</span>
-                                <span class="detail-value">{{ selectedVerification.notes || 'No verification notes yet.' }}</span>
+                                <span class="detail-value">{{ verificationNotes }}</span>
                             </div>
                         </div>
                     </div>
@@ -153,6 +154,14 @@ const metrics = computed(() => {
     const moreInfo = verifications.value.filter((item) => String(item.status || '').toLowerCase() === 'needs_more_information').length
 
     return { pending, verified, rejected, moreInfo }
+})
+
+const verificationDescription = computed(() => {
+    return selectedVerification.value?.report?.description || 'No description provided.'
+})
+
+const verificationNotes = computed(() => {
+    return selectedVerification.value?.notes || 'No verification notes yet.'
 })
 
 const visibleRows = computed(() => {

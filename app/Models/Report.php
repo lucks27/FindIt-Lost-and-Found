@@ -20,6 +20,7 @@ class Report extends Model
         'description',
         'color',
         'date_occurred',
+        'time_found',
         'location',
         'additional_details',
         'private_identifying_details',

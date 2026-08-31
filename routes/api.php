@@ -114,6 +114,8 @@ Route::middleware('auth:admin')->group(function () {
     Route::get('/admin/matches', [App\Http\Controllers\AdminWorkflowController::class, 'indexPotentialMatches']);
     Route::get('/admin/surrenders', [App\Http\Controllers\AdminWorkflowController::class, 'indexSurrenderRequests']);
     Route::get('/admin/event-fines', [App\Http\Controllers\AdminWorkflowController::class, 'indexEventFines']);
+    Route::get('/admin/claims', [App\Http\Controllers\AdminWorkflowController::class, 'indexClaimReviews']);
+    Route::get('/admin/releases', [App\Http\Controllers\AdminWorkflowController::class, 'indexItemReleases']);
     Route::get('/admin/settings', [App\Http\Controllers\AdminWorkflowController::class, 'indexAdminSettings']);
     Route::post('/admin/settings', [App\Http\Controllers\AdminWorkflowController::class, 'storeAdminSetting']);
 

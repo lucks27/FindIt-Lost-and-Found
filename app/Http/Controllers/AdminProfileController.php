@@ -176,7 +176,11 @@ class AdminProfileController extends Controller
     */
     public function adminLogout(Request $request)
     {
-        Auth::guard('admin')->logout();
+        $admin = Auth::guard('admin')->user();
+
+        if ($admin && $admin->currentAccessToken()) {
+            $admin->currentAccessToken()->delete();
+        }
 
         return response()->json([
             'status' => 'success',

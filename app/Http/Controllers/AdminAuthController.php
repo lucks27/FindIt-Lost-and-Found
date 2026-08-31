@@ -42,12 +42,13 @@ class AdminAuthController extends Controller
             ], 403);
         }
 
-        Auth::guard('admin')->login($admin);
-        $request->session()->regenerate();
+        // Create a Sanctum API token for the admin
+        $token = $admin->createToken('admin-token')->plainTextToken;
 
         return response()->json([
             'status' => 'success',
             'message' => 'Login successful! Redirecting to dashboard...',
+            'token' => $token,
             'admin_id' => $admin->id,
             'role' => $admin->role,
             'facility_id' => $admin->facility_id,
