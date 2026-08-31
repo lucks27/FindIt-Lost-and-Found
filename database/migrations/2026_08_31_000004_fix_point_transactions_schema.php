@@ -5,8 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         if (!Schema::hasTable('point_transactions')) {
@@ -44,7 +43,7 @@ return new class extends Migration
                 $table->string('reference_type')->nullable(); // App\Models\ItemRelease, etc.
                 $table->unsignedBigInteger('reference_id')->nullable();
                 $table->foreignId('created_by_admin_id')->nullable()->constrained('admin')->nullOnDelete();
-                
+
                 // Legacy columns for compatibility
                 $table->foreignId('completed_return_id')->nullable()->constrained('completed_returns')->nullOnDelete();
                 $table->foreignId('event_fine_conversion_id')->nullable()->constrained('event_fine_conversions')->nullOnDelete();
@@ -54,7 +53,7 @@ return new class extends Migration
                 $table->string('reference_key')->nullable()->unique();
                 $table->text('notes')->nullable();
                 $table->foreignId('processed_by_admin_id')->nullable()->constrained('admin')->nullOnDelete();
-                
+
                 $table->timestamps();
                 $table->index(['student_id', 'created_at']);
             });

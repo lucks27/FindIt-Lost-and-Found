@@ -110,6 +110,6 @@ class Student extends Authenticatable
             $this->first_name,
             $this->middle_name,
             $this->last_name,
-        ], fn ($value) => $value !== null && $value !== '')));
+        ], fn($value) => $value !== null && $value !== '')));
     }
 }

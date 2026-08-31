@@ -5,8 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -41,7 +40,7 @@ return new class extends Migration
             });
         }
 
-        foreach (['time_found','metadata','requires_images'] as $column) {
+        foreach (['time_found', 'metadata', 'requires_images'] as $column) {
             if (!Schema::hasColumn('reports', $column)) {
                 Schema::table('reports', function (Blueprint $table) use ($column) {
                     if ($column === 'metadata') {
@@ -263,7 +262,7 @@ return new class extends Migration
             return;
         }
 
-        foreach (['surrender_request_id','verifier_admin_id','checklist','notes','verified_at'] as $column) {
+        foreach (['surrender_request_id', 'verifier_admin_id', 'checklist', 'notes', 'verified_at'] as $column) {
             if (!Schema::hasColumn('item_verifications', $column)) {
                 Schema::table('item_verifications', function (Blueprint $table) use ($column) {
                     switch ($column) {
@@ -320,7 +319,7 @@ return new class extends Migration
             return;
         }
 
-        foreach (['event_name','reference_number','amount','status','reason','issued_by_admin_id','due_at'] as $column) {
+        foreach (['event_name', 'reference_number', 'amount', 'status', 'reason', 'issued_by_admin_id', 'due_at'] as $column) {
             if (!Schema::hasColumn('event_fines', $column)) {
                 Schema::table('event_fines', function (Blueprint $table) use ($column) {
                     switch ($column) {
