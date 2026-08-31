@@ -49,7 +49,7 @@
                             <td data-label="Status"><span class="status-chip">{{ item.status }}</span></td>
                             <td data-label="Student">{{ item.student?.name || item.student_name || 'Unknown' }}</td>
                             <td data-label="Posted">{{ item.published_at ? formatDate(item.published_at) : 'Not posted'
-                                }}</td>
+                            }}</td>
                             <td data-label="Visible">
                                 <button type="button" class="toggle-switch" :class="{ active: item.is_visible }"
                                     :aria-pressed="item.is_visible" :disabled="toggleId === item.id"
@@ -95,12 +95,12 @@
                         </div>
                         <div class="detail-grid">
                             <div class="detail-row"><span class="detail-label">Type</span><span class="detail-value">{{
-                                    selectedItem.type }}</span></div>
+                                selectedItem.type }}</span></div>
                             <div class="detail-row"><span class="detail-label">Location</span><span
                                     class="detail-value">{{ selectedItem.location || 'No location' }}</span></div>
                             <div class="detail-row"><span class="detail-label">Student</span><span
                                     class="detail-value">{{ selectedItem.student?.name || selectedItem.student_name ||
-                                    'Unknown' }}</span></div>
+                                        'Unknown' }}</span></div>
                             <div class="detail-row"><span class="detail-label">Visible</span><span
                                     class="detail-value">{{ selectedItem.is_visible ? 'On' : 'Off' }}</span></div>
                             <div class="detail-row full-row"><span class="detail-label">Description</span><span
@@ -134,6 +134,12 @@ function getImageUrl(imagePath) {
         if (!normalized) return '/images/snsu-logo.png'
         if (/^https?:\/\//i.test(normalized) || /^data:|^blob:/i.test(normalized) || normalized.startsWith('/')) {
             return normalized
+        }
+        if (normalized.startsWith('public/assets/')) {
+            return `/${normalized.replace(/^public\//, '')}`
+        }
+        if (normalized.startsWith('assets/')) {
+            return `/${normalized}`
         }
         if (normalized.startsWith('storage/')) {
             return `/${normalized}`

@@ -8,6 +8,12 @@ const rootPath = fs.realpathSync(process.cwd());
 
 export default defineConfig({
     root: rootPath,
+    server: {
+        hmr: {
+            host: 'localhost',
+            protocol: 'ws',
+        },
+    },
     plugins: [
         vue({
             template: {

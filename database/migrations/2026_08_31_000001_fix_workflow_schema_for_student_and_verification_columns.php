@@ -52,7 +52,21 @@ return new class extends Migration {
             if ($needsItemVerificationRepair) {
                 $rows = DB::table('item_verifications')->get()->all();
 
+                // Disable foreign key checks before dropping the table
+                if ($driver === 'sqlite') {
+                    DB::statement('PRAGMA foreign_keys = OFF');
+                } else {
+                    DB::statement('SET FOREIGN_KEY_CHECKS=0');
+                }
+
                 Schema::dropIfExists('item_verifications');
+
+                // Re-enable foreign key checks
+                if ($driver === 'sqlite') {
+                    DB::statement('PRAGMA foreign_keys = ON');
+                } else {
+                    DB::statement('SET FOREIGN_KEY_CHECKS=1');
+                }
 
                 Schema::create('item_verifications', function (Blueprint $table) {
                     $table->id();

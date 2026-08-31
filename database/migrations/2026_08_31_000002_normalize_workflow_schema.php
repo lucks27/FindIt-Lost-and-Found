@@ -80,7 +80,21 @@ return new class extends Migration {
         }
 
         if (!$hasAllColumns) {
+            // Disable foreign key checks before dropping the table
+            if ($driver === 'sqlite') {
+                DB::statement('PRAGMA foreign_keys = OFF');
+            } else {
+                DB::statement('SET FOREIGN_KEY_CHECKS=0');
+            }
+
             Schema::dropIfExists('notifications');
+
+            // Re-enable foreign key checks
+            if ($driver === 'sqlite') {
+                DB::statement('PRAGMA foreign_keys = ON');
+            } else {
+                DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            }
 
             Schema::create('notifications', function (Blueprint $table) {
                 $table->id();
@@ -214,15 +228,29 @@ return new class extends Migration {
             return;
         }
 
-        $columns = collect(DB::select('PRAGMA table_info(item_releases)'));
-
-        if ($columns->contains(fn($column) => $column->name === 'report_id')) {
+        // Check if the table already has the report_id column
+        if (Schema::hasColumn('item_releases', 'report_id')) {
             return;
         }
 
         $rows = DB::table('item_releases')->get()->all();
 
+        // Disable foreign key checks before dropping the table
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys = OFF');
+        } else {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        }
+
         Schema::dropIfExists('item_releases');
+
+        // Re-enable foreign key checks
+        if ($driver === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys = ON');
+        } else {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        }
 
         Schema::create('item_releases', function (Blueprint $table) {
             $table->id();
@@ -239,9 +267,16 @@ return new class extends Migration {
         });
 
         foreach ($rows as $row) {
+            $reportId = $row->report_id ?? $row->claim_id ?? null;
+
+            // Skip if report_id doesn't exist
+            if (!$reportId || !DB::table('reports')->where('id', $reportId)->exists()) {
+                continue;
+            }
+
             DB::table('item_releases')->insert([
                 'id' => $row->id,
-                'report_id' => $row->report_id ?? $row->claim_id ?? null,
+                'report_id' => $reportId,
                 'claimant_student_id' => $row->claimant_student_id ?? $row->inventory_item_id ?? null,
                 'approved_by_admin_id' => $row->approved_by_admin_id ?? $row->released_by_admin_id ?? null,
                 'release_code' => $row->release_code ?? ('release-' . ($row->id ?? 'legacy')),

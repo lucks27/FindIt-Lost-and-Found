@@ -1,11 +1,8 @@
 <template>
     <div :class="['admin-layout', { 'mobile-sidebar-open': mobileSidebarOpen }]">
         <div v-if="mobileSidebarOpen" class="mobile-sidebar-backdrop" @click="closeMobileMenu" aria-hidden="true" />
-        <AdminSidebar
-            :current-page="currentPage"
-            :mobile-open="mobileSidebarOpen"
-            @close-mobile-menu="closeMobileMenu"
-        />
+        <AdminSidebar :current-page="currentPage" :mobile-open="mobileSidebarOpen"
+            @close-mobile-menu="closeMobileMenu" />
         <AdminHeader :page-title="pageCategory" :title="pageTitle" @toggle-mobile-menu="toggleMobileMenu" />
         <main class="admin-main">
             <router-view />
@@ -123,7 +120,7 @@ function closeMobileMenu() {
     min-width: 0;
     min-height: 0;
     overflow: auto;
-    background: linear-gradient(180deg, rgba(10, 21, 12, 0.9), rgba(5, 14, 7, 0.96));
+    background: rgba(248, 247, 244, 0.98);
 }
 
 @media (max-width: 1024px) {

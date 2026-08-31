@@ -22,7 +22,7 @@
   --admin-shadow: 0 24px 80px rgba(4, 29, 21, 0.28);
 }
 
-html, body, #app {
+html, body, #admin-app {
   height: 100%;
   margin: 0;
   overflow: hidden;
@@ -35,7 +35,7 @@ body {
   font-weight: 400;
   letter-spacing: 0.01em;
   text-rendering: optimizeLegibility;
-  background: linear-gradient(180deg, #0a311f 0%, #0f5238 42%, #0a2f24 100%);
+  background: #ffffff;
   color: var(--admin-ink);
 }
 

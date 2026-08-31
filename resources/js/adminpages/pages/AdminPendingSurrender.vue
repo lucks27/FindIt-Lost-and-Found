@@ -144,11 +144,11 @@
                             " :alt="item.report?.title ||
                                 'SNSU logo'
                                 " class="card-image" :class="{
-                                            'fallback-image':
-                                                !item.report
-                                                    ?.images
-                                                    ?.length
-                                        }" />
+                                    'fallback-image':
+                                        !item.report
+                                            ?.images
+                                            ?.length
+                                }" />
 
                         <span class="image-view-chip">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1370,6 +1370,22 @@ function getImageUrl(
             )
         ) {
             return normalized
+        }
+
+        if (
+            normalized.startsWith(
+                'public/assets/'
+            )
+        ) {
+            return `/${normalized.replace(/^public\//, '')}`
+        }
+
+        if (
+            normalized.startsWith(
+                'assets/'
+            )
+        ) {
+            return `/${normalized}`
         }
 
         if (
