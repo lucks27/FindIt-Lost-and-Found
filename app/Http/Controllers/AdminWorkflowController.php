@@ -240,7 +240,7 @@ class AdminWorkflowController extends Controller
         }
 
         $items = ArchiveItem::query()
-            ->with(['report.student', 'report.images'])
+            ->with(['report.student', 'report.images', 'report.category'])
             ->latest('archived_at')
             ->get()
             ->map(function (ArchiveItem $archiveItem) {
@@ -469,7 +469,7 @@ class AdminWorkflowController extends Controller
         }
 
         $items = PotentialMatch::query()
-            ->with(['lostReport.images', 'foundReport.images'])
+            ->with(['lostReport.images', 'lostReport.student', 'foundReport.images', 'foundReport.student'])
             ->latest()
             ->get();
 

@@ -174,7 +174,8 @@ const ReportPreview = defineComponent({
             h('span', { class: 'report-label' }, props.label),
             getReportImageElement(props.report, props.type),
             h('h3', props.report?.title || 'Untitled report'), h('p', getCategory(props.report)),
-            h('small', props.report?.location || 'Location not provided'), h('small', formatDate(props.report?.created_at || props.report?.date_occurred)),
+            h('small', `Location: ${props.report?.location || 'Not provided'}`),
+            h('small', `Reported: ${formatDate(props.report?.created_at || props.report?.date_occurred)}`),
         ])
     },
 })
@@ -185,12 +186,19 @@ const ReportDetail = defineComponent({
         return () => h('article', { class: 'report-detail' }, [
             h('div', { class: 'detail-heading' }, [h('span', { class: `report-dot ${props.type}` }), h('h3', props.title)]),
             getReportImageElement(props.report, props.type),
-            h('dl', [detailRow('Title', props.report?.title || 'Untitled report'), detailRow('Category', getCategory(props.report)), detailRow('Description', getDescription(props.report)), detailRow('Location', props.report?.location || 'Not provided'), detailRow('Reported', formatDate(props.report?.created_at || props.report?.date_occurred))]),
+            h('dl', [
+                detailRow('Title', props.report?.title || 'Untitled report'),
+                detailRow('Category', getCategory(props.report)),
+                detailRow('Description', getDescription(props.report), 'description-row'),
+                detailRow('Location', props.report?.location || 'Not provided'),
+                detailRow('Reported by', props.report?.student?.full_name || props.report?.student?.name || 'Student reporter'),
+                detailRow('Reported', formatDate(props.report?.created_at || props.report?.date_occurred)),
+            ]),
         ])
     },
 })
 
-function detailRow(label, value) { return h('div', [h('dt', label), h('dd', value)]) }
+function detailRow(label, value, className = '') { return h('div', { class: className }, [h('dt', label), h('dd', value)]) }
 function scorePercent(value) { const score = Number(value) || 0; return score <= 1 ? Math.round(score * 100) : Math.round(score) }
 function scoreClass(value) { const score = scorePercent(value); return score >= 90 ? 'high' : score >= 70 ? 'medium' : 'low' }
 function confidenceLabel(value) { return scoreClass(value) === 'high' ? 'High Confidence' : scoreClass(value) === 'medium' ? 'Medium Confidence' : 'Low Confidence' }
@@ -469,9 +477,9 @@ button:disabled {
 
 .report-columns {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 104px minmax(0, 1fr);
     align-items: center;
-    gap: 10px;
+    gap: 14px;
 }
 
 .report-preview {
@@ -491,11 +499,12 @@ button:disabled {
 .report-preview img {
     display: block;
     width: 100%;
-    height: 105px;
+    height: 124px;
     margin-bottom: 9px;
-    object-fit: cover;
+    padding: 7px;
+    object-fit: contain;
     border-radius: 6px;
-    background: #102316;
+    background: rgba(8, 25, 14, .34);
     transition: transform .2s ease;
 }
 
@@ -520,7 +529,7 @@ button:disabled {
     overflow: hidden;
     margin: 0 0 4px;
     color: #fbf7eb;
-    font-size: .8rem;
+    font-size: .76rem;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -531,20 +540,21 @@ button:disabled {
     overflow: hidden;
     margin: 0 0 3px;
     color: #c0d0c1;
-    font-size: .64rem;
+    font-size: .62rem;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .report-preview small {
     color: #98ad9d;
+    line-height: 1.35;
 }
 
 .analysis-column {
     display: grid;
     justify-items: center;
     align-content: center;
-    min-height: 150px;
+    min-height: 164px;
     padding: 7px;
     border-inline: 1px solid rgba(255, 255, 255, .08);
     text-align: center;
@@ -749,6 +759,7 @@ button:disabled {
     border: 1px solid rgba(255, 255, 255, .13);
     border-radius: 12px;
     background: #1a4d2e;
+    color: #eef1e5;
     box-shadow: 0 28px 80px rgba(0, 0, 0, .48);
 }
 
@@ -786,6 +797,7 @@ button:disabled {
 .modal-body {
     max-height: calc(92vh - 150px);
     padding: 20px;
+    background: #1a4d2e;
     overflow-y: auto;
 }
 
@@ -801,6 +813,7 @@ button:disabled {
     border: 1px solid rgba(255, 255, 255, .09);
     border-radius: 8px;
     background: rgba(255, 255, 255, .045);
+    box-shadow: 0 4px 12px rgba(18, 60, 45, .08);
 }
 
 .detail-heading {
@@ -830,9 +843,10 @@ button:disabled {
 
 .report-detail>img {
     width: 100%;
-    height: 170px;
+    height: 90px;
     margin-bottom: 13px;
-    object-fit: cover;
+    padding: 8px;
+    object-fit: contain;
     border-radius: 6px;
     background: #102316;
 }
@@ -840,7 +854,7 @@ button:disabled {
 .report-detail>.image-placeholder {
     display: grid;
     width: 100%;
-    height: 170px;
+    height: 50px;
     margin-bottom: 13px;
     place-items: center;
     border: 1px dashed rgba(255, 255, 255, .16);
@@ -852,25 +866,35 @@ button:disabled {
 
 .report-detail dl {
     display: grid;
-    gap: 9px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
     margin: 0;
 }
 
 .report-detail dl>div {
-    display: grid;
-    grid-template-columns: 92px minmax(0, 1fr);
-    gap: 8px;
+    min-width: 0;
+    padding: 8px 9px;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, .035);
+}
+
+.report-detail dl>.description-row {
+    grid-column: 1 / -1;
 }
 
 .report-detail dt {
+    margin-bottom: 4px;
     color: #93a794;
     font-size: .68rem;
+    font-weight: 700;
 }
 
 .report-detail dd {
     margin: 0;
     color: #e1e7d8;
     font-size: .7rem;
+    font-weight: 600;
     line-height: 1.4;
     overflow-wrap: anywhere;
 }
@@ -1114,7 +1138,15 @@ button:disabled {
 
     .report-detail>img,
     .report-detail>.image-placeholder {
-        height: 145px;
+        height: 84px;
+    }
+
+    .report-detail dl {
+        grid-template-columns: 1fr;
+    }
+
+    .report-detail dl>.description-row {
+        grid-column: auto;
     }
 }
 </style>
