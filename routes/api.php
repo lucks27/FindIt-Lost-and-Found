@@ -21,7 +21,7 @@ Route::post('/login', [StudentLoginController::class, 'login']);
 Route::post('/register', [StudentLoginController::class, 'register']);
 
 // Admin Login Requests
-Route::post('/admin/login/request', [AdminAuthController::class, 'loginRequest']);
+Route::middleware('web')->post('/admin/login/request', [AdminAuthController::class, 'loginRequest']);
 
 /*
 |----------------------------------------------------------------------
@@ -66,7 +66,7 @@ Route::middleware('auth:sanctum')->group(function () {
 |----------------------------------------------------------------------
 */
 
-Route::middleware('auth:admin')->group(function () {
+Route::middleware(['web', 'auth:admin'])->group(function () {
     Route::post('/admin/students', [AdminAuthController::class, 'storeStudentRecord']);
     Route::put('/admin/students/{id}', [AdminAuthController::class, 'updateStudentRecord']);
     Route::delete('/admin/students/{id}', [AdminAuthController::class, 'deleteStudentRecord']);
@@ -110,6 +110,7 @@ Route::middleware('auth:admin')->group(function () {
 
     Route::put('/admin/matches/{id}/confirm', [App\Http\Controllers\AdminWorkflowController::class, 'confirmPotentialMatch']);
     Route::put('/admin/matches/{id}/reject', [App\Http\Controllers\AdminWorkflowController::class, 'rejectPotentialMatch']);
+    Route::put('/admin/matches/{id}/reset', [App\Http\Controllers\AdminWorkflowController::class, 'resetPotentialMatch']);
 
 
     Route::post('/admin/event-fines/{id}/approve-conversion', [App\Http\Controllers\AdminWorkflowController::class, 'approveEventFineConversion']);

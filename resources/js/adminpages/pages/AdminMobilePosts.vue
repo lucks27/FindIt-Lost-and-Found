@@ -2,581 +2,715 @@
     <main class="admin-page-body">
         <header class="page-header">
             <div>
-                <p class="page-kicker">Mobile posts</p>
-                <h1>Post lost and found items</h1>
-                <p class="page-copy">Approved lost reports and verified found reports are visible in the student mobile
-                    app.</p>
+                <p class="page-kicker">Mobile Posts Management</p>
+                <h1>Published Lost and Found Items</h1>
+                <p class="page-copy">Manage items displayed on the student mobile application.</p>
             </div>
-            <button type="button" class="primary-button" @click="loadItems">Refresh</button>
+            <button class="primary-button" type="button" @click="loadItems">Refresh Posts</button>
         </header>
 
         <section class="panel-card">
-            <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
-            <div v-if="loading" class="loading-state">Loading items...</div>
+            <div class="filters">
+                <label class="search-control">
+                    <span class="sr-only">Search posts</span>
+                    <input v-model="search" type="search" placeholder="Search item, location, student..." />
+                </label>
+                <label class="filter-control">
+                    <span>Type</span>
+                    <select v-model="typeFilter">
+                        <option value="">All Types</option>
+                        <option value="lost">Lost</option>
+                        <option value="found">Found</option>
+                    </select>
+                </label>
+                <label class="filter-control">
+                    <span>Category</span>
+                    <select v-model="categoryFilter">
+                        <option value="">All Categories</option>
+                        <option v-for="category in categories" :key="category" :value="category">
+                            {{ category }}
+                        </option>
+                    </select>
+                </label>
+                <label class="filter-control">
+                    <span>Visibility</span>
+                    <select v-model="visibilityFilter">
+                        <option value="">All Visibility</option>
+                        <option :value="true">Public</option>
+                        <option :value="false">Private</option>
+                    </select>
+                </label>
+            </div>
 
-            <div v-else class="table-shell">
-                <div v-if="!items.length" class="empty-state-card" role="status">
-                    <h2>No items ready for mobile</h2>
-                    <p>Approve lost reports or verify found items first.</p>
+            <div class="results-heading">
+                <div>
+                    <h2>Published Posts</h2>
+                    <p>{{ filteredItems.length }} {{ filteredItems.length === 1 ? 'post' : 'posts' }} found</p>
                 </div>
+                <span class="page-indicator">Page {{ page }} of {{ pages }}</span>
+            </div>
 
-                <table v-else class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>Image</th>
-                            <th>Item</th>
-                            <th>Type</th>
-                            <th>Status</th>
-                            <th>Student</th>
-                            <th>Posted</th>
-                            <th>Visible</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="item in items" :key="item.id">
-                            <td data-label="Image">
-                                <button type="button" class="image-trigger" @click="openItem(item)"
-                                    aria-label="View item image">
-                                    <img :src="getItemImage(item)" :alt="item.title || 'Item image'" />
-                                </button>
-                            </td>
-                            <td data-label="Item">
-                                <strong>{{ item.title }}</strong>
-                                <small class="item-location">{{ item.location || 'No location' }}</small>
-                            </td>
-                            <td data-label="Type">{{ item.type }}</td>
-                            <td data-label="Status"><span class="status-chip">{{ item.status }}</span></td>
-                            <td data-label="Student">{{ item.student?.name || item.student_name || 'Unknown' }}</td>
-                            <td data-label="Posted">{{ item.published_at ? formatDate(item.published_at) : 'Not posted'
-                            }}</td>
-                            <td data-label="Visible">
-                                <button type="button" class="toggle-switch" :class="{ active: item.is_visible }"
-                                    :aria-pressed="item.is_visible" :disabled="toggleId === item.id"
-                                    @click="toggleVisibility(item.id, !item.is_visible)">
-                                    <span class="toggle-knob"></span>
-                                    <span class="toggle-label">{{ item.is_visible ? 'On' : 'Off' }}</span>
-                                </button>
-                            </td>
-                            <td data-label="Action">
-                                <div class="action-stack">
-                                    <button v-if="canPost(item)" type="button" class="secondary-button"
-                                        :disabled="postingId === item.id" @click="postItem(item.id)">
-                                        {{ postingId === item.id ? 'Posting...' : 'Post to mobile' }}
-                                    </button>
-                                    <button v-else type="button" class="secondary-button danger-button"
-                                        :disabled="archiveId === item.id" @click="archiveItem(item.id)">
-                                        {{ archiveId === item.id ? 'Archiving...' : 'Archive' }}
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div v-if="paginatedItems.length" class="grid">
+                <article v-for="item in paginatedItems" :key="item.id" class="item-card">
+                    <div class="image-wrap">
+                        <img :src="getItemImage(item)" :alt="item.title || 'Lost and found item'" />
+                        <span class="visibility-badge" :class="{ public: item.is_visible }">
+                            {{ item.is_visible ? 'Public' : 'Private' }}
+                        </span>
+                    </div>
+                    <h3>{{ item.title }}</h3>
+                    <p class="item-category">{{ getCategory(item) }}</p>
+                    <span class="type-badge">{{ item.type || 'Unknown type' }}</span>
+
+                    <div class="card-actions">
+                        <button class="secondary-button" type="button" @click="openItem(item)">View Details</button>
+
+                        <button class="toggle" type="button" :class="{ active: item.is_visible }"
+                            @click="toggleVisibility(item.id, !item.is_visible)">
+                            Set {{ item.is_visible ? 'Private' : 'Public' }}
+                        </button>
+
+                        <button class="danger-button" type="button" @click="archiveItem(item.id)">
+                            Archive Post
+                        </button>
+                    </div>
+                </article>
+            </div>
+
+            <div v-else class="empty-state">
+                <h2>No posts match these filters</h2>
+                <p>Try another search or clear one of the filters to view published lost and found items.</p>
+            </div>
+
+            <div class="pagination">
+                <button type="button" @click="page--" :disabled="page === 1">Previous</button>
+                <span>Page {{ page }} of {{ pages }}</span>
+                <button type="button" @click="page++" :disabled="page === pages">Next</button>
             </div>
         </section>
 
-        <transition name="modal-fade">
-            <div v-if="selectedItem" class="modal-overlay" @click.self="closeItem">
-                <div class="modal-content">
-                    <button type="button" class="modal-close" @click="closeItem"
-                        aria-label="Close item preview">×</button>
-                    <div class="modal-header">
-                        <div>
-                            <p class="page-kicker modal-kicker">Mobile post preview</p>
-                            <h2>{{ selectedItem.title }}</h2>
-                        </div>
-                        <span class="status-chip">{{ selectedItem.status }}</span>
-                    </div>
-                    <div class="modal-body">
-                        <div class="detail-image-wrap">
-                            <img :src="getItemImage(selectedItem)" :alt="selectedItem.title || 'Item image'"
-                                class="detail-image" />
-                        </div>
-                        <div class="detail-grid">
-                            <div class="detail-row"><span class="detail-label">Type</span><span class="detail-value">{{
-                                selectedItem.type }}</span></div>
-                            <div class="detail-row"><span class="detail-label">Location</span><span
-                                    class="detail-value">{{ selectedItem.location || 'No location' }}</span></div>
-                            <div class="detail-row"><span class="detail-label">Student</span><span
-                                    class="detail-value">{{ selectedItem.student?.name || selectedItem.student_name ||
-                                        'Unknown' }}</span></div>
-                            <div class="detail-row"><span class="detail-label">Visible</span><span
-                                    class="detail-value">{{ selectedItem.is_visible ? 'On' : 'Off' }}</span></div>
-                            <div class="detail-row full-row"><span class="detail-label">Description</span><span
-                                    class="detail-value">{{ selectedItem.item?.description || 'No description provided.'
-                                    }}</span></div>
-                        </div>
-                    </div>
+        <div v-if="selectedItem" class="modal-overlay" @click.self="selectedItem = null">
+            <section class="modal" role="dialog" aria-modal="true"
+                :aria-labelledby="`preview-title-${selectedItem.id}`">
+                <button class="close" type="button" aria-label="Close item details"
+                    @click="selectedItem = null">×</button>
+
+                <p class="preview-kicker">Student mobile preview</p>
+                <img class="preview" :src="getItemImage(selectedItem)" />
+
+                <h2 :id="`preview-title-${selectedItem.id}`">{{ selectedItem.title || 'Untitled post' }}</h2>
+
+                <div class="details">
+                    <p><b>Type:</b> {{ selectedItem.type || 'N/A' }}</p>
+                    <p><b>Category:</b> {{ getCategory(selectedItem) }}</p>
+                    <p><b>Description:</b> {{ getDescription(selectedItem) }}</p>
+                    <p><b>Posted:</b> {{ formatDate(selectedItem.published_at || selectedItem.created_at) }}</p>
+                    <p><b>Location:</b> {{ selectedItem.location || 'N/A' }}</p>
+                    <p><b>Additional Details:</b> {{ selectedItem.additional_details || 'None' }}</p>
+                    <p><b>Status:</b> {{ selectedItem.status }}</p>
+                    <p><b>Visibility:</b> {{ selectedItem.is_visible ? 'Public' : 'Private' }}</p>
                 </div>
-            </div>
-        </transition>
+            </section>
+        </div>
     </main>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import api from '@/bootstrap'
 
 const items = ref([])
-const loading = ref(false)
-const postingId = ref(null)
-const toggleId = ref(null)
-const archiveId = ref(null)
 const selectedItem = ref(null)
-const errorMessage = ref('')
+const search = ref('')
+const typeFilter = ref('')
+const categoryFilter = ref('')
+const visibilityFilter = ref('')
+const page = ref(1)
+const perPage = 12
 
-function getImageUrl(imagePath) {
-    if (!imagePath) return '/images/snsu-logo.png'
+const categories = computed(() => [...new Set(items.value.map(getCategory).filter(Boolean))].sort())
 
-    if (typeof imagePath === 'string') {
-        const normalized = imagePath.trim()
-        if (!normalized) return '/images/snsu-logo.png'
-        if (/^https?:\/\//i.test(normalized) || /^data:|^blob:/i.test(normalized) || normalized.startsWith('/')) {
-            return normalized
-        }
-        if (normalized.startsWith('public/assets/')) {
-            return `/${normalized.replace(/^public\//, '')}`
-        }
-        if (normalized.startsWith('assets/')) {
-            return `/${normalized}`
-        }
-        if (normalized.startsWith('storage/')) {
-            return `/${normalized}`
-        }
-        return `/storage/${normalized}`
-    }
+const filteredItems = computed(() => items.value.filter(i => {
+    return (!search.value || JSON.stringify(i).toLowerCase().includes(search.value.toLowerCase()))
+        && (!typeFilter.value || i.type === typeFilter.value)
+        && (!categoryFilter.value || getCategory(i) === categoryFilter.value)
+        && (visibilityFilter.value === '' || i.is_visible === visibilityFilter.value)
+}))
 
-    return '/images/snsu-logo.png'
+const pages = computed(() => Math.max(1, Math.ceil(filteredItems.value.length / perPage)))
+const paginatedItems = computed(() => filteredItems.value.slice((page.value - 1) * perPage, page.value * perPage))
+
+watch([search, typeFilter, categoryFilter, visibilityFilter], () => {
+    page.value = 1
+})
+
+function getImageUrl(path) {
+    if (!path) return '/images/snsu-logo.png'
+    if (path.startsWith('http') || path.startsWith('/')) return path
+    return '/storage/' + path
 }
 
 function getItemImage(item) {
-    const images = Array.isArray(item?.images) ? item.images : Array.isArray(item?.item?.images) ? item.item.images : []
-    const image = images[0]
-    const filePath = image?.file_path || image?.path || image?.url || item?.image || item?.item?.image
-    return getImageUrl(filePath)
+    const img = item.images?.[0]
+    return getImageUrl(img?.file_path || img?.path || item.image)
 }
 
-function canPost(item) {
-    return !item.published_at && ((item.type === 'lost' && item.status === 'approved')
-        || (item.type === 'found' && item.status === 'verified'))
+function getDescription(item) {
+    return item.item?.description || item.description || 'No description'
 }
 
-function openItem(item) {
-    selectedItem.value = item
+function getCategory(item) {
+    return item.category?.name || item.category || item.item?.category?.name || item.item?.category || item.item?.item_category || 'Uncategorized'
 }
 
-function closeItem() {
-    selectedItem.value = null
+function formatDate(v) {
+    return v ? new Date(v).toLocaleString() : 'N/A'
 }
 
-function formatDate(value) {
-    return value ? new Date(value).toLocaleDateString() : 'Not posted'
-}
+function openItem(item) { selectedItem.value = item }
 
 async function loadItems() {
-    loading.value = true
-    errorMessage.value = ''
-
-    try {
-        const response = await api.get('/api/admin/mobile-posts')
-        items.value = response.data?.data || []
-    } catch (error) {
-        errorMessage.value = error.response?.data?.message || 'Failed to load mobile posts.'
-        items.value = []
-    } finally {
-        loading.value = false
-    }
+    const res = await api.get('/api/admin/mobile-posts')
+    items.value = res.data?.data || []
 }
 
-async function postItem(id) {
-    postingId.value = id
-    errorMessage.value = ''
-
-    try {
-        await api.post(`/api/admin/mobile-posts/${id}/publish`)
-        await loadItems()
-    } catch (error) {
-        errorMessage.value = error.response?.data?.message || 'Unable to post this item to mobile.'
-    } finally {
-        postingId.value = null
-    }
-}
-
-async function toggleVisibility(id, isVisible) {
-    toggleId.value = id
-    errorMessage.value = ''
-
-    try {
-        await api.patch(`/api/admin/mobile-posts/${id}/visibility`, { is_visible: isVisible })
-        await loadItems()
-    } catch (error) {
-        errorMessage.value = error.response?.data?.message || 'Unable to update visibility.'
-    } finally {
-        toggleId.value = null
-    }
+async function toggleVisibility(id, value) {
+    await api.patch(`/api/admin/mobile-posts/${id}/visibility`, { is_visible: value })
+    await loadItems()
 }
 
 async function archiveItem(id) {
-    archiveId.value = id
-    errorMessage.value = ''
-
-    try {
-        await api.post(`/api/admin/mobile-posts/${id}/archive`)
-        await loadItems()
-    } catch (error) {
-        errorMessage.value = error.response?.data?.message || 'Unable to archive this item.'
-    } finally {
-        archiveId.value = null
-    }
+    await api.post(`/api/admin/mobile-posts/${id}/archive`)
+    await loadItems()
 }
 
 onMounted(loadItems)
 </script>
 
 <style scoped>
-.admin-page-body {
-    min-height: calc(100vh - 60px);
-    padding: 24px;
-    color: #eef1e5;
-    background: radial-gradient(circle at top left, rgba(80, 130, 82, 0.16), transparent 30%), #0f2112;
+* {
+    box-sizing: border-box;
 }
 
-.page-header,
-.panel-card {
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+.admin-page-body {
+    min-height: 100vh;
+    padding: 28px;
+    color: #f4f1e5;
+    background:
+        radial-gradient(circle at top left, rgba(80, 130, 82, 0.16), transparent 30%),
+        #102316;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .page-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 20px;
-    padding: 20px 22px;
-    border-radius: 20px;
-    margin-bottom: 18px;
+    gap: 24px;
+    max-width: 1440px;
+    margin: 0 auto 18px;
+    padding: 4px 2px;
+}
+
+.page-header>div {
+    min-width: 0;
 }
 
 .page-kicker {
-    margin: 0 0 8px;
-    color: #c1b37a;
-    font-size: 0.78rem;
-    letter-spacing: 0.18em;
+    margin: 0 0 7px;
+    color: #d2b45d;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
 }
 
-.page-header h1 {
-    margin: 0;
+h1,
+h2,
+h3,
+p {
+    margin-top: 0;
+}
+
+h1 {
+    margin-bottom: 8px;
     color: #fbf7eb;
+    font-size: clamp(1.45rem, 2.4vw, 2rem);
+    line-height: 1.2;
 }
 
 .page-copy {
-    margin: 8px 0 0;
-    color: #bcc0a7;
+    margin-bottom: 0;
+    color: #b9c3b0;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.panel-card {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    background: rgba(21, 41, 26, 0.84);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
+}
+
+.filters {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) repeat(3, minmax(145px, 0.45fr));
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.search-control,
+.filter-control {
+    min-width: 0;
+}
+
+.filter-control {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-control>span {
+    color: #b9c3b0;
+    font-size: 0.68rem;
+    font-weight: 750;
+}
+
+.filters input,
+.filters select {
+    width: 100%;
+    height: 42px;
+    min-width: 0;
+    padding: 0 12px;
+    border: 1px solid rgba(18, 60, 45, 0.2);
+    border-radius: 7px;
+    outline: none;
+    background: #edf8ef;
+    color: #123c2d;
+    font: inherit;
+    font-size: 0.78rem;
+}
+
+.filters input::placeholder {
+    color: #737d69;
+}
+
+.filters input:focus,
+.filters select:focus {
+    border-color: #c49d3b;
+    box-shadow: 0 0 0 3px rgba(196, 157, 59, 0.14);
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.results-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.results-heading h2 {
+    margin-bottom: 3px;
+    color: #fbf7eb;
+    font-size: 1rem;
+}
+
+.results-heading p {
+    margin-bottom: 0;
+    color: #a8b59f;
+    font-size: 0.72rem;
+}
+
+.page-indicator {
+    color: #c9cebb;
+    font-size: 0.7rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.item-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    background: #206b3a;
+    color: #f4f1e5;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.item-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(196, 157, 59, 0.34);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+}
+
+.item-card img {
+    width: 100%;
+    height: 148px;
+    margin-bottom: 12px;
+    object-fit: cover;
+    border-radius: 7px;
+    background: #102316;
+}
+
+.image-wrap {
+    position: relative;
+}
+
+.visibility-badge {
+    position: absolute;
+    right: 7px;
+    bottom: 19px;
+    padding: 4px 7px;
+    border-radius: 999px;
+    background: rgba(12, 27, 16, 0.86);
+    color: #f0d98b;
+    font-size: 0.58rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.visibility-badge.public {
+    color: #86efac;
+}
+
+.item-card h3 {
+    margin-bottom: 5px;
+    overflow: hidden;
+    color: #fbf7eb;
+    font-size: 0.92rem;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.item-card p {
+    margin-bottom: 8px;
+    overflow: hidden;
+    color: #c9cebb;
+    font-size: 0.72rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.item-card>span {
+    align-self: flex-start;
+    margin-bottom: 14px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(196, 157, 59, 0.14);
+    color: #e7c765;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.card-actions {
+    display: grid;
+    gap: 6px;
+    margin-top: auto;
+}
+
+.empty-state {
+    display: grid;
+    min-height: 230px;
+    place-items: center;
+    align-content: center;
+    padding: 28px;
+    border: 1px dashed rgba(196, 157, 59, 0.34);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.035);
+    text-align: center;
+}
+
+.empty-state h2 {
+    margin-bottom: 7px;
+    color: #f8f5e8;
+    font-size: 1rem;
+}
+
+.empty-state p {
+    max-width: 470px;
+    margin-bottom: 0;
+    color: #b9c3b0;
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+button {
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 750;
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+button:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
 }
 
 .primary-button,
 .secondary-button {
-    border: 0;
-    border-radius: 10px;
-    padding: 0.75rem 1rem;
-    font-weight: 700;
-    cursor: pointer;
+    border-color: #d2b45d;
+    background: #d2b45d;
+    color: #183522;
 }
 
-.primary-button {
-    background: #c49d3b;
-    color: #131b10;
+.primary-button:hover,
+.secondary-button:hover {
+    background: #e1c56f;
 }
 
-.secondary-button {
-    border: 1px solid rgba(196, 157, 59, 0.5);
-    background: rgba(196, 157, 59, 0.16);
-    color: #f6cf77;
-}
-
-button:disabled {
-    opacity: 0.65;
-    cursor: wait;
-}
-
-.panel-card {
-    padding: 18px;
-    border-radius: 20px;
-}
-
-.table-shell {
-    overflow-x: auto;
-}
-
-.admin-table {
+.secondary-button,
+.toggle,
+.danger-button {
     width: 100%;
-    border-collapse: collapse;
+    margin-top: 6px;
 }
 
-.admin-table th,
-.admin-table td {
-    padding: 14px 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    text-align: left;
+.toggle {
+    border-color: rgba(237, 248, 239, 0.4);
+    background: transparent;
+    color: #edf8ef;
 }
 
-.admin-table th {
-    color: #c1b37a;
-    font-size: 0.76rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.admin-table td {
-    color: #eef1e5;
-}
-
-.image-trigger {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 70px;
-    height: 70px;
-    padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.03);
-    cursor: pointer;
-    overflow: hidden;
-}
-
-.image-trigger img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
-
-.item-location {
-    display: block;
-    margin-top: 4px;
-    color: #aeb69d;
-}
-
-.status-chip,
-.posted-label {
-    color: #f6cf77;
-    text-transform: capitalize;
-}
-
-.toggle-switch {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 88px;
-    padding: 6px 10px 6px 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.04);
-    color: #eef1e5;
-    cursor: pointer;
-}
-
-.toggle-switch.active {
-    background: rgba(76, 175, 80, 0.18);
-    border-color: rgba(76, 175, 80, 0.45);
-}
-
-.toggle-knob {
-    display: inline-block;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: #eef1e5;
-    transition: transform 180ms ease;
-}
-
-.toggle-switch.active .toggle-knob {
-    transform: translateX(22px);
-    background: #7ae38a;
-}
-
-.toggle-label {
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-
-.action-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.secondary-button {
-    width: 100%;
+.toggle.active {
+    border-color: #16a34a;
+    background: #22c55e;
+    color: #fff;
 }
 
 .danger-button {
-    border-color: rgba(255, 117, 117, 0.45);
-    background: rgba(255, 117, 117, 0.12);
-    color: #ffc9c9;
+    border-color: #dc2626;
+    background: #ef4444;
+    color: #fff;
+}
+
+.danger-button:hover {
+    background: #dc2626;
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 18px;
+    color: #c9cebb;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.pagination button {
+    min-width: 82px;
+    border-color: rgba(237, 248, 239, 0.18);
+    background: rgba(255, 255, 255, 0.08);
+    color: #edf8ef;
+}
+
+.pagination button:hover:not(:disabled) {
+    border-color: #c49d3b;
+    background: rgba(196, 157, 59, 0.16);
 }
 
 .modal-overlay {
     position: fixed;
     inset: 0;
-    z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 20px;
-    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    background: rgba(3, 12, 6, 0.78);
+    backdrop-filter: blur(4px);
 }
 
-.modal-content {
+.modal {
     position: relative;
-    width: min(860px, 100%);
+    width: min(700px, 100%);
     max-height: 90vh;
-    overflow: hidden;
-    border-radius: 20px;
-    background: #0f2112;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    padding: 24px;
+    overflow: auto;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: #28583a;
+    color: #f4f1e5;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46);
 }
 
-.modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 22px 24px 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.modal-header h2 {
-    margin: 0;
+.modal h2 {
+    margin: 18px 42px 18px 0;
     color: #fbf7eb;
+    font-size: 1.25rem;
+    line-height: 1.25;
 }
 
-.modal-kicker {
-    margin: 0 0 10px;
+.preview-kicker {
+    margin-bottom: 10px;
+    color: #d2b45d;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
 }
 
-.modal-close {
+.close {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    border: none;
-    background: transparent;
-    color: #eef1e5;
-    font-size: 2rem;
-    cursor: pointer;
+    top: 14px;
+    right: 14px;
+    display: grid;
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+    place-items: center;
+    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 1.2rem;
     line-height: 1;
 }
 
-.modal-body {
-    display: grid;
-    grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
-    gap: 20px;
-    padding: 24px;
-    max-height: 60vh;
-    overflow-y: auto;
+.close:hover {
+    background: rgba(255, 255, 255, 0.16);
 }
 
-.detail-image-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 220px;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.03);
-    overflow: hidden;
-}
-
-.detail-image {
-    width: 100%;
-    max-height: 360px;
+.preview {
+    display: block;
+    width: 220px;
+    height: 180px;
     object-fit: cover;
+    border-radius: 8px;
+    background: #102316;
 }
 
-.detail-grid {
+.details {
     display: grid;
-    gap: 12px;
-}
-
-.detail-row {
-    display: grid;
-    grid-template-columns: 110px minmax(0, 1fr);
-    gap: 12px;
+    gap: 0;
     padding: 10px 12px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
 }
 
-.detail-row.full-row {
-    grid-template-columns: 1fr;
+.details p {
+    margin: 0;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #d8dfd1;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
 }
 
-.detail-label {
-    color: #bcc0a7;
-    font-weight: 600;
+.details p:last-child {
+    border-bottom: 0;
 }
 
-.detail-value {
-    color: #fbf7eb;
-    word-break: break-word;
-    line-height: 1.5;
+.details b {
+    display: inline-block;
+    min-width: 118px;
+    color: #e7c765;
 }
 
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-    transition: opacity 0.2s ease;
-}
+@media (max-width: 900px) {
+    .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-    opacity: 0;
-}
+    .filters {
+        grid-template-columns: 1fr 1fr;
+    }
 
-.empty-state-card,
-.loading-state {
-    padding: 42px 20px;
-    text-align: center;
-    color: #cbd2bd;
-}
+    .filters input {
+        grid-column: 1 / -1;
+    }
 
-.empty-state-card h2 {
-    color: #fbf7eb;
-}
-
-.inline-alert {
-    margin-bottom: 16px;
-    padding: 12px 14px;
-    border-radius: 10px;
-}
-
-.error-alert {
-    background: rgba(170, 53, 53, 0.2);
-    color: #ffd1d1;
-}
-
-@media (max-width: 720px) {
-    .admin-page-body {
-        padding: 16px;
+    .filter-control {
+        grid-template-columns: 1fr;
+        gap: 4px;
     }
 
     .page-header {
         flex-direction: column;
     }
 
-    .modal-body {
+    .primary-button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 560px) {
+    .admin-page-body {
+        padding: 16px;
+    }
+
+    .panel-card {
+        padding: 12px;
+    }
+
+    .filters,
+    .grid {
         grid-template-columns: 1fr;
     }
 
-    .detail-row {
-        grid-template-columns: 1fr;
+    .filters input {
+        grid-column: auto;
+    }
+
+    .modal-overlay {
+        padding: 10px;
+    }
+
+    .modal {
+        padding: 18px;
+    }
+
+    .preview {
+        width: 100%;
+        height: 170px;
+    }
+
+    .details b {
+        display: block;
+        min-width: 0;
+        margin-bottom: 2px;
     }
 }
 </style>

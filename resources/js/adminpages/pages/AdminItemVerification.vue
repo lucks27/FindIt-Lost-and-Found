@@ -487,11 +487,11 @@ image,
                                         ) in getReportImages(
         selectedVerification.report
     )" :key="index" type="button" class="thumbnail-button" :class="{
-                                                    active:
-                                                        currentImageIndex === index
-                                                }" @click="
-                                            currentImageIndex = index
-                                            ">
+        active:
+            currentImageIndex === index
+    }" @click="
+        currentImageIndex = index
+        ">
                                         <img :src="getImageUrl(
                                             image.file_path ||
                                             image.path ||
@@ -4367,6 +4367,9 @@ onMounted(
     -webkit-line-clamp:
         3;
 
+    line-clamp:
+        3;
+
     -webkit-box-orient:
         vertical;
 }
@@ -7066,5 +7069,179 @@ onMounted(
         transition:
             none !important;
     }
+}
+
+/* Match the pending reports palette. */
+.admin-page-body {
+    color: #eef1e5;
+    background:
+        radial-gradient(circle at top left,
+            rgba(80, 130, 82, 0.13),
+            transparent 28%),
+        #1a4d2e;
+}
+
+.page-kicker,
+.modal-kicker,
+.request-kicker {
+    color: #c1b37a;
+}
+
+.page-header h1,
+.modal-header h2,
+.card-title {
+    color: #fbf7eb;
+}
+
+.page-copy,
+.queue-count span,
+.verification-id,
+.claimant-name span,
+.card-information dt,
+.card-student,
+.modal-close,
+.approved-footer-copy small {
+    color: #c9cebb;
+}
+
+.queue-count {
+    border-color: rgba(196, 157, 59, 0.23);
+    background: rgba(196, 157, 59, 0.075);
+}
+
+.queue-count strong {
+    color: #e6c765;
+}
+
+.filter-toolbar {
+    border-color: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.search-field input,
+.category-field select,
+.sort-button {
+    border-color: rgba(18, 60, 45, 0.2);
+    background: #edf8ef;
+    color: #123c2d;
+}
+
+.search-field input::placeholder,
+.field-label {
+    color: #737d69;
+}
+
+.verification-card {
+    border-color: rgba(255, 255, 255, 0.07);
+    background: #206b3a;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.verification-card:hover {
+    border-color: rgba(196, 157, 59, 0.24);
+    box-shadow: 0 9px 20px rgba(0, 0, 0, 0.17);
+}
+
+.verification-image {
+    border-color: rgba(255, 255, 255, 0.07);
+    background: #102316;
+}
+
+.claimant-name strong,
+.card-information dd,
+.ownership-preview p {
+    color: #c9cebb;
+}
+
+.card-information,
+.ownership-preview {
+    border-color: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.preview-heading {
+    color: #e7c765;
+}
+
+.status-badge.pending,
+.request-btn,
+.modal-request-button,
+.send-request-button {
+    background: #fbbf24;
+    color: #f0f0f0;
+}
+
+.status-badge.approved,
+.approve-btn,
+.modal-approve-button,
+.complete-transaction-button {
+    background: #22c55e;
+    color: #ffffff;
+}
+
+.status-badge.rejected,
+.reject-btn,
+.modal-reject-button {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+.empty-state-card {
+    background: #206b3a;
+}
+
+.modal-content {
+    background: #28583a;
+}
+
+.empty-state-card {
+    border-color: rgba(196, 157, 59, 0.24);
+}
+
+.empty-icon {
+    background: rgba(22, 93, 49, 0.15);
+    color: #4ade80;
+}
+
+.empty-state-card h2,
+.empty-state-card p {
+    color: #f8f5e8;
+}
+
+.empty-state-card p,
+.completed-message,
+.modal-scroll {
+    color: #c9cebb;
+}
+
+.pagination-bar {
+    border-color: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.pagination-info,
+.pagination-info strong,
+.page-status,
+.pagination-button {
+    color: #123c2d;
+}
+
+.pagination-button {
+    border-color: rgba(18, 60, 45, 0.15);
+    background: #edf8ef;
+}
+
+.modal-content {
+    border-color: rgba(255, 255, 255, 0.085);
+}
+
+.modal-header,
+.modal-actions {
+    background: #206b3a;
+}
+
+.modal-header,
+.modal-actions {
+    border-color: rgba(255, 255, 255, 0.07);
 }
 </style>

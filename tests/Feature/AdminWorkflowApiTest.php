@@ -61,4 +61,25 @@ class AdminWorkflowApiTest extends TestCase
             ->assertJsonPath('status', 'success')
             ->assertJsonCount(1, 'data');
     }
+
+    public function test_admin_login_persists_session_for_protected_requests(): void
+    {
+        $admin = Admin::create([
+            'name' => 'Super Admin',
+            'email' => 'super@example.com',
+            'password' => bcrypt('secret123'),
+            'status' => true,
+            'role' => 'super_admin',
+        ]);
+
+        $loginResponse = $this->postJson('/api/admin/login/request', [
+            'email' => $admin->email,
+            'password' => 'secret123',
+        ]);
+
+        $loginResponse->assertOk()
+            ->assertJsonPath('status', 'success');
+
+        $this->getJson('/api/admin/dashboard')->assertOk();
+    }
 }

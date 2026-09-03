@@ -8,6 +8,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+/**
+ * @property int $id
+ * @property int|null $student_id
+ * @property string|null $status
+ * @property string|null $location
+ * @property \Illuminate\Support\Carbon|null $created_at
+ */
 class Report extends Model
 {
     use HasFactory;

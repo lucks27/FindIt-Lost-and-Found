@@ -2287,8 +2287,6 @@ onMounted(() => {
 
     text-align: left;
 
-    vertical-align: middle;
-
     cursor: pointer;
 
     appearance: none;

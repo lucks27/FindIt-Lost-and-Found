@@ -42,6 +42,9 @@ class AdminAuthController extends Controller
             ], 403);
         }
 
+        Auth::guard('admin')->login($admin);
+        $request->session()->regenerate();
+
         // Create a Sanctum API token for the admin
         $token = $admin->createToken('admin-token')->plainTextToken;
 
@@ -148,6 +151,7 @@ class AdminAuthController extends Controller
 
     private function adminUser(): Admin
     {
+        /** @var Admin|null $admin */
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {

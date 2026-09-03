@@ -2,354 +2,1007 @@
     <main class="admin-page-body">
         <header class="page-header">
             <div>
-                <p class="page-kicker">Potential matches</p>
-                <h1>Compare lost and found cases with confidence</h1>
-                <p class="page-copy">Use each backend-generated match suggestion to decide whether to confirm or reject
-                    the pairing.</p>
+                <p class="page-kicker">Match review workspace</p>
+                <h1>Potential Match Review</h1>
+                <p class="page-copy">Review possible matches between lost and found reports before notifying students.
+                </p>
             </div>
-            <button type="button" class="primary-button" @click="loadMatches">Refresh matches</button>
+            <div class="header-actions">
+                <label class="search-field">
+                    <span class="sr-only">Search matches</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="11" cy="11" r="6" />
+                        <path d="m16 16 4 4" />
+                    </svg>
+                    <input v-model.trim="query" type="search" placeholder="Search item, category, or location" />
+                </label>
+                <button type="button" class="primary-button" :disabled="loading" @click="loadMatches">Refresh
+                    Matches</button>
+            </div>
         </header>
-
-        <section class="metric-grid" aria-label="Potential match summary metrics">
-            <article class="metric-card">
-                <span class="metric-label">Open</span>
-                <strong class="metric-value">{{ metrics.open }}</strong>
-                <small>Awaiting review</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Confirmed</span>
-                <strong class="metric-value">{{ metrics.confirmed }}</strong>
-                <small>Ready for release</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Rejected</span>
-                <strong class="metric-value">{{ metrics.rejected }}</strong>
-                <small>Closed as mismatch</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Total</span>
-                <strong class="metric-value">{{ metrics.total }}</strong>
-                <small>Match suggestions</small>
-            </article>
-        </section>
 
         <section class="panel-card">
             <div class="toolbar-row">
-                <label class="search-field">
-                    <span class="sr-only">Search potential matches</span>
-                    <input v-model.trim="query" type="search" placeholder="Search item, score, or note"
-                        aria-label="Search potential matches" />
-                </label>
-                <div class="chip-row" aria-label="Match status filters">
-                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'all' }"
-                        @click="activeStatus = 'all'">All</button>
-                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'pending' }"
-                        @click="activeStatus = 'pending'">Open</button>
-                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'confirmed' }"
-                        @click="activeStatus = 'confirmed'">Confirmed</button>
-                    <button type="button" class="chip-button" :class="{ active: activeStatus === 'rejected' }"
-                        @click="activeStatus = 'rejected'">Rejected</button>
-                </div>
+                <nav class="status-tabs" aria-label="Match status">
+                    <button v-for="tab in statusTabs" :key="tab.value" type="button" class="status-tab"
+                        :class="{ active: activeStatus === tab.value }" @click="activeStatus = tab.value">{{ tab.label
+                        }}</button>
+                </nav>
+                <label class="score-filter"><span>Match score</span><select v-model="activeScore">
+                        <option value="all">All scores</option>
+                        <option value="high">High confidence</option>
+                        <option value="medium">Medium confidence</option>
+                        <option value="low">Low confidence</option>
+                    </select></label>
             </div>
 
-            <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
-            <div v-if="loading" class="loading-state">Loading matches…</div>
-
-            <div v-else class="table-shell">
-                <div v-if="!visibleRows.length" class="empty-state-card" role="status">
-                    <h2>No match suggestions to review</h2>
-                    <p>When matches are generated, each score, note, and decision state will appear here for quick
-                        review.</p>
-                </div>
-
-                <table v-else class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>Source item</th>
-                            <th>Matched item</th>
-                            <th>Score</th>
-                            <th>Status</th>
-                            <th>Notes</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="item in visibleRows" :key="item.id">
-                            <td>{{ item.lost_report?.title || item.lost_report_id }}</td>
-                            <td>{{ item.found_report?.title || item.found_report_id }}</td>
-                            <td>{{ item.score }}</td>
-                            <td><span class="status-chip">{{ formatStatus(item.status) }}</span></td>
-                            <td>{{ item.notes || '—' }}</td>
-                            <td class="action-cell">
-                                <button type="button" class="secondary-button" @click="confirmMatch(item.id)"
-                                    :disabled="String(item.status || '').toLowerCase() === 'confirmed'">Confirm</button>
-                                <button type="button" class="secondary-button" @click="rejectMatch(item.id)"
-                                    :disabled="String(item.status || '').toLowerCase() === 'rejected'">Reject</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div v-if="errorMessage" class="inline-alert error-alert" role="alert">{{ errorMessage }}</div>
+            <div v-if="loading" class="match-grid" aria-label="Loading matches">
+                <article v-for="index in 4" :key="index" class="match-card skeleton-card">
+                    <div class="skeleton skeleton-line short"></div>
+                    <div class="skeleton-reports">
+                        <div class="skeleton skeleton-image"></div>
+                        <div class="skeleton skeleton-image"></div>
+                    </div>
+                    <div class="skeleton skeleton-line"></div>
+                    <div class="skeleton skeleton-line medium"></div>
+                </article>
             </div>
+            <div v-else-if="paginatedMatches.length" class="match-grid">
+                <article v-for="match in paginatedMatches" :key="match.id" class="match-card">
+                    <div class="match-card-header"><span class="match-id">Potential Match #{{ match.id }}</span><span
+                            class="status-badge" :class="statusClass(match.status)">{{ formatStatus(match.status)
+                            }}</span></div>
+                    <div class="report-columns">
+                        <ReportPreview label="Lost report" :report="match.lost_report" type="lost" />
+                        <div class="analysis-column"><span class="analysis-label">Match score</span><strong
+                                class="score-value" :class="scoreClass(match.score)">{{ scorePercent(match.score)
+                                }}%</strong><span class="confidence-label">{{ confidenceLabel(match.score) }}</span>
+                        </div>
+                        <ReportPreview label="Found report" :report="match.found_report" type="found" />
+                    </div>
+                    <div class="match-card-footer"><span class="source-label">{{ sourceLabel(match) }}</span><button
+                            type="button" class="review-button" @click="openReview(match)">Review Match <svg
+                                viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m9 18 6-6-6-6" />
+                            </svg></button></div>
+                </article>
+            </div>
+            <div v-else class="empty-state" role="status">
+                <div class="empty-icon"><svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M8 7h8M8 11h5M5 4h14v14H8l-3 3z" />
+                    </svg></div>
+                <h2>No match suggestions found</h2>
+                <p>Try changing your search or filters. New backend-generated suggestions will appear here for review.
+                </p>
+            </div>
+            <div v-if="!loading" class="pagination"><button type="button" :disabled="page === 1"
+                    @click="page--">Previous</button><button v-for="number in pageNumbers" :key="number" type="button"
+                    class="page-number" :class="{ active: number === page }" @click="page = number">{{ number
+                    }}</button><button type="button" :disabled="page === pages" @click="page++">Next</button></div>
         </section>
+
+        <Transition name="modal-fade">
+            <div v-if="selectedMatch" class="modal-overlay" @click.self="closeReview">
+                <section class="review-modal" role="dialog" aria-modal="true" aria-labelledby="review-title">
+                    <header class="modal-header">
+                        <div>
+                            <p class="modal-kicker">Potential Match #{{ selectedMatch.id }}</p>
+                            <h2 id="review-title">Match Review</h2>
+                        </div><button type="button" class="icon-button" aria-label="Close review"
+                            @click="closeReview">×</button>
+                    </header>
+                    <div class="modal-body">
+                        <div class="modal-reports">
+                            <ReportDetail title="Lost report" :report="selectedMatch.lost_report" type="lost" />
+                            <ReportDetail title="Found report" :report="selectedMatch.found_report" type="found" />
+                        </div>
+                        <section class="analysis-panel">
+                            <div class="analysis-score"><span>Similarity score</span><strong
+                                    :class="scoreClass(selectedMatch.score)">{{ scorePercent(selectedMatch.score)
+                                    }}%</strong><small>{{ confidenceLabel(selectedMatch.score) }}</small></div>
+                            <div class="analysis-reasons">
+                                <h3>Why this match was suggested</h3>
+                                <ul>
+                                    <li v-for="reason in matchReasons(selectedMatch)" :key="reason"><span>✓</span>{{
+                                        reason }}</li>
+                                </ul>
+                            </div>
+                        </section>
+                    </div>
+                    <footer class="modal-actions"><template v-if="isPending(selectedMatch.status)"><button type="button"
+                                class="decision-button confirm-button" :disabled="decisionLoading"
+                                @click="confirmMatch(selectedMatch)">Confirm Match</button><button type="button"
+                                class="decision-button reject-button" :disabled="decisionLoading"
+                                @click="requestReject(selectedMatch)">Reject Match</button></template><span v-else
+                            class="final-status">{{ formatStatus(selectedMatch.status) }}</span><button
+                            v-if="['confirmed', 'rejected'].includes(String(selectedMatch.status || '').toLowerCase())"
+                            type="button" class="cancel-button" :disabled="decisionLoading"
+                            @click.stop.prevent="resetMatch(selectedMatch)">Return to
+                            Pending</button></footer>
+                </section>
+            </div>
+        </Transition>
+        <Transition name="toast-slide">
+            <div v-if="toast.message" class="toast" :class="toast.type" role="status">{{ toast.message }}</div>
+        </Transition>
     </main>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, defineComponent, h, onMounted, reactive, ref, watch } from 'vue'
 import api from '@/bootstrap'
 
 const query = ref('')
 const activeStatus = ref('all')
+const activeScore = ref('all')
 const matches = ref([])
 const loading = ref(false)
+const decisionLoading = ref(false)
 const errorMessage = ref('')
+const selectedMatch = ref(null)
+const page = ref(1)
+const perPage = 12
+const toast = reactive({ message: '', type: 'success' })
+let toastTimer
 
-const metrics = computed(() => {
-    const counts = { open: 0, confirmed: 0, rejected: 0, total: matches.value.length }
+const statusTabs = [
+    { label: 'All Matches', value: 'all' }, { label: 'Pending Review', value: 'pending' },
+    { label: 'Confirmed', value: 'confirmed' }, { label: 'Rejected', value: 'rejected' },
+]
 
-    matches.value.forEach((item) => {
-        const status = String(item.status || '').toLowerCase()
-        if (status === 'pending') counts.open += 1
-        if (status === 'confirmed') counts.confirmed += 1
-        if (status === 'rejected') counts.rejected += 1
-    })
+const filteredMatches = computed(() => matches.value.filter((match) => {
+    const status = String(match.status || 'pending').toLowerCase()
+    const score = scorePercent(match.score)
+    const lost = match.lost_report || {}
+    const found = match.found_report || {}
+    const text = [lost.title, found.title, lost.category?.name, found.category?.name, lost.category, found.category, lost.location, found.location, match.review_notes, match.source, match.score].filter(Boolean).join(' ').toLowerCase()
+    const scoreMatches = activeScore.value === 'all' || (activeScore.value === 'high' && score >= 90) || (activeScore.value === 'medium' && score >= 70 && score < 90) || (activeScore.value === 'low' && score < 70)
+    return (activeStatus.value === 'all' || status === activeStatus.value) && scoreMatches && (!query.value || text.includes(query.value.toLowerCase()))
+}))
 
-    return counts
+const pages = computed(() => Math.max(1, Math.ceil(filteredMatches.value.length / perPage)))
+const paginatedMatches = computed(() => filteredMatches.value.slice((page.value - 1) * perPage, page.value * perPage))
+const pageNumbers = computed(() => Array.from({ length: pages.value }, (_, index) => index + 1).slice(0, 7))
+watch([query, activeStatus, activeScore], () => { page.value = 1 })
+watch(pages, () => { if (page.value > pages.value) page.value = pages.value })
+
+const ReportPreview = defineComponent({
+    props: { label: String, report: Object, type: String },
+    setup(props) {
+        return () => h('div', { class: 'report-preview' }, [
+            h('span', { class: 'report-label' }, props.label),
+            getReportImageElement(props.report, props.type),
+            h('h3', props.report?.title || 'Untitled report'), h('p', getCategory(props.report)),
+            h('small', props.report?.location || 'Location not provided'), h('small', formatDate(props.report?.created_at || props.report?.date_occurred)),
+        ])
+    },
 })
 
-const visibleRows = computed(() => {
-    const search = query.value.toLowerCase()
-    return matches.value.filter((item) => {
-        const status = String(item.status || '').toLowerCase()
-        const matchesStatus = activeStatus.value === 'all' || status === activeStatus.value
-        const matchesSearch = !search || [item.lost_report?.title, item.found_report?.title, item.notes, item.score]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase()
-            .includes(search)
-
-        return matchesStatus && matchesSearch
-    })
+const ReportDetail = defineComponent({
+    props: { title: String, report: Object, type: String },
+    setup(props) {
+        return () => h('article', { class: 'report-detail' }, [
+            h('div', { class: 'detail-heading' }, [h('span', { class: `report-dot ${props.type}` }), h('h3', props.title)]),
+            getReportImageElement(props.report, props.type),
+            h('dl', [detailRow('Title', props.report?.title || 'Untitled report'), detailRow('Category', getCategory(props.report)), detailRow('Description', getDescription(props.report)), detailRow('Location', props.report?.location || 'Not provided'), detailRow('Reported', formatDate(props.report?.created_at || props.report?.date_occurred))]),
+        ])
+    },
 })
 
-function formatStatus(value) {
-    if (!value) return 'Pending'
-    return String(value).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
-}
+function detailRow(label, value) { return h('div', [h('dt', label), h('dd', value)]) }
+function scorePercent(value) { const score = Number(value) || 0; return score <= 1 ? Math.round(score * 100) : Math.round(score) }
+function scoreClass(value) { const score = scorePercent(value); return score >= 90 ? 'high' : score >= 70 ? 'medium' : 'low' }
+function confidenceLabel(value) { return scoreClass(value) === 'high' ? 'High Confidence' : scoreClass(value) === 'medium' ? 'Medium Confidence' : 'Low Confidence' }
+function isPending(value) { return !['confirmed', 'rejected'].includes(String(value || 'pending').toLowerCase()) }
+function statusClass(value) { return String(value || 'pending').toLowerCase() }
+function formatStatus(value) { return String(value || 'pending').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()) }
+function getCategory(report) { return report?.category?.name || report?.category || report?.item_category || 'Uncategorized' }
+function getDescription(report) { return report?.description || report?.additional_details || 'No description provided.' }
+function sourceLabel(match) { return match?.source || 'System generated suggestion' }
+function getReportImage(report) { const image = report?.images?.find((item) => item.is_primary) || report?.images?.[0]; const path = image?.file_path || image?.path || report?.image; if (!path) return null; return path.startsWith('http') || path.startsWith('/') ? path : `/storage/${path}` }
+function getReportImageElement(report, type) { const imagePath = getReportImage(report); return imagePath ? h('img', { src: imagePath, alt: report?.title || `${type} report image` }) : h('div', { class: 'image-placeholder' }, 'No image available') }
+function formatDate(value) { return value ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not provided' }
+function matchReasons(match) { const lost = match.lost_report || {}; const found = match.found_report || {}; const reasons = []; if (getCategory(lost).toLowerCase() === getCategory(found).toLowerCase()) reasons.push('Same item category'); if (lost.color && found.color && lost.color.toLowerCase() === found.color.toLowerCase()) reasons.push('Similar color description'); if (lost.location && found.location && (lost.location.toLowerCase().includes(found.location.toLowerCase()) || found.location.toLowerCase().includes(lost.location.toLowerCase()))) reasons.push('Same location area'); if (lost.description && found.description) reasons.push('Matching item details'); return reasons.length ? reasons : ['Backend-generated similarity score', 'Review the report details before deciding'] }
+function showToast(message, type = 'success') { toast.message = message; toast.type = type; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toast.message = '' }, 3500) }
+function openReview(match) { selectedMatch.value = match }
+function closeReview() { if (!decisionLoading.value) selectedMatch.value = null }
+function requestReject(match) { if (window.confirm('Reject this match? This will close this suggestion as a mismatch.')) rejectMatch(match) }
 
-async function loadMatches() {
-    loading.value = true
-    errorMessage.value = ''
-
-    try {
-        const response = await api.get('/api/admin/matches')
-        matches.value = Array.isArray(response.data?.data) ? response.data.data : []
-    } catch (error) {
-        errorMessage.value = error.response?.data?.message || 'Failed to load potential matches.'
-        matches.value = []
-    } finally {
-        loading.value = false
-    }
-}
-
-async function confirmMatch(id) {
-    errorMessage.value = ''
-    try {
-        await api.put(`/api/admin/matches/${id}/confirm`)
-        await loadMatches()
-    } catch (error) {
-        errorMessage.value = error.response?.data?.message || 'Unable to confirm match.'
-    }
-}
-
-async function rejectMatch(id) {
-    errorMessage.value = ''
-    try {
-        await api.put(`/api/admin/matches/${id}/reject`)
-        await loadMatches()
-    } catch (error) {
-        errorMessage.value = error.response?.data?.message || 'Unable to reject match.'
-    }
-}
+async function loadMatches() { loading.value = true; errorMessage.value = ''; try { const response = await api.get('/api/admin/matches'); matches.value = Array.isArray(response.data?.data) ? response.data.data : [] } catch (error) { errorMessage.value = error.response?.data?.message || 'Failed to load potential matches.'; matches.value = [] } finally { loading.value = false } }
+async function confirmMatch(match) { decisionLoading.value = true; try { await api.put(`/api/admin/matches/${match.id}/confirm`); match.status = 'confirmed'; showToast('Match confirmed. The student has been notified.'); selectedMatch.value = null; await loadMatches() } catch (error) { showToast(error.response?.data?.message || 'Unable to confirm match.', 'error') } finally { decisionLoading.value = false } }
+async function rejectMatch(match) { decisionLoading.value = true; try { await api.put(`/api/admin/matches/${match.id}/reject`); match.status = 'rejected'; showToast('Match rejected.'); selectedMatch.value = null; await loadMatches() } catch (error) { showToast(error.response?.data?.message || 'Unable to reject match.', 'error') } finally { decisionLoading.value = false } }
+async function resetMatch(match) { decisionLoading.value = true; try { await api.put(`/api/admin/matches/${match.id}/reset`); match.status = 'pending'; showToast('Match returned to pending review.'); selectedMatch.value = null; await loadMatches() } catch (error) { showToast(error.response?.data?.message || 'Unable to return match to pending.', 'error') } finally { decisionLoading.value = false } }
 
 onMounted(loadMatches)
 </script>
 
 <style scoped>
+* {
+    box-sizing: border-box;
+}
+
 .admin-page-body {
     min-height: calc(100vh - 60px);
-    padding: 24px;
+    padding: 28px;
     color: #eef1e5;
-    background: radial-gradient(circle at top left, rgba(80, 130, 82, 0.16), transparent 30%), #0f2112;
+    background: radial-gradient(circle at top left, rgba(80, 130, 82, .16), transparent 30%), #0f2112;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .page-header,
-.panel-card,
-.metric-card {
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+.panel-card {
+    max-width: 1440px;
+    margin-inline: auto;
 }
 
 .page-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 20px;
-    padding: 20px 22px;
-    border-radius: 20px;
+    gap: 24px;
     margin-bottom: 18px;
 }
 
-.page-kicker {
-    margin: 0 0 8px;
-    color: #c1b37a;
-    font-size: 0.78rem;
-    letter-spacing: 0.18em;
+.page-kicker,
+.modal-kicker {
+    margin: 0 0 7px;
+    color: #d2b45d;
+    font-size: .7rem;
+    font-weight: 800;
+    letter-spacing: .14em;
     text-transform: uppercase;
 }
 
 .page-header h1 {
-    margin: 0;
-    font-size: clamp(1.9rem, 3vw, 2.6rem);
+    margin: 0 0 8px;
     color: #fbf7eb;
+    font-size: clamp(1.6rem, 3vw, 2.35rem);
+    line-height: 1.2;
 }
 
 .page-copy {
-    margin: 8px 0 0;
-    max-width: 720px;
-    color: #bcc0a7;
-    line-height: 1.6;
+    max-width: 660px;
+    margin: 0;
+    color: #b9c3b0;
+    font-size: .88rem;
+    line-height: 1.5;
 }
 
-.primary-button,
-.chip-button {
-    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.search-field {
+    position: relative;
+    display: block;
+    width: min(330px, 100%);
+}
+
+.search-field svg {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    width: 16px;
+    height: 16px;
+    transform: translateY(-50%);
+    fill: none;
+    stroke: #6f7d70;
+    stroke-width: 1.8;
+}
+
+.search-field input {
+    width: 100%;
+    height: 42px;
+    padding: 0 12px 0 37px;
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 7px;
+    outline: none;
+    background: rgba(14, 29, 18, .95);
+    color: #eef1e5;
+    font: inherit;
+    font-size: .76rem;
+}
+
+.search-field input::placeholder {
+    color: #829083;
+}
+
+.search-field input:focus,
+select:focus,
+button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(196, 157, 59, .2);
+}
+
+button {
+    font: inherit;
+    cursor: pointer;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: .5;
 }
 
 .primary-button {
-    border: none;
-    border-radius: 14px;
-    padding: 0.86rem 1.2rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 42px;
+    padding: 0 14px;
+    border-radius: 7px;
     background: #c49d3b;
     color: #131b10;
-    font-weight: 700;
-    cursor: pointer;
-    min-width: 168px;
+    font-size: .74rem;
+    font-weight: 800;
+    white-space: nowrap;
 }
 
-.primary-button:hover,
-.chip-button:hover {
-    transform: translateY(-1px);
-}
-
-.metric-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
-    margin-bottom: 18px;
-}
-
-.metric-card {
-    padding: 18px;
-    border-radius: 18px;
-}
-
-.metric-label {
-    display: block;
-    margin-bottom: 10px;
-    color: #b8be9d;
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-}
-
-.metric-value {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 1.8rem;
-    color: #fbf7eb;
-}
-
-.metric-card small {
-    color: #9fa58d;
-}
-
-.panel-card {
-    padding: 18px;
-    border-radius: 20px;
+.primary-button svg {
+    width: 15px;
+    height: 15px;
 }
 
 .toolbar-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 16px;
+    gap: 18px;
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, .08);
 }
 
-.search-field {
-    width: min(420px, 100%);
-}
-
-.search-field input {
-    width: 100%;
-    padding: 0.9rem 1rem;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(14, 29, 18, 0.95);
-    color: #eef1e5;
-}
-
-.search-field input:focus,
-.chip-button:focus-visible,
-.primary-button:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 4px rgba(196, 157, 59, 0.18);
-}
-
-.chip-row {
+.status-tabs {
     display: flex;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 8px;
+    background: rgba(8, 25, 14, .32);
+}
+
+.status-tab {
+    min-height: 34px;
+    padding: 0 13px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: #aebeaF;
+    font-size: .72rem;
+    font-weight: 750;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .16s ease, border-color .16s ease, color .16s ease;
+}
+
+.status-tab:hover {
+    color: #f0d98b;
+    background: rgba(255, 255, 255, .06);
+}
+
+.status-tab.active {
+    border-color: rgba(196, 157, 59, .42);
+    background: rgba(196, 157, 59, .18);
+    color: #f6d982;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .14);
+}
+
+.score-filter {
+    display: flex;
+    align-items: center;
     gap: 8px;
 }
 
-.chip-button {
-    padding: 0.7rem 0.95rem;
+.score-filter span {
+    color: #9eae9f;
+    font-size: .7rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.match-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.match-card {
+    min-width: 0;
+    padding: 15px;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 9px;
+    background: linear-gradient(140deg, #206b3a, #1a4d2e);
+    box-shadow: 0 7px 18px rgba(0, 0, 0, .13);
+    transition: transform .18s ease, border-color .18s ease;
+}
+
+.match-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(196, 157, 59, .35);
+}
+
+.match-card-header,
+.match-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.match-card-header {
+    margin-bottom: 14px;
+}
+
+.match-id {
+    color: #c9cebb;
+    font-size: .68rem;
+    font-weight: 800;
+}
+
+.status-badge {
+    padding: 4px 8px;
     border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.04);
-    color: #dde2c9;
-    cursor: pointer;
+    font-size: .6rem;
+    font-weight: 800;
+    text-transform: uppercase;
 }
 
-.chip-button.active {
-    background: rgba(196, 157, 59, 0.16);
-    border-color: rgba(196, 157, 59, 0.38);
-    color: #f6cf77;
+.status-badge.pending {
+    background: rgba(196, 157, 59, .16);
+    color: #f0d98b;
 }
 
-.table-shell {
-    border-radius: 16px;
+.status-badge.confirmed {
+    background: rgba(34, 197, 94, .16);
+    color: #86efac;
+}
+
+.status-badge.rejected {
+    background: rgba(220, 38, 38, .14);
+    color: #ffaaa5;
+}
+
+.report-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+}
+
+.report-preview {
+    min-width: 0;
+}
+
+.report-label {
+    display: block;
+    margin-bottom: 7px;
+    color: #9fc1a6;
+    font-size: .61rem;
+    font-weight: 800;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+}
+
+.report-preview img {
+    display: block;
+    width: 100%;
+    height: 105px;
+    margin-bottom: 9px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: #102316;
+    transition: transform .2s ease;
+}
+
+.report-preview img:hover {
+    transform: scale(1.025);
+}
+
+.report-preview .image-placeholder {
+    display: grid;
+    width: 100%;
+    height: 105px;
+    margin-bottom: 9px;
+    place-items: center;
+    border: 1px dashed rgba(255, 255, 255, .16);
+    border-radius: 6px;
+    background: rgba(8, 25, 14, .28);
+    color: #9eae9f;
+    font-size: .62rem;
+}
+
+.report-preview h3 {
     overflow: hidden;
+    margin: 0 0 4px;
+    color: #fbf7eb;
+    font-size: .8rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.empty-state-card {
-    padding: 42px 18px;
+.report-preview p,
+.report-preview small {
+    display: block;
+    overflow: hidden;
+    margin: 0 0 3px;
+    color: #c0d0c1;
+    font-size: .64rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.report-preview small {
+    color: #98ad9d;
+}
+
+.analysis-column {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    min-height: 150px;
+    padding: 7px;
+    border-inline: 1px solid rgba(255, 255, 255, .08);
     text-align: center;
-    border: 1px dashed rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.03);
 }
 
-.empty-state-card h2 {
-    margin: 0 0 10px;
-    font-size: 1.2rem;
+.analysis-label,
+.confidence-label {
+    color: #9eae9f;
+    font-size: .58rem;
+}
+
+.score-value {
+    display: block;
+    margin: 7px 0 3px;
+    font-size: 1.7rem;
+    line-height: 1;
+}
+
+.score-value.high,
+.analysis-score strong.high {
+    color: #86efac;
+}
+
+.score-value.medium,
+.analysis-score strong.medium {
+    color: #f0d98b;
+}
+
+.score-value.low,
+.analysis-score strong.low {
+    color: #c4cbc4;
+}
+
+.confidence-label {
+    font-weight: 750;
+}
+
+.match-card-footer {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, .08);
+}
+
+.source-label {
+    overflow: hidden;
+    color: #8da391;
+    font-size: .62rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.review-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 7px 0 7px 8px;
+    background: transparent;
+    color: #f0d98b;
+    font-size: .7rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.review-button svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+}
+
+.review-button:hover {
+    color: #fff;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    margin-top: 18px;
+}
+
+.pagination button {
+    min-width: 35px;
+    height: 32px;
+    padding: 0 9px;
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, .05);
+    color: #c9d5c6;
+    font-size: .68rem;
+    font-weight: 750;
+}
+
+.pagination button:first-child,
+.pagination button:last-child {
+    padding-inline: 12px;
+}
+
+.pagination button:hover:not(:disabled),
+.pagination button.active {
+    border-color: #c49d3b;
+    background: rgba(196, 157, 59, .16);
+    color: #f0d98b;
+}
+
+.empty-state {
+    display: grid;
+    min-height: 300px;
+    place-items: center;
+    align-content: center;
+    padding: 28px;
+    text-align: center;
+}
+
+.empty-icon {
+    display: grid;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 13px;
+    place-items: center;
+    border-radius: 12px;
+    background: rgba(196, 157, 59, .12);
+    color: #e7c765;
+}
+
+.empty-icon svg {
+    width: 26px;
+    height: 26px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+}
+
+.empty-state h2 {
+    margin-bottom: 7px;
     color: #f8f5e8;
+    font-size: 1rem;
 }
 
-.empty-state-card p {
+.empty-state p {
+    max-width: 460px;
     margin: 0;
-    color: #b0b59b;
+    color: #a8b59f;
+    font-size: .76rem;
+    line-height: 1.5;
+}
+
+.skeleton {
+    border-radius: 5px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, .06) 25%, rgba(255, 255, 255, .14) 50%, rgba(255, 255, 255, .06) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.3s infinite linear;
+}
+
+.skeleton-card {
+    min-height: 285px;
+    pointer-events: none;
+}
+
+.skeleton-line {
+    width: 100%;
+    height: 10px;
+    margin-bottom: 12px;
+}
+
+.skeleton-line.short {
+    width: 32%;
+}
+
+.skeleton-line.medium {
+    width: 64%;
+}
+
+.skeleton-reports {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 22px 0;
+}
+
+.skeleton-image {
+    height: 110px;
+}
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    padding: 20px;
+    place-items: center;
+    background: rgba(3, 12, 6, .8);
+    backdrop-filter: blur(5px);
+}
+
+.review-modal {
+    width: min(1000px, 100%);
+    max-height: 92vh;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, .13);
+    border-radius: 12px;
+    background: #1a4d2e;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, .48);
+}
+
+.modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, .09);
+    background: #206b3a;
+}
+
+.modal-header h2 {
+    margin: 0;
+    color: #fbf7eb;
+    font-size: 1.2rem;
+}
+
+.modal-kicker {
+    margin-bottom: 5px;
+    font-size: .62rem;
+}
+
+.icon-button {
+    width: 31px;
+    height: 31px;
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, .08);
+    color: #fff;
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.modal-body {
+    max-height: calc(92vh - 150px);
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.modal-reports {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.report-detail {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, .09);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .045);
+}
+
+.detail-heading {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 12px;
+}
+
+.detail-heading h3 {
+    margin: 0;
+    color: #f8f5e8;
+    font-size: .82rem;
+    text-transform: uppercase;
+}
+
+.report-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #e7c765;
+}
+
+.report-dot.found {
+    background: #86efac;
+}
+
+.report-detail>img {
+    width: 100%;
+    height: 170px;
+    margin-bottom: 13px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: #102316;
+}
+
+.report-detail>.image-placeholder {
+    display: grid;
+    width: 100%;
+    height: 170px;
+    margin-bottom: 13px;
+    place-items: center;
+    border: 1px dashed rgba(255, 255, 255, .16);
+    border-radius: 6px;
+    background: rgba(8, 25, 14, .28);
+    color: #9eae9f;
+    font-size: .68rem;
+}
+
+.report-detail dl {
+    display: grid;
+    gap: 9px;
+    margin: 0;
+}
+
+.report-detail dl>div {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 8px;
+}
+
+.report-detail dt {
+    color: #93a794;
+    font-size: .68rem;
+}
+
+.report-detail dd {
+    margin: 0;
+    color: #e1e7d8;
+    font-size: .7rem;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.analysis-panel {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 22px;
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid rgba(196, 157, 59, .25);
+    border-radius: 8px;
+    background: rgba(196, 157, 59, .08);
+}
+
+.analysis-score {
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    padding-right: 22px;
+    border-right: 1px solid rgba(255, 255, 255, .1);
+    text-align: center;
+}
+
+.analysis-score span,
+.analysis-score small {
+    color: #b4c1ad;
+    font-size: .68rem;
+}
+
+.analysis-score strong {
+    display: block;
+    margin: 6px 0 3px;
+    font-size: 2.15rem;
+}
+
+.analysis-score small {
+    font-weight: 750;
+}
+
+.analysis-reasons h3 {
+    margin-bottom: 10px;
+    color: #f8f5e8;
+    font-size: .78rem;
+}
+
+.analysis-reasons ul {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.analysis-reasons li {
+    color: #d8e0d5;
+    font-size: .72rem;
+}
+
+.analysis-reasons li span {
+    display: inline-grid;
+    width: 19px;
+    height: 19px;
+    margin-right: 7px;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(34, 197, 94, .16);
+    color: #86efac;
+    font-weight: 800;
+}
+
+.modal-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid rgba(255, 255, 255, .09);
+    background: #206b3a;
+}
+
+.decision-button,
+.cancel-button {
+    min-height: 38px;
+    padding: 0 14px;
+    border-radius: 6px;
+    font-size: .72rem;
+    font-weight: 800;
+}
+
+.confirm-button {
+    background: #22c55e;
+    color: #fff;
+}
+
+.reject-button {
+    background: #d84f4b;
+    color: #fff;
+}
+
+.cancel-button {
+    border: 1px solid rgba(255, 255, 255, .18);
+    background: rgba(255, 255, 255, .08);
+    color: #eef1e5;
+}
+
+.final-status {
+    margin-right: auto;
+    color: #e7c765;
+    font-size: .78rem;
+    font-weight: 800;
+}
+
+.toast {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 1100;
+    max-width: min(360px, calc(100vw - 32px));
+    padding: 12px 16px;
+    border: 1px solid rgba(255, 255, 255, .14);
+    border-radius: 7px;
+    background: #1a4d2e;
+    color: #f5f7ed;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .25);
+    font-size: .76rem;
+    font-weight: 700;
+}
+
+.toast.error {
+    border-color: rgba(220, 38, 38, .45);
+    background: #4d211f;
 }
 
 .sr-only {
@@ -364,25 +1017,104 @@ onMounted(loadMatches)
     border: 0;
 }
 
-@media (max-width: 900px) {
-    .metric-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+.modal-fade-enter-active,
+.modal-fade-leave-active,
+.toast-slide-enter-active,
+.toast-slide-leave-active {
+    transition: opacity .18s ease, transform .18s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+    opacity: 0;
+}
+
+.modal-fade-enter-from .review-modal,
+.modal-fade-leave-to .review-modal {
+    transform: translateY(10px) scale(.99);
+}
+
+.toast-slide-enter-from,
+.toast-slide-leave-to {
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+@keyframes shimmer {
+    from {
+        background-position: 200% 0;
     }
 
-    .page-header,
-    .toolbar-row {
-        flex-direction: column;
-        align-items: stretch;
+    to {
+        background-position: -200% 0;
     }
 }
 
-@media (max-width: 640px) {
-    .metric-grid {
+@media (max-width: 680px) {
+    .admin-page-body {
+        padding: 16px;
+    }
+
+    .header-actions,
+    .toolbar-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .search-field {
+        width: 100%;
+    }
+
+    .status-tabs {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .status-tab {
+        flex: 0 0 auto;
+    }
+
+    .score-filter {
+        justify-content: space-between;
+    }
+
+    .modal-overlay {
+        padding: 10px;
+    }
+
+    .modal-body {
+        padding: 14px;
+    }
+
+    .modal-reports,
+    .analysis-panel {
         grid-template-columns: 1fr;
     }
 
-    .admin-page-body {
-        padding: 16px;
+    .analysis-score {
+        padding: 0 0 14px;
+        border-right: 0;
+        border-bottom: 1px solid rgba(255, 255, 255, .1);
+    }
+
+    .modal-actions {
+        flex-wrap: wrap;
+        padding: 12px 14px;
+    }
+
+    .decision-button,
+    .cancel-button {
+        flex: 1;
+    }
+
+    .final-status {
+        width: 100%;
+        margin-right: 0;
+    }
+
+    .report-detail>img,
+    .report-detail>.image-placeholder {
+        height: 145px;
     }
 }
 </style>

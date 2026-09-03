@@ -469,7 +469,7 @@ class AdminWorkflowController extends Controller
         }
 
         $items = PotentialMatch::query()
-            ->with(['lostReport.student', 'foundReport.student'])
+            ->with(['lostReport.images', 'foundReport.images'])
             ->latest()
             ->get();
 
@@ -1257,10 +1257,37 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $match = PotentialMatch::findOrFail($id);
-        $match->update(['status' => 'confirmed']);
+        $match = PotentialMatch::with(['lostReport', 'foundReport'])->findOrFail($id);
 
-        return response()->json(['status' => 'success', 'message' => 'Potential match confirmed.', 'data' => $match]);
+        DB::transaction(function () use ($admin, $match) {
+            $match->update([
+                'status' => 'confirmed',
+                'reviewed_by_admin_id' => $admin->id,
+                'reviewed_at' => now(),
+            ]);
+
+            if ($match->lostReport?->student_id) {
+                Notification::create([
+                    'student_id' => $match->lostReport->student_id,
+                    'recipient_id' => $match->lostReport->student_id,
+                    'recipient_role' => 'student',
+                    'type' => 'lost_found_match',
+                    'title' => 'Possible Match Found!',
+                    'message' => 'A found item may match your lost report. Please review the details and confirm if this is your item.',
+                    'action' => 'view_match',
+                    'subject_type' => PotentialMatch::class,
+                    'subject_id' => $match->id,
+                    'data' => [
+                        'potential_match_id' => $match->id,
+                        'lost_report_id' => $match->lost_report_id,
+                        'found_report_id' => $match->found_report_id,
+                    ],
+                    'is_read' => false,
+                ]);
+            }
+        });
+
+        return response()->json(['status' => 'success', 'message' => 'Potential match confirmed and student notified.', 'data' => $match->fresh(['lostReport', 'foundReport'])]);
     }
 
     public function rejectPotentialMatch($id)
@@ -1275,6 +1302,24 @@ class AdminWorkflowController extends Controller
         $match->update(['status' => 'rejected']);
 
         return response()->json(['status' => 'success', 'message' => 'Potential match rejected.', 'data' => $match]);
+    }
+
+    public function resetPotentialMatch($id)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $match = PotentialMatch::findOrFail($id);
+        $match->update([
+            'status' => 'pending',
+            'reviewed_by_admin_id' => null,
+            'reviewed_at' => null,
+        ]);
+
+        return response()->json(['status' => 'success', 'message' => 'Potential match returned to pending review.', 'data' => $match->fresh()]);
     }
 
     public function approveClaim(Request $request, $id)

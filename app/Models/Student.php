@@ -8,6 +8,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\HasApiTokens;
 
+/**
+ * @property int $id
+ * @property string|null $student_id
+ * @property string|null $name
+ * @property string|null $email
+ * @property int|null $reports_count
+ */
 class Student extends Authenticatable
 {
     use HasFactory, HasApiTokens;
