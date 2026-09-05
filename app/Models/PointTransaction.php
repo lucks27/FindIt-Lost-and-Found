@@ -14,10 +14,14 @@ class PointTransaction extends Model
         'student_id',
         'amount',
         'type',
+        'direction',
+        'points',
         'description',
+        'notes',
         'reference_type',
         'reference_id',
         'created_by_admin_id',
+        'processed_by_admin_id',
     ];
 
     protected $casts = [

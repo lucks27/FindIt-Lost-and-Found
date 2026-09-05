@@ -86,6 +86,7 @@ Route::middleware(['web', 'auth:admin'])->group(function () {
     Route::put('/admin/point-rules/{id}', [App\Http\Controllers\AdminWorkflowController::class, 'updatePointRule']);
     Route::delete('/admin/point-rules/{id}', [App\Http\Controllers\AdminWorkflowController::class, 'destroyPointRule']);
     Route::get('/admin/points', [App\Http\Controllers\AdminWorkflowController::class, 'indexPointBalances']);
+    Route::put('/admin/points/{id}', [App\Http\Controllers\AdminWorkflowController::class, 'updatePointBalance']);
     Route::post('/admin/notifications/{id}/mark-read', [App\Http\Controllers\AdminWorkflowController::class, 'markAdminNotificationRead']);
 
     Route::get('/admin/notifications', [App\Http\Controllers\AdminWorkflowController::class, 'indexAdminNotifications']);

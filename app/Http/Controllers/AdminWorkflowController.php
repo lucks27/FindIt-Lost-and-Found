@@ -759,7 +759,8 @@ class AdminWorkflowController extends Controller
             ->map(function (Student $student) {
                 return [
                     'id' => $student->id,
-                    'student_id' => $student->student_id,
+                    'student_id_number' => $student->student_id_number,
+                    'profile_photo' => $student->profile_photo,
                     'name' => $student->name,
                     'email' => $student->email,
                     'recognition_points' => (int) ($student->recognition_points ?? $student->point_transactions_sum_points ?? 0),
@@ -769,6 +770,63 @@ class AdminWorkflowController extends Controller
             });
 
         return response()->json(['status' => 'success', 'data' => $students]);
+    }
+
+    public function updatePointBalance(Request $request, $id)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $validated = $request->validate([
+            'recognition_points' => 'required|integer|min:0',
+            'reward_count' => 'sometimes|integer|min:0',
+            'report_count' => 'sometimes|integer|min:0',
+        ]);
+
+        $student = Student::findOrFail($id);
+        $currentPoints = (int) $student->pointTransactions()->sum('points');
+        $targetPoints = (int) $validated['recognition_points'];
+        $difference = $targetPoints - $currentPoints;
+
+        DB::transaction(function () use ($student, $admin, $difference) {
+            if ($difference > 0) {
+                PointTransaction::create([
+                    'student_id' => $student->id,
+                    'type' => 'admin_adjustment',
+                    'direction' => 'credit',
+                    'points' => $difference,
+                    'description' => 'Recognition points adjusted by administrator.',
+                    'notes' => 'Admin points balance adjustment.',
+                    'processed_by_admin_id' => $admin->id,
+                    'created_by_admin_id' => $admin->id,
+                ]);
+            } elseif ($difference < 0) {
+                $remaining = abs($difference);
+
+                foreach ($student->pointTransactions()->where('points', '>', 0)->latest('id')->get() as $transaction) {
+                    $decrease = min($remaining, (int) $transaction->points);
+                    $transaction->decrement('points', $decrease);
+                    $remaining -= $decrease;
+
+                    if ($remaining === 0) {
+                        break;
+                    }
+                }
+            }
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'success' => true,
+            'message' => 'Student points updated successfully.',
+            'data' => [
+                'id' => $student->id,
+                'recognition_points' => $targetPoints,
+            ],
+        ]);
     }
 
     public function indexClaimReviews(Request $request)

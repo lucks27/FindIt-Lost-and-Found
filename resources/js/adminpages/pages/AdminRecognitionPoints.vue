@@ -1,76 +1,200 @@
 <template>
     <main class="admin-page-body">
+        <!-- Header -->
         <header class="page-header">
-            <div>
-                <p class="page-kicker">Recognition points</p>
-                <h1>Review point balances and activity</h1>
-                <p class="page-copy">View current recognition-point totals for students and the activity counts tied to
-                    each account.</p>
+            <div class="header-content">
+                <p class="page-kicker">Recognition System</p>
+                <h1>Student Points & Rewards Management</h1>
+                <p class="page-copy">Monitor and manage student recognition points, rewards, and report submissions</p>
             </div>
-            <button type="button" class="primary-button" @click="loadStudents">Refresh</button>
+            <button type="button" class="refresh-button" @click="loadStudents" :disabled="loading">
+                <span class="icon">↻</span> Refresh
+            </button>
         </header>
 
-        <section class="metric-grid" aria-label="Recognition points summary metrics">
-            <article class="metric-card">
-                <span class="metric-label">Students</span>
-                <strong class="metric-value">{{ metrics.total }}</strong>
-                <small>Tracked accounts</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Total balance</span>
-                <strong class="metric-value">{{ metrics.awarded }}</strong>
-                <small>Recognition points</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Reports</span>
-                <strong class="metric-value">{{ metrics.reportCount }}</strong>
-                <small>Linked submissions</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Top student</span>
-                <strong class="metric-value">{{ metrics.maxPoints }}</strong>
-                <small>Highest balance</small>
-            </article>
-        </section>
-
-        <section class="panel-card">
-            <div class="toolbar-row">
+        <!-- Students Table Section -->
+        <section class="content-section">
+            <div class="section-header">
+                <h2>Student Recognition Records</h2>
                 <label class="search-field">
-                    <span class="sr-only">Search recognition points</span>
-                    <input v-model.trim="query" type="search" placeholder="Search student or email"
-                        aria-label="Search recognition points" />
+                    <input v-model.trim="query" type="search" placeholder="🔍 Search by name or email..."
+                        aria-label="Search students" />
                 </label>
             </div>
 
-            <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
-            <div v-if="loading" class="loading-state">Loading recognition points…</div>
-            <div v-else class="table-shell">
-                <div v-if="!visibleRows.length" class="empty-state-card" role="status">
-                    <h2>No point activity to display</h2>
-                    <p>Student balances will appear here once the backend returns recognition-point totals.</p>
+            <div v-if="errorMessage" class="alert alert-error">
+                <span class="alert-icon">⚠️</span>
+                {{ errorMessage }}
+            </div>
+
+            <div v-if="loading" class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading student records…</p>
+            </div>
+
+            <div v-else class="table-container">
+                <div v-if="!visibleRows.length" class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <h3>No students found</h3>
+                    <p>Try adjusting your search criteria or refresh the data</p>
                 </div>
 
-                <table v-else class="admin-table">
+                <table v-else class="students-table">
                     <thead>
                         <tr>
-                            <th>Student</th>
-                            <th>Points</th>
-                            <th>Reward total</th>
-                            <th>Reports</th>
+                            <th class="col-student">Student</th>
+                            <th class="col-points">Points</th>
+                            <th class="col-rewards">Rewards</th>
+                            <th class="col-reports">Reports</th>
+                            <th class="col-action">Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="student in visibleRows" :key="student.id">
-                            <td>{{ student.name || student.email || 'Unnamed' }}</td>
-                            <td>{{ student.recognition_points ?? 0 }}</td>
-                            <td>{{ student.reward_count || 0 }}</td>
-                            <td>{{ student.report_count || 0 }}</td>
+                        <tr v-for="student in visibleRows" :key="student.id" class="student-row">
+                            <td class="col-student">
+                                <div class="student-info">
+                                    <div class="student-avatar">
+                                        <img v-if="getProfilePhoto(student)" :src="getProfilePhoto(student)"
+                                            :alt="student.name || 'Student'" class="avatar-image" />
+                                        <span v-else class="avatar-initials">{{ getInitials(student.name ||
+                                            student.email) }}</span>
+                                    </div>
+                                    <div>
+                                        <div class="student-name">{{ student.name || student.email || 'Unnamed' }}</div>
+                                        <div class="student-email">{{ student.email }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="col-points">
+                                <span class="badge badge-points">{{ student.recognition_points ?? 0 }}</span>
+                            </td>
+                            <td class="col-rewards">
+                                <span class="badge badge-rewards">{{ student.reward_count || 0 }}</span>
+                            </td>
+                            <td class="col-reports">
+                                <span class="badge badge-reports">{{ student.report_count || 0 }}</span>
+                            </td>
+                            <td class="col-action">
+                                <button type="button" class="btn-view" @click="openStudentModal(student)"
+                                    title="View and edit student details">
+                                    View Details
+                                </button>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </section>
     </main>
+
+    <!-- Student Details Modal -->
+    <transition name="modal">
+        <div v-if="selectedStudent" class="modal-overlay" @click.self="closeStudentModal">
+            <div class="modal-card">
+                <button type="button" class="modal-close" @click="closeStudentModal" title="Close">✕</button>
+
+                <div class="modal-header">
+                    <div class="modal-avatar-large">
+                        <img v-if="getProfilePhoto(selectedStudent)" :src="getProfilePhoto(selectedStudent)"
+                            :alt="selectedStudent.name || 'Student'" class="avatar-image-large" />
+                        <span v-else class="avatar-initials-large">{{ getInitials(selectedStudent.name ||
+                            selectedStudent.email) }}</span>
+                    </div>
+                    <div class="modal-header-info">
+                        <h2>{{ selectedStudent.name || selectedStudent.email || 'Student' }}</h2>
+                        <p class="modal-email">{{ selectedStudent.email }}</p>
+                        <p class="modal-meta">Student ID: {{ selectedStudent.student_id_number ||
+                            selectedStudent.student_id || selectedStudent.id }}</p>
+                    </div>
+                </div>
+
+                <div class="modal-body">
+                    <!-- Student Background Information -->
+                    <section class="modal-section">
+                        <h3 class="section-title">Student Background</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Student ID</label>
+                                <p>{{ selectedStudent.student_id_number || selectedStudent.student_id ||
+                                    selectedStudent.id || '—' }}</p>
+                            </div>
+                            <div class="info-item">
+                                <label>Full Name</label>
+                                <p>{{ selectedStudent.name || '—' }}</p>
+                            </div>
+                            <div class="info-item">
+                                <label>Email</label>
+                                <p>{{ selectedStudent.email || '—' }}</p>
+                            </div>
+                            <div class="info-item">
+                                <label>Course</label>
+                                <p>{{ selectedStudent.course || '—' }}</p>
+                            </div>
+                            <div class="info-item">
+                                <label>Department</label>
+                                <p>{{ selectedStudent.department || '—' }}</p>
+                            </div>
+                            <div class="info-item">
+                                <label>Year Level</label>
+                                <p>{{ selectedStudent.year_level || '—' }}</p>
+                            </div>
+                            <div class="info-item">
+                                <label>Status</label>
+                                <p>
+                                    <span class="status-badge" :class="{
+                                        'status-active': selectedStudent.status === 'active',
+                                        'status-inactive': selectedStudent.status === 'inactive'
+                                    }">
+                                        {{ selectedStudent.status || 'Unknown' }}
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Editable Points & Rewards -->
+                    <section class="modal-section">
+                        <h3 class="section-title">Recognition Metrics</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="points-input">Recognition Points</label>
+                                <input v-model.number="editForm.recognition_points" type="number" id="points-input"
+                                    class="form-input" min="0" />
+                                <small class="form-hint">Current: {{ selectedStudent.recognition_points ?? 0 }}</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="rewards-input">Reward Total</label>
+                                <input v-model.number="editForm.reward_count" type="number" id="rewards-input"
+                                    class="form-input" min="0" />
+                                <small class="form-hint">Current: {{ selectedStudent.reward_count || 0 }}</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="reports-input">Reports Submitted</label>
+                                <input v-model.number="editForm.report_count" type="number" id="reports-input"
+                                    class="form-input" min="0" />
+                                <small class="form-hint">Current: {{ selectedStudent.report_count || 0 }}</small>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Modal Actions -->
+                    <div v-if="modalMessage" class="alert" :class="modalMessageType">
+                        {{ modalMessage }}
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @click="closeStudentModal">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" @click="saveStudentChanges" :disabled="savingChanges">
+                        <span v-if="savingChanges" class="spinner-small"></span>
+                        {{ savingChanges ? 'Saving...' : 'Save Changes' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </transition>
 </template>
 
 <script setup>
@@ -81,6 +205,11 @@ const query = ref('')
 const students = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
+const selectedStudent = ref(null)
+const editForm = ref({})
+const savingChanges = ref(false)
+const modalMessage = ref('')
+const modalMessageType = ref('')
 
 const metrics = computed(() => {
     const total = students.value.length
@@ -103,6 +232,79 @@ const visibleRows = computed(() => {
     })
 })
 
+function getInitials(name) {
+    if (!name) return '?'
+    return name
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .toUpperCase()
+        .substring(0, 2)
+}
+
+function getProfilePhoto(student) {
+    const path = student?.profile_photo || student?.photo || student?.profilePhoto || student?.avatar_url
+    if (!path) return null
+    return path.startsWith('http') || path.startsWith('/') ? path : `/storage/${path}`
+}
+
+function openStudentModal(student) {
+    selectedStudent.value = student
+    editForm.value = {
+        recognition_points: student.recognition_points || 0,
+        reward_count: student.reward_count || 0,
+        report_count: student.report_count || 0,
+    }
+    modalMessage.value = ''
+}
+
+function closeStudentModal() {
+    selectedStudent.value = null
+    editForm.value = {}
+    modalMessage.value = ''
+}
+
+async function saveStudentChanges() {
+    if (!selectedStudent.value) return
+
+    savingChanges.value = true
+    modalMessage.value = ''
+    modalMessageType.value = ''
+
+    try {
+        const response = await api.put(`/api/admin/points/${selectedStudent.value.id}`, {
+            recognition_points: editForm.value.recognition_points,
+            reward_count: editForm.value.reward_count,
+            report_count: editForm.value.report_count,
+        })
+
+        if (response.data?.success) {
+            // Update the student in the list
+            const studentIndex = students.value.findIndex(s => s.id === selectedStudent.value.id)
+            if (studentIndex !== -1) {
+                students.value[studentIndex] = {
+                    ...students.value[studentIndex],
+                    recognition_points: editForm.value.recognition_points,
+                    reward_count: editForm.value.reward_count,
+                    report_count: editForm.value.report_count,
+                }
+            }
+
+            modalMessage.value = 'Student information saved successfully!'
+            modalMessageType.value = 'alert-success'
+
+            setTimeout(() => {
+                closeStudentModal()
+            }, 1500)
+        }
+    } catch (error) {
+        modalMessage.value = error.response?.data?.message || 'Failed to save changes. Please try again.'
+        modalMessageType.value = 'alert-error'
+    } finally {
+        savingChanges.value = false
+    }
+}
+
 async function loadStudents() {
     loading.value = true
     errorMessage.value = ''
@@ -121,213 +323,793 @@ onMounted(loadStudents)
 </script>
 
 <style scoped>
+:root {
+    --primary-color: #1e7e5c;
+    --primary-dark: #0d5940;
+    --primary-light: #2fa378;
+    --accent-gold: #d4a547;
+    --accent-light: #f5d88b;
+    --text-primary: #ffffff;
+    --text-secondary: #e0e0e0;
+    --text-muted: #b0b0b0;
+    --bg-light: #2a9a6f;
+    --bg-white: #1e7e5c;
+    --border-color: rgba(255, 255, 255, 0.2);
+    --border-color-light: rgba(255, 255, 255, 0.15);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.3);
+}
+
+* {
+    box-sizing: border-box;
+}
+
 .admin-page-body {
-    min-height: calc(100vh - 60px);
-    padding: 24px;
-    color: #eef1e5;
-    background: radial-gradient(circle at top left, rgba(80, 130, 82, 0.16), transparent 30%), #0f2112;
+    min-height: 100vh;
+    padding: 32px 24px;
+    color: var(--text-primary);
+    background: linear-gradient(135deg, #1a6b4f 0%, #2a9a6f 50%, #1e7e5c 100%);
 }
 
-.page-header,
-.panel-card,
-.metric-card {
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
-}
-
+/* Header */
 .page-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 20px;
-    padding: 20px 22px;
-    border-radius: 20px;
-    margin-bottom: 18px;
+    gap: 24px;
+    padding: 28px 32px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(30, 126, 92, 0.8);
+    margin-bottom: 28px;
+    box-shadow: var(--shadow-md);
+}
+
+.header-content {
+    flex: 1;
 }
 
 .page-kicker {
     margin: 0 0 8px;
-    color: #c1b37a;
-    font-size: 0.78rem;
-    letter-spacing: 0.18em;
+    color: var(--accent-gold);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
     text-transform: uppercase;
 }
 
 .page-header h1 {
-    margin: 0;
-    font-size: clamp(1.9rem, 3vw, 2.6rem);
-    color: #fbf7eb;
+    margin: 0 0 8px;
+    font-size: clamp(1.8rem, 3vw, 2.4rem);
+    font-weight: 700;
+    color: #ffffff;
 }
 
 .page-copy {
-    margin: 8px 0 0;
-    max-width: 720px;
-    color: #bcc0a7;
+    margin: 0;
+    max-width: 620px;
+    color: #e0e0e0;
     line-height: 1.6;
+    font-size: 0.95rem;
 }
 
-.primary-button,
-.chip-button {
-    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
-}
-
-.primary-button {
+.refresh-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.8rem 1.6rem;
     border: none;
-    border-radius: 14px;
-    padding: 0.86rem 1.2rem;
-    background: #c49d3b;
-    color: #131b10;
-    font-weight: 700;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent-gold), #e0b850);
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.95rem;
     cursor: pointer;
-    min-width: 154px;
+    white-space: nowrap;
+    transition: all 200ms ease;
+    box-shadow: var(--shadow-md);
 }
 
-.primary-button:hover,
-.chip-button:hover {
-    transform: translateY(-1px);
+.refresh-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
 }
 
-.metric-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
-    margin-bottom: 18px;
+.refresh-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
-.metric-card {
-    padding: 18px;
-    border-radius: 18px;
+.refresh-button .icon {
+    display: inline-block;
+    transition: transform 600ms ease;
 }
 
-.metric-label {
-    display: block;
-    margin-bottom: 10px;
-    color: #b8be9d;
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
+.refresh-button:not(:disabled):hover .icon {
+    transform: rotate(180deg);
 }
 
-.metric-value {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 1.8rem;
-    color: #fbf7eb;
+/* Content Section */
+.content-section {
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: #1e7e5c;
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
 }
 
-.metric-card small {
-    color: #9fa58d;
-}
-
-.panel-card {
-    padding: 18px;
-    border-radius: 20px;
-}
-
-.toolbar-row {
+.section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    margin-bottom: 16px;
+    padding: 24px 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(13, 89, 64, 0.6);
+}
+
+.section-header h2 {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #ffffff;
 }
 
 .search-field {
-    width: min(420px, 100%);
+    flex: 1;
+    max-width: 380px;
 }
 
 .search-field input {
     width: 100%;
-    padding: 0.9rem 1rem;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(14, 29, 18, 0.95);
-    color: #eef1e5;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(30, 126, 92, 0.5);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    transition: all 200ms ease;
 }
 
-.search-field input:focus,
-.chip-button:focus-visible,
-.primary-button:focus-visible {
+.search-field input:focus {
     outline: none;
-    box-shadow: 0 0 0 4px rgba(196, 157, 59, 0.18);
+    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(30, 126, 92, 0.7);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
 }
 
-.chip-row {
+.search-field input::placeholder {
+    color: #b0b0b0;
+}
+
+/* Alerts */
+.alert {
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin: 16px 28px 0;
     display: flex;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.95rem;
+}
+
+.alert-error {
+    background: rgba(255, 107, 107, 0.2);
+    border: 1px solid rgba(255, 107, 107, 0.4);
+    color: #ffb3b3;
+}
+
+.alert-success {
+    background: rgba(81, 207, 102, 0.2);
+    border: 1px solid rgba(81, 207, 102, 0.4);
+    color: #99f5b5;
+}
+
+.alert-icon {
+    font-size: 1.2rem;
+}
+
+/* Loading State */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 60px 28px;
+    color: var(--text-secondary);
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #f5d88b;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.spinner-small {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 8px;
+}
+
+/* Table */
+.table-container {
+    overflow-x: auto;
+}
+
+.students-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.students-table thead {
+    background: rgba(13, 89, 64, 0.6);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.students-table th {
+    padding: 16px 20px;
+    text-align: left;
+    color: #e0e0e0;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.student-row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 150ms ease;
+}
+
+.student-row:hover {
+    background: rgba(30, 126, 92, 0.3);
+}
+
+.students-table td {
+    padding: 16px 20px;
+    color: #ffffff;
+}
+
+.col-student {
+    width: 280px;
+}
+
+.col-action {
+    width: 120px;
+    text-align: center;
+}
+
+.student-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.student-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.avatar-initials {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.student-name {
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.student-email {
+    font-size: 0.85rem;
+    color: #b0b0b0;
+    margin-top: 2px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+}
+
+.badge-points {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.badge-rewards {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.badge-reports {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+.btn-view {
+    padding: 0.5rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 150ms ease;
+}
+
+.btn-view:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-1px);
+}
+
+/* Empty State */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 60px 28px;
+    text-align: center;
+}
+
+.empty-icon {
+    font-size: 3rem;
+}
+
+.empty-state h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #ffffff;
+}
+
+.empty-state p {
+    margin: 0;
+    color: #e0e0e0;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.modal-card {
+    position: relative;
+    width: 100%;
+    max-width: 700px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: #1e7e5c;
+    box-shadow: var(--shadow-lg);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 150ms ease;
+    z-index: 10;
+}
+
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: rotate(90deg);
+}
+
+.modal-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(13, 89, 64, 0.6);
+}
+
+.modal-avatar-large {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.8rem;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+}
+
+.avatar-image-large {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.avatar-initials-large {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.modal-header-info {
+    flex: 1;
+}
+
+.modal-header-info h2 {
+    margin: 0 0 4px;
+    font-size: 1.6rem;
+    color: #ffffff;
+}
+
+.modal-email {
+    margin: 0 0 2px;
+    color: #f5d88b;
+    font-weight: 500;
+}
+
+.modal-meta {
+    margin: 0;
+    color: #b0b0b0;
+    font-size: 0.85rem;
+}
+
+.modal-body {
+    padding: 28px;
+}
+
+.modal-section {
+    margin-bottom: 28px;
+}
+
+.modal-section:last-child {
+    margin-bottom: 0;
+}
+
+.section-title {
+    margin: 0 0 16px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.section-title::before {
+    content: '';
+    width: 3px;
+    height: 20px;
+    border-radius: 2px;
+    background: var(--accent-gold);
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.info-item label {
+    display: block;
+    margin-bottom: 6px;
+    color: #e0e0e0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.info-item p {
+    margin: 0;
+    color: #ffffff;
+    font-size: 0.95rem;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.status-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-inactive {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Form Grid */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 8px;
+    color: #e0e0e0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.form-input {
+    padding: 0.75rem 0.95rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(30, 126, 92, 0.5);
+    color: #ffffff;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 200ms ease;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(30, 126, 92, 0.7);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.form-input::placeholder {
+    color: #b0b0b0;
+}
+
+.form-hint {
+    margin-top: 4px;
+    color: #b0b0b0;
+    font-size: 0.75rem;
+}
+
+/* Modal Footer */
+.modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 20px 28px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(13, 89, 64, 0.4);
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 200ms ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     gap: 8px;
 }
 
-.chip-button {
-    padding: 0.7rem 0.95rem;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.04);
-    color: #dde2c9;
-    cursor: pointer;
+.btn-primary {
+    background: linear-gradient(135deg, #d4a547, #e0b850);
+    color: #1e7e5c;
+    font-weight: 700;
 }
 
-.chip-button.active {
-    background: rgba(196, 157, 59, 0.16);
-    border-color: rgba(196, 157, 59, 0.38);
-    color: #f6cf77;
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
 
-.table-shell {
-    border-radius: 16px;
-    overflow: hidden;
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
-.empty-state-card {
-    padding: 42px 18px;
-    text-align: center;
-    border: 1px dashed rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.03);
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #ffffff;
 }
 
-.empty-state-card h2 {
-    margin: 0 0 10px;
-    font-size: 1.2rem;
-    color: #f8f5e8;
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
 }
 
-.empty-state-card p {
-    margin: 0;
-    color: #b0b59b;
+/* Modal Transition */
+.modal-enter-active,
+.modal-leave-active {
+    transition: all 200ms ease;
 }
 
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
+.modal-enter-from,
+.modal-leave-to {
+    opacity: 0;
 }
 
+.modal-enter-from .modal-card {
+    transform: scale(0.95);
+}
+
+.modal-leave-to .modal-card {
+    transform: scale(1.05);
+}
+
+/* Responsive Design */
 @media (max-width: 900px) {
-    .metric-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .page-header {
+        flex-direction: column;
     }
 
-    .page-header,
-    .toolbar-row {
+    .metrics-section {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .section-header {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .search-field {
+        max-width: 100%;
+    }
+
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .col-student {
+        width: auto;
     }
 }
 
 @media (max-width: 640px) {
-    .metric-grid {
+    .admin-page-body {
+        padding: 20px 16px;
+    }
+
+    .page-header {
+        padding: 20px;
+    }
+
+    .page-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .metrics-section {
         grid-template-columns: 1fr;
     }
 
-    .admin-page-body {
+    .metric-card {
+        gap: 12px;
+    }
+
+    .section-header {
         padding: 16px;
+    }
+
+    .section-header h2 {
+        font-size: 1.1rem;
+    }
+
+    .students-table th,
+    .students-table td {
+        padding: 12px;
+        font-size: 0.85rem;
+    }
+
+    .col-action {
+        width: 100px;
+    }
+
+    .btn-view {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.75rem;
+    }
+
+    .modal-card {
+        max-width: 95vw;
+    }
+
+    .modal-header {
+        flex-direction: column;
+        text-align: center;
+        padding: 20px;
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .modal-footer {
+        flex-direction: column-reverse;
+        padding: 16px;
+    }
+
+    .btn {
+        width: 100%;
     }
 }
 </style>
