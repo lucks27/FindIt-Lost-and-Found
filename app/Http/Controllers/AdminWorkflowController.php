@@ -16,6 +16,7 @@ use App\Models\PointTransaction;
 use App\Models\PotentialMatch;
 use App\Models\Report;
 use App\Models\Student;
+use App\Models\StudentRecognitionRecord;
 use App\Models\SurrenderRequest;
 use App\Models\AdminSetting;
 use App\Models\VisiblePostedItem;
@@ -788,22 +789,45 @@ class AdminWorkflowController extends Controller
             ->withSum('pointTransactions as recognition_points', 'points')
             ->withCount('reports')
             ->latest()
-            ->get()
-            ->map(function (Student $student) {
-                return [
-                    'id' => $student->id,
-                    'student_id_number' => $student->student_id_number,
-                    'profile_photo' => $student->profile_photo,
-                    'name' => $student->name,
-                    'email' => $student->email,
-                    'recognition_points' => (int) ($student->recognition_points ?? $student->point_transactions_sum_points ?? 0),
-                    'peso_value' => round((int) ($student->recognition_points ?? $student->point_transactions_sum_points ?? 0) / self::POINTS_PER_PESO, 2),
-                    'report_count' => $student->reports_count,
-                    'reward_count' => 0,
-                ];
-            });
+            ->get();
 
-        return response()->json(['status' => 'success', 'data' => $students]);
+        $records = $students->map(function (Student $student) {
+            $recognitionPoints = (int) ($student->recognition_points ?? $student->point_transactions_sum_points ?? 0);
+
+            return [
+                'student_id' => $student->id,
+                'recognition_points' => $recognitionPoints,
+                'peso_value' => round($recognitionPoints / self::POINTS_PER_PESO, 2),
+                'reward_count' => (int) ($student->reward_count ?? 0),
+                'report_count' => (int) $student->reports_count,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        });
+
+        StudentRecognitionRecord::upsert(
+            $records->all(),
+            ['student_id'],
+            ['recognition_points', 'peso_value', 'reward_count', 'report_count', 'updated_at']
+        );
+
+        $data = $students->map(function (Student $student) {
+            $recognitionPoints = (int) ($student->recognition_points ?? $student->point_transactions_sum_points ?? 0);
+
+            return [
+                'id' => $student->id,
+                'student_id_number' => $student->student_id_number,
+                'profile_photo' => $student->profile_photo,
+                'name' => $student->name,
+                'email' => $student->email,
+                'recognition_points' => $recognitionPoints,
+                'peso_value' => round($recognitionPoints / self::POINTS_PER_PESO, 2),
+                'report_count' => $student->reports_count,
+                'reward_count' => (int) ($student->reward_count ?? 0),
+            ];
+        });
+
+        return response()->json(['status' => 'success', 'data' => $data]);
     }
 
     public function updatePointBalance(Request $request, $id)
@@ -825,7 +849,7 @@ class AdminWorkflowController extends Controller
         $targetPoints = (int) $validated['recognition_points'];
         $difference = $targetPoints - $currentPoints;
 
-        DB::transaction(function () use ($student, $admin, $difference) {
+        DB::transaction(function () use ($student, $admin, $difference, $validated) {
             if ($difference > 0) {
                 PointTransaction::create([
                     'student_id' => $student->id,
@@ -851,7 +875,22 @@ class AdminWorkflowController extends Controller
                     }
                 }
             }
+
+            if (array_key_exists('reward_count', $validated)) {
+                $student->update(['reward_count' => $validated['reward_count']]);
+            }
         });
+
+        $student->refresh();
+        StudentRecognitionRecord::updateOrCreate(
+            ['student_id' => $student->id],
+            [
+                'recognition_points' => $targetPoints,
+                'peso_value' => round($targetPoints / self::POINTS_PER_PESO, 2),
+                'reward_count' => (int) ($student->reward_count ?? 0),
+                'report_count' => $student->reports()->count(),
+            ]
+        );
 
         return response()->json([
             'status' => 'success',
@@ -861,6 +900,7 @@ class AdminWorkflowController extends Controller
                 'id' => $student->id,
                 'recognition_points' => $targetPoints,
                 'peso_value' => round($targetPoints / self::POINTS_PER_PESO, 2),
+                'reward_count' => (int) ($validated['reward_count'] ?? $student->reward_count ?? 0),
             ],
         ]);
     }

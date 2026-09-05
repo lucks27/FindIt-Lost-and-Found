@@ -70,7 +70,8 @@
                                 <span class="badge badge-points">{{ student.recognition_points ?? 0 }}</span>
                             </td>
                             <td class="col-value">
-                                ₱{{ Number(student.peso_value ?? ((Number(student.recognition_points) || 0) / 100)).toFixed(2) }}
+                                ₱{{ Number(student.peso_value ?? ((Number(student.recognition_points) || 0) /
+                                    100)).toFixed(2) }}
                             </td>
                             <td class="col-rewards">
                                 <span class="badge badge-rewards">{{ student.reward_count || 0 }}</span>
@@ -288,8 +289,9 @@ async function saveStudentChanges() {
             if (studentIndex !== -1) {
                 students.value[studentIndex] = {
                     ...students.value[studentIndex],
-                    recognition_points: editForm.value.recognition_points,
-                    reward_count: editForm.value.reward_count,
+                    recognition_points: response.data.data?.recognition_points ?? editForm.value.recognition_points,
+                    peso_value: response.data.data?.peso_value,
+                    reward_count: response.data.data?.reward_count ?? editForm.value.reward_count,
                     report_count: editForm.value.report_count,
                 }
             }

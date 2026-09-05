@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property int $id
@@ -36,6 +37,7 @@ class Student extends Authenticatable
         'year_level',
         'profile_photo',
         'status',
+        'reward_count',
     ];
 
     protected $hidden = [
@@ -51,6 +53,7 @@ class Student extends Authenticatable
     // --- ADD THIS SECTION HERE ---
     protected $casts = [
         'password' => 'hashed',
+        'reward_count' => 'integer',
     ];
     // -----------------------------
 
@@ -78,6 +81,11 @@ class Student extends Authenticatable
     public function pointTransactions(): HasMany
     {
         return $this->hasMany(PointTransaction::class);
+    }
+
+    public function recognitionRecord(): HasOne
+    {
+        return $this->hasOne(StudentRecognitionRecord::class);
     }
 
     public function deviceTokens()
