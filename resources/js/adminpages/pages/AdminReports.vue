@@ -9,64 +9,66 @@
             <button type="button" class="primary-button" @click="loadReportData">Refresh</button>
         </header>
 
-        <section class="metric-grid" aria-label="Report summary metrics">
-            <article class="metric-card">
-                <span class="metric-label">Item activity</span>
-                <strong class="metric-value">{{ metrics.totalReports }}</strong>
-                <small>Reports in workflow</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Claims processed</span>
-                <strong class="metric-value">{{ metrics.totalClaims }}</strong>
-                <small>Review records</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Returns completed</span>
-                <strong class="metric-value">{{ metrics.totalReleases }}</strong>
-                <small>Completed handovers</small>
-            </article>
-            <article class="metric-card">
-                <span class="metric-label">Points awarded</span>
-                <strong class="metric-value">{{ metrics.pointsAwarded }}</strong>
-                <small>Recognition activity</small>
-            </article>
-        </section>
-
         <section class="report-layout">
             <article class="report-card">
-                <p class="card-label">Item activity</p>
-                <strong>{{ metrics.itemTitle }}</strong>
-                <div class="stat-row">
-                    <span>Total reports</span>
-                    <strong>{{ metrics.totalReports }}</strong>
+                <div class="card-heading">
+                    <div>
+                        <p class="card-label">Workflow mix</p>
+                        <h2>Current activity balance</h2>
+                    </div>
+                    <span class="chart-badge">Live</span>
                 </div>
-                <div class="stat-row">
-                    <span>Open reports</span>
-                    <strong>{{ metrics.openReports }}</strong>
+                <div class="donut-layout">
+                    <div class="donut-chart" :style="donutStyle" role="img"
+                        :aria-label="`Workflow mix: ${metrics.totalReports} reports, ${metrics.totalClaims} claims, ${metrics.totalReleases} releases`">
+                        <div class="donut-hole">
+                            <strong>{{ workflowTotal }}</strong>
+                            <span>records</span>
+                        </div>
+                    </div>
+                    <div class="legend-list">
+                        <div v-for="item in workflowMix" :key="item.label" class="legend-item">
+                            <span class="legend-dot" :style="{ background: item.color }"></span>
+                            <span>{{ item.label }}</span>
+                            <strong>{{ item.value }}</strong>
+                        </div>
+                    </div>
                 </div>
             </article>
-            <article class="report-card">
-                <p class="card-label">Claim and release mix</p>
-                <strong>{{ metrics.claimsTitle }}</strong>
-                <div class="stat-row">
-                    <span>Total claims</span>
-                    <strong>{{ metrics.totalClaims }}</strong>
-                </div>
-                <div class="stat-row">
-                    <span>Total releases</span>
-                    <strong>{{ metrics.totalReleases }}</strong>
-                </div>
-            </article>
-            <article class="report-card wide-card">
-                <p class="card-label">Recent activity</p>
-                <strong>Latest backend updates</strong>
 
-                <div v-if="loading" class="loading-state">Loading report insights…</div>
-                <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
+            <article class="report-card">
+                <div class="card-heading">
+                    <div>
+                        <p class="card-label">Activity comparison</p>
+                        <h2>Volume by workflow</h2>
+                    </div>
+                    <span class="chart-badge">{{ workflowTotal }} total</span>
+                </div>
+                <div class="bar-chart" role="img" aria-label="Bar chart comparing workflow volume">
+                    <div v-for="item in workflowMix" :key="item.label" class="bar-column">
+                        <strong>{{ item.value }}</strong>
+                        <div class="bar-track"><span
+                                :style="{ height: `${item.height}%`, background: item.color }"></span></div>
+                        <small>{{ item.shortLabel }}</small>
+                    </div>
+                </div>
+            </article>
+
+            <article class="report-card wide-card">
+                <div class="card-heading">
+                    <div>
+                        <p class="card-label">Recent activity</p>
+                        <h2>Latest backend updates</h2>
+                    </div>
+                    <span class="activity-count">{{ recentEvents.length }} updates</span>
+                </div>
+
+                <div v-if="loading" class="loading-state">Loading report insights...</div>
+                <div v-else-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
 
                 <div v-else class="table-shell">
                     <div v-if="!recentEvents.length" class="empty-state-card" role="status">
-                        <h2>No recent events available</h2>
+                        <h3>No recent events available</h3>
                         <p>Activity summary will appear here once the backend returns data.</p>
                     </div>
                     <div v-else>
@@ -82,7 +84,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import api from '@/bootstrap'
 
 const loading = ref(false)
@@ -104,6 +106,35 @@ const metrics = ref({
 
 const recentEvents = ref([])
 
+const workflowMix = computed(() => {
+    const values = [
+        { label: 'Reports', shortLabel: 'Reports', value: metrics.value.totalReports, color: '#2a9a6f' },
+        { label: 'Claims', shortLabel: 'Claims', value: metrics.value.totalClaims, color: '#d9b45b' },
+        { label: 'Completed returns', shortLabel: 'Returns', value: metrics.value.totalReleases, color: '#8dc6ad' },
+    ]
+    const highest = Math.max(...values.map((item) => item.value), 1)
+
+    return values.map((item) => ({ ...item, height: Math.max((item.value / highest) * 100, item.value ? 8 : 0) }))
+})
+
+const workflowTotal = computed(() => workflowMix.value.reduce((sum, item) => sum + item.value, 0))
+const donutStyle = computed(() => {
+    if (!workflowTotal.value) {
+        return { background: '#174c3b' }
+    }
+
+    const total = workflowTotal.value
+    let start = 0
+    const stops = workflowMix.value.map((item) => {
+        const end = start + (item.value / total) * 360
+        const stop = `${item.color} ${start}deg ${end}deg`
+        start = end
+        return stop
+    })
+
+    return { background: `conic-gradient(${stops.join(', ')})` }
+})
+
 function formatDate(value) {
     if (!value) return '—'
     return new Date(value).toLocaleDateString()
@@ -113,9 +144,9 @@ async function loadReportData() {
     loading.value = true
     errorMessage.value = ''
     try {
-        const [dashboardResponse, claimsResponse, releasesResponse, pointsResponse] = await Promise.all([
+        const [dashboardResponse, verificationsResponse, releasesResponse, pointsResponse] = await Promise.all([
             api.get('/api/admin/dashboard'),
-            api.get('/api/admin/claims'),
+            api.get('/api/admin/verifications'),
             api.get('/api/admin/releases'),
             api.get('/api/admin/points'),
         ])
@@ -125,9 +156,10 @@ async function loadReportData() {
         const activity = dashboard.recent_activity || []
 
         reports.value = []
-        claims.value = Array.isArray(claimsResponse.data?.data) ? claimsResponse.data.data : []
+        claims.value = Array.isArray(verificationsResponse.data?.data) ? verificationsResponse.data.data : []
         releases.value = Array.isArray(releasesResponse.data?.data) ? releasesResponse.data.data : []
         students.value = Array.isArray(pointsResponse.data?.data) ? pointsResponse.data.data : []
+        const completedReleases = releases.value.filter((release) => release.status === 'released')
 
         metrics.value = {
             itemTitle: 'Report activity summary',
@@ -135,7 +167,7 @@ async function loadReportData() {
             openReports: Number(summary.open_reports || 0),
             claimsTitle: 'Claim and release summary',
             totalClaims: claims.value.length,
-            totalReleases: releases.value.length,
+            totalReleases: completedReleases.length,
             pointsAwarded: students.value.reduce((sum, student) => sum + (Number(student.recognition_points) || 0), 0),
         }
 
@@ -158,15 +190,14 @@ onMounted(loadReportData)
 .admin-page-body {
     min-height: calc(100vh - 60px);
     padding: 24px;
-    color: #eef1e5;
-    background: radial-gradient(circle at top left, rgba(80, 130, 82, 0.16), transparent 30%), #0f2112;
+    color: #eef4ef;
+    background: radial-gradient(circle at 8% 0%, rgba(42, 154, 111, 0.22), transparent 34%), #092d22;
 }
 
 .page-header,
-.report-card,
-.metric-card {
+.report-card {
     border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(13, 89, 64, 0.38);
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
 }
 
@@ -176,13 +207,13 @@ onMounted(loadReportData)
     justify-content: space-between;
     gap: 20px;
     padding: 20px 22px;
-    border-radius: 20px;
+    border-radius: 12px;
     margin-bottom: 18px;
 }
 
 .page-kicker {
     margin: 0 0 8px;
-    color: #c1b37a;
+    color: #d9b45b;
     font-size: 0.78rem;
     letter-spacing: 0.18em;
     text-transform: uppercase;
@@ -191,56 +222,24 @@ onMounted(loadReportData)
 .page-header h1 {
     margin: 0;
     font-size: clamp(1.9rem, 3vw, 2.6rem);
-    color: #fbf7eb;
+    color: #ffffff;
 }
 
 .page-copy {
     margin: 8px 0 0;
     max-width: 720px;
-    color: #bcc0a7;
+    color: #b8c8c0;
     line-height: 1.6;
 }
 
 .primary-button {
     border: none;
-    border-radius: 14px;
+    border-radius: 8px;
     padding: 0.86rem 1.2rem;
-    background: #c49d3b;
-    color: #131b10;
+    background: #d9b45b;
+    color: #092d22;
     font-weight: 700;
     cursor: pointer;
-}
-
-.metric-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
-    margin-bottom: 18px;
-}
-
-.metric-card {
-    padding: 18px;
-    border-radius: 18px;
-}
-
-.metric-label {
-    display: block;
-    margin-bottom: 10px;
-    color: #b8be9d;
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-}
-
-.metric-value {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 1.8rem;
-    color: #fbf7eb;
-}
-
-.metric-card small {
-    color: #9fa58d;
 }
 
 .report-layout {
@@ -251,7 +250,7 @@ onMounted(loadReportData)
 
 .report-card {
     padding: 20px;
-    border-radius: 20px;
+    border-radius: 12px;
 }
 
 .report-card.wide-card {
@@ -266,61 +265,129 @@ onMounted(loadReportData)
     font-size: 0.76rem;
 }
 
-.report-card strong {
-    display: block;
-    margin-bottom: 14px;
-    color: #fbf7eb;
+.card-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.card-heading h2 {
+    margin: 0 0 22px;
+    color: #ffffff;
+    font-size: 1.15rem;
+}
+
+.chart-badge,
+.activity-count {
+    padding: 5px 9px;
+    border: 1px solid rgba(217, 180, 91, 0.3);
+    border-radius: 999px;
+    color: #e8cc84;
+    font-size: 0.72rem;
+    white-space: nowrap;
+}
+
+.donut-layout {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+}
+
+.donut-chart {
+    display: grid;
+    flex: 0 0 150px;
+    place-items: center;
+    width: 150px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+}
+
+.donut-hole {
+    display: grid;
+    place-items: center;
+    width: 94px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: #0d5940;
+}
+
+.donut-hole strong {
+    margin: 18px 0 -14px;
+    color: #ffffff;
+    font-size: 1.55rem;
+}
+
+.donut-hole span {
+    color: #a9c1b5;
+    font-size: 0.72rem;
 }
 
 .bar-chart {
     display: flex;
     align-items: flex-end;
-    gap: 10px;
-    height: 150px;
+    justify-content: space-around;
+    gap: 20px;
+    height: 190px;
+    padding-top: 12px;
 }
 
-.bar-row {
-    flex: 1;
+.bar-column {
     display: flex;
+    flex: 1;
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    color: #aeb5a2;
+    height: 100%;
+    color: #c5d4cc;
     font-size: 0.78rem;
 }
 
-.bar-row i {
+.bar-column>strong {
+    color: #ffffff;
+}
+
+.bar-track {
+    display: flex;
+    align-items: flex-end;
+    width: min(64px, 100%);
+    height: 130px;
+    overflow: hidden;
+    border-radius: 6px 6px 2px 2px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.bar-track span {
     width: 100%;
-    max-width: 42px;
-    border-radius: 12px 12px 4px 4px;
-    background: linear-gradient(180deg, #d5b35b, #8c6a1e);
-    display: block;
+    min-height: 0;
+    border-radius: 6px 6px 2px 2px;
+    transition: height 0.35s ease;
 }
 
 .legend-list {
     display: grid;
     gap: 12px;
-    color: #cdd2ba;
+    min-width: 140px;
+    color: #c5d4cc;
 }
 
-.dot {
-    display: inline-block;
+.legend-item {
+    display: grid;
+    grid-template-columns: 10px 1fr auto;
+    align-items: center;
+    gap: 9px;
+    font-size: 0.88rem;
+}
+
+.legend-item strong {
+    margin: 0;
+    color: #ffffff;
+}
+
+.legend-dot {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    margin-right: 10px;
-}
-
-.dot-gold {
-    background: #c49d3b;
-}
-
-.dot-green {
-    background: #6ba56e;
-}
-
-.dot-muted {
-    background: #91a086;
 }
 
 .table-shell {
@@ -344,12 +411,10 @@ onMounted(loadReportData)
 .activity-row strong {
     margin: 0;
     font-size: 0.92rem;
-    color: #f7e2a5;
+    color: #e8cc84;
 }
 
 @media (max-width: 900px) {
-
-    .metric-grid,
     .report-layout {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -361,8 +426,6 @@ onMounted(loadReportData)
 }
 
 @media (max-width: 640px) {
-
-    .metric-grid,
     .report-layout {
         grid-template-columns: 1fr;
     }
@@ -373,6 +436,19 @@ onMounted(loadReportData)
 
     .admin-page-body {
         padding: 16px;
+    }
+
+    .donut-layout {
+        gap: 16px;
+    }
+
+    .donut-chart {
+        flex-basis: 124px;
+        width: 124px;
+    }
+
+    .donut-hole {
+        width: 78px;
     }
 }
 </style>
