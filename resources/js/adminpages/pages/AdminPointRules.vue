@@ -61,7 +61,7 @@
                 </table>
             </div>
 
-            <div v-if="pageCount > 1" class="pagination-row">
+            <div class="pagination-row">
                 <span>Showing {{ pageStart }}-{{ pageEnd }} of {{ filteredRules.length }}</span>
                 <div class="pagination-controls">
                     <button type="button" class="pagination-btn" :disabled="currentPage === 1"
@@ -443,6 +443,7 @@ button:disabled {
     width: min(520px, 100%);
     padding: 26px;
     border-radius: 16px;
+    background: #2a9a6f;
 }
 
 .modal-header {

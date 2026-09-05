@@ -51,7 +51,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="student in visibleRows" :key="student.id" class="student-row">
+                        <tr v-for="student in paginatedRows" :key="student.id" class="student-row">
                             <td class="col-student">
                                 <div class="student-info">
                                     <div class="student-avatar">
@@ -88,6 +88,20 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="pagination-row">
+                <span>Showing {{ pageStart }}-{{ pageEnd }} of {{ visibleRows.length }}</span>
+                <div class="pagination-controls">
+                    <button type="button" class="pagination-btn" :disabled="currentPage === 1"
+                        @click="currentPage--">Previous</button>
+                    <button v-for="page in pageCount" :key="page" type="button"
+                        :class="['pagination-btn', { active: page === currentPage }]" @click="currentPage = page">
+                        {{ page }}
+                    </button>
+                    <button type="button" class="pagination-btn" :disabled="currentPage === pageCount"
+                        @click="currentPage++">Next</button>
+                </div>
             </div>
         </section>
     </main>
@@ -203,7 +217,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/bootstrap'
 
 const query = ref('')
@@ -215,6 +229,8 @@ const editForm = ref({})
 const savingChanges = ref(false)
 const modalMessage = ref('')
 const modalMessageType = ref('')
+const currentPage = ref(1)
+const rowsPerPage = 10
 
 const metrics = computed(() => {
     const total = students.value.length
@@ -235,6 +251,24 @@ const visibleRows = computed(() => {
         const text = [item.name, item.email, item.recognition_points].filter(Boolean).join(' ').toLowerCase()
         return !search || text.includes(search)
     })
+})
+
+const pageCount = computed(() => Math.max(1, Math.ceil(visibleRows.value.length / rowsPerPage)))
+const paginatedRows = computed(() => visibleRows.value.slice(
+    (currentPage.value - 1) * rowsPerPage,
+    currentPage.value * rowsPerPage,
+))
+const pageStart = computed(() => visibleRows.value.length
+    ? (currentPage.value - 1) * rowsPerPage + 1
+    : 0)
+const pageEnd = computed(() => Math.min(currentPage.value * rowsPerPage, visibleRows.value.length))
+
+watch(query, () => {
+    currentPage.value = 1
+})
+
+watch(pageCount, (count) => {
+    if (currentPage.value > count) currentPage.value = count
 })
 
 function getInitials(name) {
@@ -691,6 +725,48 @@ onMounted(loadStudents)
     transform: translateY(-1px);
 }
 
+.pagination-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 28px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(13, 89, 64, 0.4);
+    color: #e0e0e0;
+    font-size: 0.88rem;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pagination-btn {
+    min-width: 38px;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.pagination-btn:hover:not(:disabled),
+.pagination-btn.active {
+    border-color: var(--accent-gold);
+    background: var(--accent-gold);
+    color: #1e7e5c;
+}
+
+.pagination-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
 /* Empty State */
 .empty-state {
     display: flex;
@@ -1073,6 +1149,12 @@ onMounted(loadStudents)
     }
 
     .section-header {
+        padding: 16px;
+    }
+
+    .pagination-row {
+        align-items: stretch;
+        flex-direction: column;
         padding: 16px;
     }
 
