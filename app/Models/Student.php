@@ -11,8 +11,10 @@ use Laravel\Sanctum\HasApiTokens;
 /**
  * @property int $id
  * @property string|null $student_id
+ * @property string|null $student_id_number
  * @property string|null $name
  * @property string|null $email
+ * @property string|null $profile_photo
  * @property int|null $reports_count
  */
 class Student extends Authenticatable

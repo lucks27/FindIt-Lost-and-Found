@@ -44,6 +44,7 @@
                         <tr>
                             <th class="col-student">Student</th>
                             <th class="col-points">Points</th>
+                            <th class="col-value">Value</th>
                             <th class="col-rewards">Rewards</th>
                             <th class="col-reports">Reports</th>
                             <th class="col-action">Action</th>
@@ -67,6 +68,9 @@
                             </td>
                             <td class="col-points">
                                 <span class="badge badge-points">{{ student.recognition_points ?? 0 }}</span>
+                            </td>
+                            <td class="col-value">
+                                ₱{{ Number(student.peso_value ?? ((Number(student.recognition_points) || 0) / 100)).toFixed(2) }}
                             </td>
                             <td class="col-rewards">
                                 <span class="badge badge-rewards">{{ student.reward_count || 0 }}</span>

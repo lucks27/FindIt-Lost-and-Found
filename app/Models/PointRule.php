@@ -6,11 +6,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string|null $category_name
+ * @property string|null $item_category
+ */
 class PointRule extends Model
 {
     use HasFactory;
 
     protected $fillable = [
+        'category_name',
         'item_category',
         'category_id',
         'base_points',

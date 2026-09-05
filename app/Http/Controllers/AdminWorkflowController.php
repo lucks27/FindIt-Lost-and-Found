@@ -24,11 +24,14 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
 
 class AdminWorkflowController extends Controller
 {
+    private const POINTS_PER_PESO = 100;
+
     public function listStudents(Request $request)
     {
         $admin = Auth::guard('admin')->user();
@@ -678,10 +681,25 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $items = PointRule::query()
-            ->with('updatedByAdmin')
+        $pointRuleQuery = PointRule::query()
+            ->with('updatedByAdmin');
+
+        if (Schema::hasColumn('point_rules', 'category_id')) {
+            $pointRuleQuery->with('category');
+        }
+
+        $items = $pointRuleQuery
             ->latest()
-            ->get();
+            ->get()
+            ->map(function (PointRule $item) {
+                $item->category_name = $item->category_name
+                    ?: $item->item_category
+                    ?: $item->category?->name;
+                $item->item_category = $item->category_name;
+                $item->active = true;
+
+                return $item;
+            });
 
         return response()->json(['status' => 'success', 'data' => $items]);
     }
@@ -695,16 +713,20 @@ class AdminWorkflowController extends Controller
         }
 
         $validated = $request->validate([
-            'item_category' => 'required|string|max:120',
+            'category_name' => 'required|string|max:120',
             'base_points' => 'required|integer|min:0',
-            'active' => 'sometimes|boolean',
         ]);
 
-        $item = PointRule::create([
+        $pointRuleData = [
             'updated_by_admin_id' => $admin->id,
-            'active' => $validated['active'] ?? true,
             ...$validated,
-        ]);
+        ];
+
+        if (Schema::hasColumn('point_rules', 'item_category')) {
+            $pointRuleData['item_category'] = $validated['category_name'];
+        }
+
+        $item = PointRule::create($pointRuleData);
 
         return response()->json(['status' => 'success', 'message' => 'Point rule created successfully.', 'data' => $item], 201);
     }
@@ -719,12 +741,23 @@ class AdminWorkflowController extends Controller
 
         $item = PointRule::findOrFail($id);
         $validated = $request->validate([
-            'item_category' => 'sometimes|required|string|max:120',
+            'category_name' => 'sometimes|required|string|max:120',
             'base_points' => 'sometimes|required|integer|min:0',
-            'active' => 'sometimes|boolean',
         ]);
 
-        $item->update($validated);
+        $pointRuleData = [
+            ...$validated,
+            ...(array_key_exists('category_name', $validated)
+                ? ['item_category' => $validated['category_name']]
+                : []),
+            'updated_by_admin_id' => $admin->id,
+        ];
+
+        if (!Schema::hasColumn('point_rules', 'item_category')) {
+            unset($pointRuleData['item_category']);
+        }
+
+        $item->update($pointRuleData);
 
         return response()->json(['status' => 'success', 'message' => 'Point rule updated successfully.', 'data' => $item]);
     }
@@ -764,6 +797,7 @@ class AdminWorkflowController extends Controller
                     'name' => $student->name,
                     'email' => $student->email,
                     'recognition_points' => (int) ($student->recognition_points ?? $student->point_transactions_sum_points ?? 0),
+                    'peso_value' => round((int) ($student->recognition_points ?? $student->point_transactions_sum_points ?? 0) / self::POINTS_PER_PESO, 2),
                     'report_count' => $student->reports_count,
                     'reward_count' => 0,
                 ];
@@ -798,6 +832,7 @@ class AdminWorkflowController extends Controller
                     'type' => 'admin_adjustment',
                     'direction' => 'credit',
                     'points' => $difference,
+                    'amount' => round($difference / self::POINTS_PER_PESO, 2),
                     'description' => 'Recognition points adjusted by administrator.',
                     'notes' => 'Admin points balance adjustment.',
                     'processed_by_admin_id' => $admin->id,
@@ -825,6 +860,7 @@ class AdminWorkflowController extends Controller
             'data' => [
                 'id' => $student->id,
                 'recognition_points' => $targetPoints,
+                'peso_value' => round($targetPoints / self::POINTS_PER_PESO, 2),
             ],
         ]);
     }
@@ -1631,7 +1667,8 @@ class AdminWorkflowController extends Controller
                     if (!$existingTransaction) {
                         PointTransaction::create([
                             'student_id' => $finder->id,
-                            'amount' => (int) ($pointRule?->base_points ?? 5),
+                            'amount' => round((int) ($pointRule?->base_points ?? 5) / self::POINTS_PER_PESO, 2),
+                            'points' => (int) ($pointRule?->base_points ?? 5),
                             'type' => 'return_completion',
                             'description' => 'Recognition points awarded for completed return.',
                             'reference_type' => ItemRelease::class,

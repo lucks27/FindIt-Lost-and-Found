@@ -25,7 +25,7 @@ class PointTransaction extends Model
     ];
 
     protected $casts = [
-        'amount' => 'integer',
+        'amount' => 'decimal:2',
     ];
 
     public function student(): BelongsTo
