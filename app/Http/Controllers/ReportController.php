@@ -144,7 +144,7 @@ class ReportController extends Controller
         }
 
         if ($status === 'pending_surrender') {
-            SurrenderRequest::create([
+            $surrender = SurrenderRequest::create([
                 'report_id' => $report->id,
                 'student_id' => $user->id,
                 'status' => 'pending',

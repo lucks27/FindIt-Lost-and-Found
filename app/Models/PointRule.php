@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string|null $category_name
  * @property string|null $item_category
+ * @property bool|null $active
+ * @property bool|null $is_active
  */
 class PointRule extends Model
 {

@@ -12,29 +12,6 @@
             </div>
         </header>
 
-        <section class="student-metrics">
-            <article class="metric-card">
-                <span>Total Students</span>
-                <strong>{{ students.length }}</strong>
-                <p>All student accounts in the directory.</p>
-            </article>
-            <article class="metric-card">
-                <span>Active Accounts</span>
-                <strong>{{ activeCount }}</strong>
-                <p>Students with active account status.</p>
-            </article>
-            <article class="metric-card">
-                <span>Inactive / Suspended</span>
-                <strong>{{ inactiveCount + suspendedCount }}</strong>
-                <p>Accounts requiring review or reactivation.</p>
-            </article>
-            <article class="metric-card">
-                <span>New Students</span>
-                <strong>{{ newStudentsCount }}</strong>
-                <p>Added in the last 7 days.</p>
-            </article>
-        </section>
-
         <section class="student-directory-card">
             <div class="directory-toolbar">
                 <div class="toolbar-row">
@@ -116,35 +93,23 @@
                         <tr>
                             <th>Student</th>
                             <th>Student ID</th>
-                            <th>Course &amp; Year</th>
                             <th>Email</th>
-                            <th>Status</th>
-                            <th>Date Added</th>
                             <th class="actions-column">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="student in paginatedStudents" :key="student.id">
                             <td class="student-cell">
-                                <span class="student-avatar">{{ studentInitials(student.name) }}</span>
+                                <img class="student-avatar" :src="studentImage(student)"
+                                    :alt="`${student.name || 'Student'} profile picture`" />
                                 <div>
                                     <div class="student-name">{{ student.name }}</div>
                                     <div class="student-subtext">{{ student.department || student.course || 'No program'
-                                        }}</div>
+                                    }}</div>
                                 </div>
                             </td>
-                            <td>{{ student.student_id || '—' }}</td>
-                            <td>
-                                <div class="table-title">{{ student.course || '—' }}</div>
-                                <div class="table-subtitle">{{ student.year_level || 'Year not set' }}</div>
-                            </td>
+                            <td>{{ studentId(student) }}</td>
                             <td>{{ student.email || '—' }}</td>
-                            <td>
-                                <span :class="['status-badge', statusClass(student.account_status)]">
-                                    {{ capitalize(student.account_status || 'active') }}
-                                </span>
-                            </td>
-                            <td>{{ formatDate(student.created_at) }}</td>
                             <td class="action-cell">
                                 <button type="button" class="icon-button" title="View details"
                                     @click="openDetailsModal(student)">
@@ -222,7 +187,7 @@
                             <span>Student ID *</span>
                             <input v-model.trim="studentForm.student_id" type="text" placeholder="e.g. 2026-00123" />
                             <span v-if="studentErrors.student_id" class="field-error">{{ studentErrors.student_id
-                                }}</span>
+                            }}</span>
                         </label>
                     </div>
 
@@ -235,7 +200,7 @@
                                 <option v-for="course in COURSES" :key="course" :value="course">{{ course }}</option>
                             </select>
                             <span v-if="studentErrors.course_base" class="field-error">{{ studentErrors.course_base
-                                }}</span>
+                            }}</span>
                         </label>
 
                         <label v-if="needsMajorSelection">
@@ -256,7 +221,7 @@
                                 </option>
                             </select>
                             <span v-if="studentErrors.concentration" class="field-error">{{ studentErrors.concentration
-                                }}</span>
+                            }}</span>
                         </label>
 
                         <label>
@@ -266,7 +231,7 @@
                                 <option v-for="year in YEAR_LEVELS" :key="year" :value="year">{{ year }}</option>
                             </select>
                             <span v-if="studentErrors.year_level" class="field-error">{{ studentErrors.year_level
-                                }}</span>
+                            }}</span>
                         </label>
 
                         <label>
@@ -276,13 +241,13 @@
                                 <option v-for="dept in DEPARTMENTS" :key="dept" :value="dept">{{ dept }}</option>
                             </select>
                             <span v-if="studentErrors.department" class="field-error">{{ studentErrors.department
-                                }}</span>
+                            }}</span>
                         </label>
                     </div>
 
                     <div class="form-section">
                         <h3>Account Information</h3>
-                        <label>
+                        <label v-if="studentModalMode === 'create'">
                             <span>Email</span>
                             <div class="email-input-row">
                                 <input v-model.trim="studentForm.emailPrefix" type="text" placeholder="username"
@@ -292,11 +257,26 @@
                             <span v-if="studentErrors.email" class="field-error">{{ studentErrors.email }}</span>
                         </label>
 
+                        <label v-else>
+                            <span>Email</span>
+                            <input :value="selectedStudent?.email || '—'" type="email" readonly class="locked-field" />
+                            <span class="field-hint">Protected and cannot be changed here.</span>
+                        </label>
+
                         <label v-if="studentModalMode === 'create'">
                             <span>Temporary password *</span>
                             <input v-model="studentForm.password" type="password" placeholder="Set password" />
                             <span v-if="studentErrors.password" class="field-error">{{ studentErrors.password }}</span>
                         </label>
+                    </div>
+
+                    <div v-if="studentModalMode === 'edit'" class="protected-student-fields">
+                        <div><span>Status</span><strong>{{ studentStatus(selectedStudent)
+                                }}</strong></div>
+                        <div><span>Created date</span><strong>{{ formatDate(selectedStudent?.created_at) }}</strong>
+                        </div>
+                        <div><span>Updated date</span><strong>{{ formatDate(selectedStudent?.updated_at) }}</strong>
+                        </div>
                     </div>
 
                     <div class="modal-actions modal-actions-full">
@@ -313,42 +293,45 @@
 
         <div v-if="showDetailsModal && selectedStudent" class="modal-overlay" @click.self="closeDetailsModal">
             <div class="modal-card modal-card-large">
-                <div class="modal-header">
-                    <div>
-                        <h2>Student Details</h2>
-                        <p class="modal-copy">Review student profile and account information in read-only mode.</p>
+                <div class="modal-header profile-modal-header">
+                    <div class="profile-heading">
+                        <img class="profile-modal-avatar" :src="studentImage(selectedStudent)"
+                            :alt="`${selectedStudent.name || 'Student'} profile picture`" />
+                        <div>
+                            <p class="modal-eyebrow">Student profile</p>
+                            <h2>{{ selectedStudent.name || 'Student details' }}</h2>
+                            <p class="modal-copy">{{ selectedStudent.email || 'No email available' }}</p>
+                        </div>
                     </div>
                     <button type="button" class="close-button" @click="closeDetailsModal" aria-label="Close">×</button>
                 </div>
 
-                <div class="details-grid">
-                    <div class="details-summary">
-                        <div class="details-avatar">{{ studentInitials(selectedStudent.name) }}</div>
-                        <h3>{{ selectedStudent.name || 'No name provided' }}</h3>
-                        <p>{{ selectedStudent.student_id || 'No student ID' }}</p>
+                <div class="details-grid profile-details-grid">
+                    <div class="detail-row"><span>School ID</span><strong>{{ studentId(selectedStudent)
+                            }}</strong></div>
+                    <div class="detail-row"><span>Status</span><strong>{{ studentStatus(selectedStudent) }}</strong>
                     </div>
-
-                    <div class="details-list">
-                        <div class="detail-row"><span>Course</span><strong>{{ selectedStudent.course || '—' }}</strong>
-                        </div>
-                        <div class="detail-row"><span>Year level</span><strong>{{ selectedStudent.year_level || '—'
-                                }}</strong></div>
-                        <div class="detail-row"><span>Department</span><strong>{{ selectedStudent.department || '—'
-                                }}</strong></div>
-                        <div class="detail-row"><span>Email</span><strong>{{ selectedStudent.email || '—' }}</strong>
-                        </div>
-                        <div class="detail-row"><span>Status</span><strong>{{ capitalize(selectedStudent.account_status
-                            || 'active') }}</strong></div>
-                        <div class="detail-row"><span>Created</span><strong>{{ formatDate(selectedStudent.created_at)
-                                }}</strong></div>
-                        <div class="detail-row"><span>Updated</span><strong>{{ formatDate(selectedStudent.updated_at)
-                                }}</strong></div>
-                        <div v-if="selectedStudent.recognition_points !== undefined" class="detail-row">
-                            <span>Recognition points</span><strong>{{ selectedStudent.recognition_points }}</strong>
-                        </div>
-                        <div v-if="selectedStudent.lost_found_summary" class="detail-row"><span>Activity
-                                summary</span><strong>{{ selectedStudent.lost_found_summary }}</strong></div>
+                    <div class="detail-row detail-row-wide"><span>Email</span><strong>{{ selectedStudent.email || '—'
+                            }}</strong></div>
+                    <div class="detail-row detail-row-wide"><span>Course</span><strong>{{ selectedStudent.course || '—'
+                            }}</strong></div>
+                    <div class="detail-row"><span>Department</span><strong>{{ selectedStudent.department || '—'
+                            }}</strong></div>
+                    <div class="detail-row"><span>Year level</span><strong>{{ selectedStudent.year_level || '—'
+                            }}</strong></div>
+                    <div class="detail-row"><span>Recognition points</span><strong>{{ recognitionPoints(selectedStudent)
+                            }}</strong></div>
+                    <div class="detail-row"><span>Peso value</span><strong>₱{{ pesoValue(selectedStudent) }}</strong>
                     </div>
+                    <div class="detail-row"><span>Created date</span><strong>{{ formatDate(selectedStudent.created_at)
+                            }}</strong></div>
+                    <div class="detail-row"><span>Updated date</span><strong>{{ formatDate(selectedStudent.updated_at)
+                            }}</strong></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="ghost-btn" @click="closeDetailsModal">Close</button>
+                    <button type="button" class="primary-action-btn"
+                        @click="closeDetailsModal(); openStudentModal('edit', selectedStudent)">Edit profile</button>
                 </div>
             </div>
         </div>
@@ -457,11 +440,35 @@ function capitalize(value) {
         .replace(/(^|\s)\S/g, (letter) => letter.toUpperCase())
 }
 
+function studentStatus(student) {
+    return capitalize(student?.account_status || student?.status || 'active')
+}
+
 function studentInitials(name) {
     if (!name) return 'S'
     const parts = name.trim().split(/\s+/)
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
     return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+}
+
+function studentImage(student) {
+    const path = student?.profile_picture || student?.profile_photo || student?.profilePhoto
+    if (!path) return '/assets/logo.png'
+    if (/^https?:\/\//i.test(path) || path.startsWith('/')) return path
+    return `/${String(path).replace(/^\/+/, '')}`
+}
+
+function studentId(student) {
+    return student?.student_id || student?.student_id_number || '—'
+}
+
+function recognitionPoints(student) {
+    return Number(student?.recognition_points ?? student?.recognitionRecord?.recognition_points ?? 0)
+}
+
+function pesoValue(student) {
+    const value = student?.peso_value ?? student?.recognitionRecord?.peso_value
+    return Number(value ?? recognitionPoints(student) / 100).toFixed(2)
 }
 
 function formatDate(value) {
@@ -546,7 +553,7 @@ const filteredStudents = computed(() => {
 
         const haystack = [
             student.name,
-            student.student_id,
+            studentId(student),
             student.email,
             student.course,
             student.year_level,
@@ -707,7 +714,7 @@ function openStudentModal(mode, student = null) {
 
         studentForm.value = {
             name: student?.name || '',
-            student_id: student?.student_id || '',
+            student_id: studentId(student) === '—' ? '' : studentId(student),
             course_base: base,
             major: maj,
             concentration: conc,
@@ -738,6 +745,55 @@ function closeStudentModal() {
         studentModalLoading.value = false
         editingStudentId.value = null
         resetStudentForm(false)
+    }
+}
+
+async function submitStudent() {
+    if (!validateStudentForm()) return
+
+    studentModalLoading.value = true
+    resetMessages()
+
+    let fullCourseName = studentForm.value.course_base
+    if (needsMajorSelection.value && studentForm.value.major) {
+        fullCourseName += ` Major in ${studentForm.value.major}`
+    } else if (needsConcentrationSelection.value && studentForm.value.concentration) {
+        fullCourseName += ` Concentration in ${studentForm.value.concentration}`
+    }
+
+    const payload = {
+        name: studentForm.value.name,
+        student_id: studentForm.value.student_id,
+        course: fullCourseName,
+        year_level: studentForm.value.year_level,
+        department: studentForm.value.department,
+    }
+
+    try {
+        let response
+        if (studentModalMode.value === 'create') {
+            response = await api.post('/api/admin/students', {
+                ...payload,
+                email: `${studentForm.value.emailPrefix}@snsu.edu.ph`,
+                password: studentForm.value.password,
+            })
+            students.value = [response.data?.data, ...students.value.filter(Boolean)]
+            statusMessage.value = response.data?.message || 'Student account created successfully.'
+        } else {
+            response = await api.put(`/api/admin/students/${editingStudentId.value}`, payload)
+            const updatedStudent = response.data?.data
+            students.value = students.value.map((student) => (
+                student.id === updatedStudent.id ? updatedStudent : student
+            ))
+            statusMessage.value = response.data?.message || 'Student record updated successfully.'
+        }
+        showStudentModal.value = false
+        editingStudentId.value = null
+        resetStudentForm(false)
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message || 'Failed to save student record.'
+    } finally {
+        studentModalLoading.value = false
     }
 }
 
@@ -810,8 +866,8 @@ onMounted(loadListData)
     min-height: 100%;
     padding: 24px 24px 32px;
     position: relative;
-    background: linear-gradient(180deg, #dff7e4 0%, #c7efd0 35%, #8ec89a 100%);
-    color: #123c2d;
+    background: linear-gradient(180deg, #081c14 0%, #0d2b1e 54%, #123d2b 100%);
+    color: #e5f3e8;
 }
 
 .student-management-page::before {
@@ -838,19 +894,19 @@ onMounted(loadListData)
     font-size: 12px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: #c7961d;
+    color: #8fdda7;
 }
 
 .page-header h1 {
     margin: 0;
     font-size: clamp(28px, 4vw, 38px);
     line-height: 1.05;
-    color: #123c2d;
+    color: #eaf7ec;
 }
 
 .page-header p {
     margin: 0;
-    color: rgba(26, 53, 43, 0.86);
+    color: rgba(229, 243, 232, 0.76);
     max-width: 760px;
 }
 
@@ -875,18 +931,18 @@ onMounted(loadListData)
 
 .primary-action-btn,
 .delete-btn {
-    background: linear-gradient(135deg, #f3d46a 0%, #d4af37 100%);
-    color: #0f2414;
-    box-shadow: 0 8px 20px rgba(212, 175, 55, 0.2);
+    background: #3d9b61;
+    color: #ffffff;
+    box-shadow: 0 8px 20px rgba(38, 120, 73, 0.18);
 }
 
 .secondary-action-btn,
 .ghost-btn,
 .pagination-btn,
 .icon-button {
-    background: rgba(10, 31, 24, 0.08);
-    color: #123c2d;
-    border: 1px solid rgba(18, 60, 45, 0.2);
+    background: rgba(222, 247, 228, 0.1);
+    color: #dff4e4;
+    border: 1px solid rgba(178, 230, 190, 0.28);
 }
 
 .secondary-action-btn,
@@ -920,50 +976,11 @@ onMounted(loadListData)
     fill: currentColor;
 }
 
-.student-metrics {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.metric-card {
-    background: linear-gradient(180deg, #1c7d57 0%, #143f34 100%);
-    border: 1px solid rgba(8, 35, 27, 0.22);
-    border-radius: 22px;
-    padding: 20px;
-    min-height: 120px;
-    display: grid;
-    gap: 10px;
-    color: #f4f8f6;
-    box-shadow: 0 18px 42px rgba(10, 57, 38, 0.18);
-}
-
-.metric-card span {
-    font-size: 12px;
-    color: #f4d46c;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-}
-
-.metric-card strong {
-    font-size: 32px;
-    color: #ffffff;
-    line-height: 1.05;
-}
-
-.metric-card p {
-    margin: 0;
-    color: rgba(244, 248, 246, 0.82);
-    font-size: 14px;
-    line-height: 1.5;
-}
-
 .student-directory-card {
-    background: linear-gradient(180deg, #2d7f5b 0%, #1c6349 100%);
-    border-radius: 28px;
-    box-shadow: 0 18px 42px rgba(10, 57, 38, 0.16);
-    border: 1px solid rgba(7, 34, 26, 0.22);
+    background: linear-gradient(145deg, #173d2b 0%, #1c5138 100%);
+    border-radius: 18px;
+    box-shadow: 0 16px 42px rgba(32, 91, 52, 0.1);
+    border: 1px solid rgba(175, 225, 186, 0.22);
     padding: 24px;
     backdrop-filter: blur(16px);
 }
@@ -991,11 +1008,11 @@ onMounted(loadListData)
 .student-form input,
 .student-form select {
     width: 100%;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 14px;
+    border: 1px solid rgba(175, 225, 186, 0.3);
+    border-radius: 10px;
     padding: 12px 14px;
-    background: rgba(10, 25, 19, 0.72);
-    color: #f4f8f6;
+    background: #0d2b1e;
+    color: #e5f3e8;
     font-size: 14px;
 }
 
@@ -1004,7 +1021,7 @@ onMounted(loadListData)
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #f4d46c;
+    color: #8fdda7;
 }
 
 .toolbar-filters {
@@ -1022,7 +1039,7 @@ onMounted(loadListData)
 }
 
 .result-count {
-    color: #f4f8f6;
+    color: #d8efdc;
     font-weight: 700;
 }
 
@@ -1036,9 +1053,9 @@ onMounted(loadListData)
     padding: 16px 18px;
     margin-bottom: 18px;
     font-weight: 700;
-    background: rgba(16, 44, 36, 0.3);
-    color: #f4f8f6;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(8, 28, 20, 0.42);
+    color: #d8efdc;
+    border: 1px solid rgba(175, 225, 186, 0.2);
 }
 
 .success-alert {
@@ -1059,9 +1076,9 @@ onMounted(loadListData)
     gap: 12px;
     align-items: center;
     padding: 28px;
-    color: #f4f8f6;
+    color: #d8efdc;
     font-weight: 700;
-    background: rgba(12, 58, 43, 0.1);
+    background: rgba(8, 28, 20, 0.22);
     border-radius: 22px;
 }
 
@@ -1076,34 +1093,34 @@ onMounted(loadListData)
 
 .empty-state-card {
     padding: 42px 24px;
-    border: 1px dashed rgba(255, 255, 255, 0.18);
+    border: 1px dashed rgba(175, 225, 186, 0.3);
     border-radius: 22px;
     text-align: center;
-    color: rgba(244, 248, 246, 0.82);
-    background: rgba(12, 58, 43, 0.1);
+    color: #b9d8bf;
+    background: rgba(8, 28, 20, 0.2);
 }
 
 .empty-state-card h3 {
     margin: 0 0 10px;
     font-size: 20px;
-    color: #f4f8f6;
+    color: #e5f3e8;
 }
 
 .empty-state-card p {
     margin: 0;
-    color: rgba(244, 248, 246, 0.8);
+    color: #a9c9b0;
 }
 
 .admin-table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 840px;
+    min-width: 720px;
 }
 
 .admin-table th,
 .admin-table td {
     padding: 16px 18px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(175, 225, 186, 0.14);
     vertical-align: middle;
 }
 
@@ -1112,12 +1129,12 @@ onMounted(loadListData)
     font-size: 12px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #f4d46c;
-    background: rgba(12, 58, 43, 0.12);
+    color: #9bdcaf;
+    background: rgba(8, 28, 20, 0.28);
 }
 
 .admin-table tbody tr:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(143, 221, 167, 0.08);
 }
 
 .student-cell {
@@ -1132,20 +1149,21 @@ onMounted(loadListData)
     border-radius: 50%;
     display: grid;
     place-items: center;
-    background: rgba(255, 255, 255, 0.1);
-    color: #f8f4ea;
+    object-fit: cover;
+    background: #245d40;
+    border: 2px solid #8fdda7;
     font-weight: 800;
 }
 
 .student-name {
     font-weight: 700;
-    color: #f4f8f6;
+    color: #e5f3e8;
 }
 
 .student-subtext {
     margin-top: 5px;
     font-size: 13px;
-    color: rgba(244, 248, 246, 0.8);
+    color: #a9c9b0;
 }
 
 .status-badge {
@@ -1161,14 +1179,14 @@ onMounted(loadListData)
 }
 
 .status-active {
-    background: rgba(34, 139, 64, 0.18);
-    color: #e3f9e8;
+    background: #d8f0dc;
+    color: #23723e;
 }
 
 .status-inactive {
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(244, 248, 246, 0.82);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: #e4eee6;
+    color: #5d7564;
+    border: 1px solid #cbded0;
 }
 
 .status-suspended {
@@ -1177,8 +1195,8 @@ onMounted(loadListData)
 }
 
 .status-pending {
-    background: rgba(246, 214, 109, 0.12);
-    color: #f3d46a;
+    background: #f2efd5;
+    color: #887126;
 }
 
 .action-cell {
@@ -1193,9 +1211,9 @@ onMounted(loadListData)
     border-radius: 14px;
     display: grid;
     place-items: center;
-    color: #f8f4ea;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #a8e8b7;
+    background: rgba(143, 221, 167, 0.1);
+    border: 1px solid rgba(175, 225, 186, 0.26);
 }
 
 .icon-button.danger {
@@ -1217,7 +1235,7 @@ onMounted(loadListData)
 }
 
 .pagination-summary {
-    color: rgba(25, 52, 42, 0.8);
+    color: rgba(229, 243, 232, 0.74);
     font-size: 14px;
 }
 
@@ -1231,28 +1249,69 @@ onMounted(loadListData)
 .pagination-btn {
     padding: 10px 14px;
     border-radius: 12px;
-    background: rgba(10, 25, 19, 0.08);
-    color: #123c2d;
+    background: rgba(222, 247, 228, 0.1);
+    color: #dff4e4;
 }
 
 .pagination-btn.active {
-    background: #f3d46a;
-    color: #0f2414;
+    background: #267849;
+    color: #ffffff;
 }
 
 .rows-per-page {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    color: #123c2d;
+    color: #dff4e4;
     font-weight: 600;
 }
 
 .rows-per-page select {
     min-width: 80px;
-    background: rgba(10, 25, 19, 0.08);
-    color: #123c2d;
-    border: 1px solid rgba(18, 60, 45, 0.2);
+    background: #0d2b1e;
+    color: #dff4e4;
+    border: 1px solid rgba(175, 225, 186, 0.28);
+}
+
+.locked-field {
+    background: #214d36 !important;
+    color: #b9d8bf !important;
+    cursor: not-allowed;
+}
+
+.field-hint {
+    color: #a9c9b0;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.protected-student-fields {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    padding: 0 24px;
+}
+
+.protected-student-fields>div {
+    display: grid;
+    gap: 6px;
+    padding: 13px;
+    border: 1px solid rgba(175, 225, 186, 0.2);
+    border-radius: 12px;
+    background: rgba(8, 28, 20, 0.26);
+}
+
+.protected-student-fields span {
+    color: #9cc6a6;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.protected-student-fields strong {
+    color: #e5f3e8;
+    font-size: 14px;
 }
 
 .modal-overlay {
@@ -1260,7 +1319,7 @@ onMounted(loadListData)
     inset: 0;
     display: grid;
     place-items: center;
-    background: rgba(10, 16, 20, 0.8);
+    background: rgba(20, 55, 32, 0.34);
     padding: 20px;
     z-index: 1200;
 }
@@ -1269,10 +1328,10 @@ onMounted(loadListData)
     width: min(900px, calc(100vw - 32px));
     max-height: calc(100vh - 40px);
     overflow: auto;
-    border-radius: 24px;
-    background: rgba(10, 16, 20, 0.95);
-    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.35);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    background: linear-gradient(145deg, #173d2b 0%, #1c5138 100%);
+    box-shadow: 0 24px 70px rgba(21, 77, 42, 0.2);
+    border: 1px solid rgba(175, 225, 186, 0.26);
 }
 
 .modal-card-large {
@@ -1285,25 +1344,25 @@ onMounted(loadListData)
     gap: 16px;
     align-items: flex-start;
     padding: 24px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(175, 225, 186, 0.18);
 }
 
 .modal-header h2 {
     margin: 0;
     font-size: 26px;
-    color: #f8f4ea;
+    color: #eaf7ec;
 }
 
 .modal-copy {
     margin: 0.25rem 0 0;
-    color: rgba(248, 244, 234, 0.72);
+    color: #b9d8bf;
     line-height: 1.6;
 }
 
 .close-button {
     border: none;
     background: transparent;
-    color: rgba(248, 244, 234, 0.72);
+    color: #b9d8bf;
     font-size: 26px;
     line-height: 1;
     cursor: pointer;
@@ -1324,14 +1383,14 @@ onMounted(loadListData)
 .form-section h3 {
     margin: 0;
     font-size: 18px;
-    color: #f8f4ea;
+    color: #8fdda7;
 }
 
 .student-form label {
     display: grid;
     gap: 8px;
     font-weight: 700;
-    color: rgba(248, 244, 234, 0.88);
+    color: #d8efdc;
 }
 
 .email-input-row {
@@ -1348,15 +1407,15 @@ onMounted(loadListData)
     display: inline-flex;
     align-items: center;
     padding: 12px 14px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(175, 225, 186, 0.22);
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.06);
-    color: #f8f4ea;
+    background: rgba(8, 28, 20, 0.26);
+    color: #d8efdc;
     font-weight: 700;
 }
 
 .field-error {
-    color: #f4b2b7;
+    color: #b00020;
     font-size: 13px;
     margin-top: 4px;
 }
@@ -1375,9 +1434,52 @@ onMounted(loadListData)
     padding: 24px;
 }
 
+.profile-modal-header {
+    align-items: center;
+}
+
+.profile-heading {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.profile-modal-avatar {
+    width: 76px;
+    height: 76px;
+    object-fit: cover;
+    border-radius: 18px;
+    border: 2px solid #8fdda7;
+    background: #245d40;
+}
+
+.modal-eyebrow {
+    margin: 0 0 6px;
+    color: #8fdda7;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.profile-details-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.detail-row {
+    padding: 13px;
+    border: 1px solid rgba(175, 225, 186, 0.2);
+    border-radius: 12px;
+    background: rgba(8, 28, 20, 0.26);
+}
+
+.detail-row-wide {
+    grid-column: span 2;
+}
+
 .details-summary {
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(175, 225, 186, 0.2);
+    background: rgba(8, 28, 20, 0.26);
     border-radius: 22px;
     padding: 24px;
     display: grid;
@@ -1390,11 +1492,11 @@ onMounted(loadListData)
     width: 84px;
     height: 84px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
+    background: #245d40;
     display: grid;
     place-items: center;
     font-size: 28px;
-    color: #f8f4ea;
+    color: #a8e8b7;
     font-weight: 800;
     margin: 0 auto;
 }
@@ -1402,12 +1504,12 @@ onMounted(loadListData)
 .details-summary h3 {
     margin: 0;
     font-size: 22px;
-    color: #f8f4ea;
+    color: #e5f3e8;
 }
 
 .details-summary p {
     margin: 0;
-    color: rgba(248, 244, 234, 0.72);
+    color: #a9c9b0;
 }
 
 .details-list {
@@ -1421,7 +1523,7 @@ onMounted(loadListData)
 }
 
 .detail-row span {
-    color: rgba(248, 244, 234, 0.72);
+    color: #9cc6a6;
     font-size: 13px;
     font-weight: 700;
     text-transform: uppercase;
@@ -1430,7 +1532,7 @@ onMounted(loadListData)
 
 .detail-row strong {
     font-size: 15px;
-    color: #f8f4ea;
+    color: #e5f3e8;
     font-weight: 700;
 }
 
@@ -1438,20 +1540,20 @@ onMounted(loadListData)
     width: min(480px, calc(100vw - 32px));
     padding: 28px;
     border-radius: 24px;
-    background: rgba(255, 255, 255, 0.06);
+    background: linear-gradient(145deg, #173d2b 0%, #1c5138 100%);
     box-shadow: 0 24px 56px rgba(0, 0, 0, 0.28);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(175, 225, 186, 0.26);
 }
 
 .confirmation-card h3 {
     margin: 0 0 12px;
     font-size: 22px;
-    color: #f8f4ea;
+    color: #e5f3e8;
 }
 
 .confirmation-card p {
     margin: 0 0 24px;
-    color: rgba(248, 244, 234, 0.72);
+    color: #b9d8bf;
     line-height: 1.6;
 }
 
@@ -1476,7 +1578,9 @@ onMounted(loadListData)
 }
 
 @media (max-width: 880px) {
-    .student-metrics {
+
+    .profile-details-grid,
+    .protected-student-fields {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
@@ -1497,16 +1601,193 @@ onMounted(loadListData)
         grid-template-columns: 1fr;
     }
 
-    .student-metrics {
+    .admin-table {
+        min-width: 100%;
+    }
+
+    .profile-details-grid,
+    .protected-student-fields {
         grid-template-columns: 1fr;
     }
 
-    .admin-table {
-        min-width: 100%;
+    .detail-row-wide {
+        grid-column: auto;
+    }
+
+    .profile-heading {
+        align-items: flex-start;
     }
 
     .pagination-controls {
         justify-content: space-between;
     }
+}
+
+/* Match the Recognition Points emerald theme. */
+.student-management-page {
+    color: #ffffff;
+    background: linear-gradient(135deg, #1a6b4f 0%, #2a9a6f 50%, #1e7e5c 100%);
+}
+
+.page-kicker,
+.field-label {
+    color: #f5d88b;
+}
+
+.page-header h1,
+.page-header p,
+.result-count,
+.pagination-summary,
+.rows-per-page {
+    color: #ffffff;
+}
+
+.student-directory-card {
+    background: rgba(30, 126, 92, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+}
+
+.toolbar-search input,
+.toolbar-filters select,
+.student-form input,
+.student-form select,
+.rows-per-page select {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(13, 89, 64, 0.6);
+    color: #ffffff;
+}
+
+.toolbar-search input::placeholder,
+.student-form input::placeholder {
+    color: #b0b0b0;
+}
+
+.toolbar-filters select option,
+.student-form select option {
+    color: #ffffff;
+    background: #1e7e5c;
+}
+
+.admin-table th,
+.admin-table td {
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.admin-table thead th {
+    color: #ffffff;
+    background: rgba(13, 89, 64, 0.6);
+}
+
+.admin-table tbody tr:hover {
+    background: rgba(30, 126, 92, 0.3);
+}
+
+.student-name,
+.student-subtext,
+.admin-table td,
+.detail-row strong,
+.details-summary h3 {
+    color: #ffffff;
+}
+
+.student-subtext,
+.pagination-summary,
+.detail-row span,
+.details-summary p,
+.modal-copy {
+    color: #b0b0b0;
+}
+
+.student-avatar,
+.profile-modal-avatar {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(30, 126, 92, 0.5);
+}
+
+.primary-action-btn,
+.delete-btn {
+    background: linear-gradient(135deg, #d4a547, #e0b850);
+    color: #1e7e5c;
+}
+
+.secondary-action-btn,
+.ghost-btn,
+.pagination-btn,
+.icon-button {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.icon-button.danger,
+.error-alert {
+    background: rgba(255, 107, 107, 0.2);
+    color: #ffb3b3;
+    border-color: rgba(255, 107, 107, 0.4);
+}
+
+.success-alert {
+    background: rgba(81, 207, 102, 0.2);
+    color: #99f5b5;
+    border-color: rgba(81, 207, 102, 0.4);
+}
+
+.status-active {
+    background: rgba(81, 207, 102, 0.2);
+    color: #99f5b5;
+}
+
+.status-inactive,
+.status-pending {
+    background: rgba(255, 255, 255, 0.1);
+    color: #b0b0b0;
+}
+
+.modal-overlay {
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.modal-card,
+.confirmation-card {
+    background: #1e7e5c;
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.modal-header h2,
+.form-section h3,
+.confirmation-card h3 {
+    color: #ffffff;
+}
+
+.close-button,
+.modal-copy,
+.student-form label {
+    color: #e0e0e0;
+}
+
+.details-summary,
+.detail-row,
+.email-domain {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(13, 89, 64, 0.6);
+}
+
+.detail-row span {
+    color: #b0b0b0;
+}
+
+.modal-eyebrow {
+    color: #f5d88b;
+}
+
+.locked-field {
+    background: rgba(13, 89, 64, 0.6) !important;
+    color: #b0b0b0 !important;
 }
 </style>

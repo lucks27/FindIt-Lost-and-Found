@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /**
  * @property int $id
  * @property int|null $student_id
+ * @property string|null $type
+ * @property string|null $title
  * @property string|null $status
  * @property string|null $location
  * @property \Illuminate\Support\Carbon|null $created_at
