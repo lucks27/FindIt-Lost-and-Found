@@ -27,7 +27,7 @@
             <div v-if="!events.length" class="small-empty">No events have been added yet.</div>
             <div v-else class="event-list">
                 <div v-for="event in events" :key="event.id" class="event-row"><strong>{{ event.name
-                        }}</strong><span class="event-amount">₱{{ money(event.fine_amount) }}</span></div>
+                }}</strong><span class="event-amount">₱{{ money(event.fine_amount) }}</span></div>
             </div>
         </section>
 
@@ -61,7 +61,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="item in visibleRows" :key="item.id">
+                        <tr v-for="item in paginatedRows" :key="item.id">
                             <td><strong>{{ item.student_name || item.student?.name || 'Unknown student' }}</strong></td>
                             <td>{{ item.school_id || item.student?.student_id_number || item.student_id }}</td>
                             <td class="event-name">{{ item.event_name }}</td>
@@ -71,6 +71,18 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <div v-if="visibleRows.length" class="pagination-row">
+                <span>Showing {{ pageStart }}-{{ pageEnd }} of {{ visibleRows.length }} transactions</span>
+                <div class="pagination-controls">
+                    <button type="button" class="pagination-button" :disabled="currentPage === 1"
+                        @click="currentPage--">Previous</button>
+                    <button v-for="page in pageCount" :key="page" type="button"
+                        :class="['pagination-button', { active: page === currentPage }]" @click="currentPage = page">{{
+                        page }}</button>
+                    <button type="button" class="pagination-button" :disabled="currentPage === pageCount"
+                        @click="currentPage++">Next</button>
+                </div>
             </div>
         </section>
 
@@ -113,11 +125,17 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/bootstrap'
 
-const query = ref(''); const activeStatus = ref('all'); const fines = ref([]); const events = ref([]); const loading = ref(false); const savingEvent = ref(false); const errorMessage = ref(''); const eventError = ref(''); const showEventForm = ref(false); const selectedTransaction = ref(null); const eventForm = ref({ name: '', fine_amount: '' })
+const query = ref(''); const activeStatus = ref('all'); const fines = ref([]); const events = ref([]); const loading = ref(false); const savingEvent = ref(false); const errorMessage = ref(''); const eventError = ref(''); const showEventForm = ref(false); const selectedTransaction = ref(null); const eventForm = ref({ name: '', fine_amount: '' }); const currentPage = ref(1); const rowsPerPage = 5
 const visibleRows = computed(() => { const search = query.value.toLowerCase(); return fines.value.filter((item) => { const text = [item.student?.name, item.student?.student_id_number, item.event_name].filter(Boolean).join(' ').toLowerCase(); return (activeStatus.value === 'all' || String(item.status).toLowerCase() === activeStatus.value) && (!search || text.includes(search)) }) })
+const pageCount = computed(() => Math.max(1, Math.ceil(visibleRows.value.length / rowsPerPage)))
+const paginatedRows = computed(() => visibleRows.value.slice((currentPage.value - 1) * rowsPerPage, currentPage.value * rowsPerPage))
+const pageStart = computed(() => visibleRows.value.length ? (currentPage.value - 1) * rowsPerPage + 1 : 0)
+const pageEnd = computed(() => Math.min(currentPage.value * rowsPerPage, visibleRows.value.length))
+watch([query, activeStatus], () => { currentPage.value = 1 })
+watch(pageCount, (count) => { if (currentPage.value > count) currentPage.value = count })
 function money(value) { return Number(value || 0).toFixed(2) }
 function remaining(item) { return Math.max(0, Number(item.remaining_amount ?? (Number(item.original_amount || item.amount || 0) - Number(item.paid_amount || 0)))) }
 function canApprove(item) { return ['pending', 'partially paid'].includes(String(item.status).toLowerCase()) }
@@ -323,6 +341,21 @@ select:focus {
     max-width: 400px
 }
 
+.transaction-tools .search-field input {
+    border-color: #a8d8b1;
+    background: #effaf0;
+    color: #245b35;
+}
+
+.transaction-tools .search-field>span {
+    color: #d8f5de;
+}
+
+.transaction-tools .search-field input::placeholder {
+    color: #909b93;
+    opacity: 1;
+}
+
 .table-shell {
     overflow-x: auto
 }
@@ -365,6 +398,44 @@ tbody tr:hover {
     background: #e5f8e9;
     color: #145b2d;
     padding: .5rem .75rem
+}
+
+.pagination-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 18px;
+    color: #d8f5de;
+    font-size: .82rem;
+}
+
+.pagination-controls {
+    display: flex;
+    gap: 6px;
+}
+
+.pagination-button {
+    min-width: 34px;
+    border: 1px solid #83c497;
+    border-radius: 4px;
+    padding: .45rem .65rem;
+    background: #e5f8e9;
+    color: #145b2d;
+    font: inherit;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.pagination-button.active {
+    border-color: #fff;
+    background: #0d4b2d;
+    color: #fff;
+}
+
+.pagination-button:disabled {
+    cursor: not-allowed;
+    opacity: .45;
 }
 
 .small-empty,
@@ -510,6 +581,15 @@ tbody tr:hover {
 
     .detail-grid {
         grid-template-columns: 1fr
+    }
+
+    .pagination-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .pagination-controls {
+        flex-wrap: wrap;
     }
 
     .reason-detail {
