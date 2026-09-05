@@ -20,7 +20,7 @@
                 </div>
                 <div class="donut-layout">
                     <div class="donut-chart" :style="donutStyle" role="img"
-                        :aria-label="`Workflow mix: ${metrics.totalReports} reports, ${metrics.totalClaims} claims, ${metrics.totalReleases} releases`">
+                        :aria-label="`Workflow mix across pending surrender, lost reports, claims, mobile posts, potential matches, archive records, and recognition points`">
                         <div class="donut-hole">
                             <strong>{{ workflowTotal }}</strong>
                             <span>records</span>
@@ -91,16 +91,15 @@ const loading = ref(false)
 const errorMessage = ref('')
 const reports = ref([])
 const claims = ref([])
-const releases = ref([])
 const students = ref([])
 
 const metrics = ref({
-    itemTitle: 'Workflow trends',
-    totalReports: 0,
-    openReports: 0,
-    claimsTitle: 'Claims and release summary',
+    pendingSurrenders: 0,
+    pendingReports: 0,
     totalClaims: 0,
-    totalReleases: 0,
+    mobilePosts: 0,
+    potentialMatches: 0,
+    archivedItems: 0,
     pointsAwarded: 0,
 })
 
@@ -108,9 +107,13 @@ const recentEvents = ref([])
 
 const workflowMix = computed(() => {
     const values = [
-        { label: 'Reports', shortLabel: 'Reports', value: metrics.value.totalReports, color: '#2a9a6f' },
-        { label: 'Claims', shortLabel: 'Claims', value: metrics.value.totalClaims, color: '#d9b45b' },
-        { label: 'Completed returns', shortLabel: 'Returns', value: metrics.value.totalReleases, color: '#8dc6ad' },
+        { label: 'Pending surrender', shortLabel: 'Surrender', value: metrics.value.pendingSurrenders, color: '#2a9a6f' },
+        { label: 'Pending lost reports', shortLabel: 'Lost reports', value: metrics.value.pendingReports, color: '#d9b45b' },
+        { label: 'Claims', shortLabel: 'Claims', value: metrics.value.totalClaims, color: '#8dc6ad' },
+        { label: 'Posted to mobile', shortLabel: 'Mobile', value: metrics.value.mobilePosts, color: '#62b8df' },
+        { label: 'Potential matches', shortLabel: 'Matches', value: metrics.value.potentialMatches, color: '#b79ae8' },
+        { label: 'Archive records', shortLabel: 'Archive', value: metrics.value.archivedItems, color: '#e08d65' },
+        { label: 'Recognition points', shortLabel: 'Points', value: metrics.value.pointsAwarded, color: '#f1d276' },
     ]
     const highest = Math.max(...values.map((item) => item.value), 1)
 
@@ -144,10 +147,9 @@ async function loadReportData() {
     loading.value = true
     errorMessage.value = ''
     try {
-        const [dashboardResponse, verificationsResponse, releasesResponse, pointsResponse] = await Promise.all([
+        const [dashboardResponse, verificationsResponse, pointsResponse] = await Promise.all([
             api.get('/api/admin/dashboard'),
             api.get('/api/admin/verifications'),
-            api.get('/api/admin/releases'),
             api.get('/api/admin/points'),
         ])
 
@@ -157,17 +159,15 @@ async function loadReportData() {
 
         reports.value = []
         claims.value = Array.isArray(verificationsResponse.data?.data) ? verificationsResponse.data.data : []
-        releases.value = Array.isArray(releasesResponse.data?.data) ? releasesResponse.data.data : []
         students.value = Array.isArray(pointsResponse.data?.data) ? pointsResponse.data.data : []
-        const completedReleases = releases.value.filter((release) => release.status === 'released')
 
         metrics.value = {
-            itemTitle: 'Report activity summary',
-            totalReports: Number(summary.total_reports || 0),
-            openReports: Number(summary.open_reports || 0),
-            claimsTitle: 'Claim and release summary',
+            pendingSurrenders: Number(summary.pending_surrenders || 0),
+            pendingReports: Number(summary.pending_reports || 0),
             totalClaims: claims.value.length,
-            totalReleases: completedReleases.length,
+            mobilePosts: Number(summary.mobile_posts || 0),
+            potentialMatches: Number(summary.potential_matches || 0),
+            archivedItems: Number(summary.archived_items || 0),
             pointsAwarded: students.value.reduce((sum, student) => sum + (Number(student.recognition_points) || 0), 0),
         }
 

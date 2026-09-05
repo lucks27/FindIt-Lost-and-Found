@@ -1931,10 +1931,10 @@ onMounted(
 .donut-center span,
 .donut-center small {
     color:
-        rgba(18,
-            60,
-            45,
-            0.59);
+        rgba(255,
+            255,
+            255,
+            0.82);
 
     font-size:
         9px;
@@ -1951,7 +1951,7 @@ onMounted(
         3px 0;
 
     color:
-        #163f30;
+        #ffffff;
 
     font-size:
         34px;

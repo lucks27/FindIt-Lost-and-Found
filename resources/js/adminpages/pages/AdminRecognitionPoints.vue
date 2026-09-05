@@ -282,9 +282,9 @@ function getInitials(name) {
 }
 
 function getProfilePhoto(student) {
-    const path = student?.profile_photo || student?.photo || student?.profilePhoto || student?.avatar_url
+    const path = student?.profile_photo || student?.profile_picture || student?.photo || student?.profilePhoto || student?.avatar_url
     if (!path) return null
-    return path.startsWith('http') || path.startsWith('/') ? path : `/storage/${path}`
+    return path.startsWith('http') || path.startsWith('/') ? path : `/${String(path).replace(/^\/+/, '')}`
 }
 
 function openStudentModal(student) {

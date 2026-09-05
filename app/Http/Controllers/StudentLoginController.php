@@ -69,7 +69,8 @@ class StudentLoginController extends Controller
                 'course' => $student->course,
                 'year_level' => $student->year_level,
                 'department' => $student->department,
-                'profile_picture' => $student->profile_picture,
+                'profile_photo' => $student->profile_photo,
+                'profile_picture' => $student->profile_photo,
             ]
         ], 200);
     }
@@ -142,7 +143,8 @@ class StudentLoginController extends Controller
                 'course' => $student->course,
                 'year_level' => $student->year_level,
                 'department' => $student->department,
-                'profile_picture' => $student->profile_picture,
+                'profile_photo' => $student->profile_photo,
+                'profile_picture' => $student->profile_photo,
             ]
         ], 201);
     }

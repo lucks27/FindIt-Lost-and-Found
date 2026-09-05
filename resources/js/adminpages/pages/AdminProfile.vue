@@ -43,13 +43,6 @@
                             </Transition>
                         </div>
 
-                        <div class="account-note">
-                            <span class="status-dot"></span>
-                            <div>
-                                <strong>Account active</strong>
-                                <span>Super admin access enabled</span>
-                            </div>
-                        </div>
                     </div>
                 </aside>
 
@@ -450,8 +443,8 @@ async function handleLogout() {
 }
 
 .profile-avatar {
-    width: 92px;
-    height: 92px;
+    width: 150px;
+    height: 150px;
     border-radius: 50%;
     object-fit: cover;
     border: 4px solid rgba(217, 180, 91, 0.32);
@@ -480,40 +473,6 @@ async function handleLogout() {
     display: flex;
     flex-direction: column;
     gap: 12px;
-}
-
-.account-note {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 16px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    text-align: left;
-}
-
-.account-note div {
-    display: grid;
-    gap: 3px;
-}
-
-.account-note strong {
-    color: #ffffff;
-    font-size: 13px;
-}
-
-.account-note span:last-child {
-    color: #a9c1b5;
-    font-size: 12px;
-}
-
-.status-dot {
-    width: 9px;
-    height: 9px;
-    flex: 0 0 auto;
-    border-radius: 50%;
-    background: #63c18f;
-    box-shadow: 0 0 0 4px rgba(99, 193, 143, 0.14);
 }
 
 /* RIGHT COLUMN DETAILS */

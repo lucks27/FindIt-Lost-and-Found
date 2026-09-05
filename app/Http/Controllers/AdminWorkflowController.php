@@ -781,7 +781,7 @@ class AdminWorkflowController extends Controller
             'pending_verifications' => ItemVerification::where('status', 'pending')->count(),
             'mobile_posts' => Report::whereNotNull('published_at')->count(),
             'potential_matches' => PotentialMatch::where('status', 'pending')->count(),
-            'archived_items' => Report::whereIn('status', ['rejected', 'claimed', 'unclaimed', 'completed_return', 'archived'])->count(),
+            'archived_items' => ArchiveItem::whereHas('report')->count(),
             'total_claims' => ClaimReview::count(),
             'total_releases' => ItemRelease::count(),
             'points_awarded' => PointTransaction::sum('points'),

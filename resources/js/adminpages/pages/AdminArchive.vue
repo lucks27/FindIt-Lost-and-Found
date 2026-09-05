@@ -229,9 +229,9 @@ function getItemImage(item) { const image = item.item?.images?.find((entry) => e
 function getReporter(item) { return item?.student || item?.item?.student || null }
 function getStudentId(student) { return student?.student_id_number || student?.student_id || student?.id || 'Not provided' }
 function getProfilePhoto(student) {
-    const path = student?.profile_photo || student?.profilePhoto || student?.avatar_url
+    const path = student?.profile_photo || student?.profile_picture || student?.profilePhoto || student?.avatar_url
     if (!path) return null
-    return path.startsWith('http') || path.startsWith('/') ? path : `/storage/${path}`
+    return path.startsWith('http') || path.startsWith('/') ? path : `/${String(path).replace(/^\/+/, '')}`
 }
 
 async function loadArchive() {
@@ -587,6 +587,43 @@ onMounted(loadArchive)
     margin: 0;
     color: #c9d5c6;
     font-size: .78rem;
+}
+
+.reporter-avatar,
+.reporter-avatar img,
+.avatar-placeholder {
+    width: 150px;
+    height: 150px;
+    border-radius: 8px;
+}
+
+.reporter-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.reporter-avatar {
+    overflow: hidden;
+    background: #102316;
+}
+
+.reporter-avatar img {
+    display: block;
+    object-fit: cover;
+}
+
+.avatar-placeholder {
+    display: grid;
+    place-items: center;
+    color: #e8cc84;
+    background: rgba(42, 154, 111, .28);
+    font-weight: 800;
+}
+
+.reporter-meta {
+    width: 100%;
 }
 
 .detail-section {

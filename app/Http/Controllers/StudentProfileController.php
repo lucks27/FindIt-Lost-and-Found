@@ -181,13 +181,16 @@ class StudentProfileController extends Controller
             $file->move(public_path('uploads/profile_pictures'), $fileName);
 
             $student->update([
-                'profile_picture' => 'uploads/profile_pictures/' . $fileName
+                'profile_photo' => 'uploads/profile_pictures/' . $fileName
             ]);
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Profile picture updated successfully.',
-                'data' => ['profile_picture' => $student->profile_picture],
+                'data' => [
+                    'profile_photo' => $student->profile_photo,
+                    'profile_picture' => $student->profile_photo,
+                ],
             ]);
         }
 
