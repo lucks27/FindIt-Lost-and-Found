@@ -7,6 +7,8 @@ use App\Models\ArchiveItem;
 use App\Models\AuditLog;
 use App\Models\ClaimReview;
 use App\Models\EventFine;
+use App\Models\EventFineArchive;
+use App\Models\EventFineEvent;
 use App\Models\ItemCategory;
 use App\Models\ItemRelease;
 use App\Models\ItemVerification;
@@ -45,11 +47,12 @@ class AdminWorkflowController extends Controller
         }
 
         $students = Student::query()
+            ->with('recognitionRecord')
             ->latest()
             ->get()
             ->map(function (Student $student) {
                 return array_merge($student->toArray(), [
-                    'recognition_points' => 0,
+                    'recognition_points' => (int) ($student->recognitionRecord?->recognition_points ?? 0),
                 ]);
             });
 
@@ -576,14 +579,114 @@ class AdminWorkflowController extends Controller
         }
 
         $items = EventFine::query()
-            ->with(['student', 'report', 'issuedByAdmin'])
+            ->with(['student', 'event', 'report', 'issuedByAdmin'])
             ->latest()
             ->get();
+
+        if ($request->boolean('archived')) {
+            return response()->json([
+                'status' => 'success',
+                'data' => EventFineArchive::query()->with('student')->latest('paid_at')->get(),
+            ]);
+        }
+
+        $items = $items->where('status', '!=', 'paid')->values();
 
         return response()->json([
             'status' => 'success',
             'data' => $items,
         ]);
+    }
+
+    public function storeEventFine(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $validated = $request->validate([
+            'student_id' => 'required|exists:students,id',
+            'event_fine_event_id' => 'required|exists:event_fine_events,id',
+            'amount_to_pay' => 'required|numeric|min:0.01',
+            'reason' => 'nullable|string|max:2000',
+            'due_at' => 'nullable|date',
+        ]);
+
+        $event = EventFineEvent::findOrFail($validated['event_fine_event_id']);
+        $student = Student::findOrFail($validated['student_id']);
+        if ((float) $validated['amount_to_pay'] > (float) $event->fine_amount) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'The amount to pay cannot be greater than the event fine.',
+            ], 422);
+        }
+
+        $fine = EventFine::create([
+            'student_id' => $validated['student_id'],
+            'student_name' => $student->name,
+            'school_id' => $student->student_id_number,
+            'event_fine_event_id' => $event->id,
+            'event_name' => $event->name,
+            'amount' => $validated['amount_to_pay'],
+            'original_amount' => $event->fine_amount,
+            'amount_to_pay' => $validated['amount_to_pay'],
+            'paid_amount' => 0,
+            'paid' => 0,
+            'remaining_amount' => $event->fine_amount,
+            'reason' => $validated['reason'] ?? null,
+            'due_at' => $validated['due_at'] ?? null,
+            'reference_number' => 'EF-' . now()->format('ymd') . '-' . strtoupper(Str::random(6)),
+            'status' => 'pending',
+            'issued_by_admin_id' => $admin->id,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Event fine request created.',
+            'data' => $fine->load('student'),
+        ], 201);
+    }
+
+    public function indexEventFineEvents(Request $request)
+    {
+        if (!Auth::guard('admin')->user()) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => EventFineEvent::query()->where('is_active', true)->latest()->get(),
+        ]);
+    }
+
+    public function storeEventFineEvent(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'fine_amount' => 'required|numeric|min:0.01',
+        ]);
+
+        $event = EventFineEvent::firstOrCreate(
+            ['name' => $validated['name']],
+            [
+                'fine_amount' => $validated['fine_amount'],
+                'is_active' => true,
+                'created_by_admin_id' => $admin->id,
+            ]
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => $event->wasRecentlyCreated ? 'Event fine option created.' : 'Event name already exists. Existing event returned.',
+            'data' => $event,
+        ], $event->wasRecentlyCreated ? 201 : 200);
     }
 
     public function indexAdminSettings(Request $request)
@@ -1793,7 +1896,7 @@ class AdminWorkflowController extends Controller
         }
 
         $fine = EventFine::findOrFail($id);
-        $fine->update(['status' => 'approved']);
+        $fine->update(['status' => (float) $fine->remaining_amount <= 0 ? 'paid' : 'approved']);
 
         return response()->json(['status' => 'success', 'message' => 'Event fine conversion approved.', 'data' => $fine]);
     }
@@ -1810,5 +1913,46 @@ class AdminWorkflowController extends Controller
         $fine->update(['status' => 'rejected']);
 
         return response()->json(['status' => 'success', 'message' => 'Event fine conversion rejected.', 'data' => $fine]);
+    }
+
+    public function recordEventFinePayment(Request $request, $id)
+    {
+        if (!Auth::guard('admin')->user()) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $validated = $request->validate(['amount' => 'required|numeric|min:0.01']);
+        $fine = EventFine::findOrFail($id);
+        $payment = min((float) $validated['amount'], (float) $fine->remaining_amount);
+        $paidAmount = (float) $fine->paid_amount + $payment;
+        $remainingAmount = max(0, (float) $fine->original_amount - $paidAmount);
+
+        $fine->update([
+            'paid_amount' => $paidAmount,
+            'paid' => $paidAmount,
+            'remaining_amount' => $remainingAmount,
+            'status' => $remainingAmount <= 0 ? 'paid' : 'partially paid',
+        ]);
+
+        if ($remainingAmount <= 0) {
+            EventFineArchive::updateOrCreate(
+                ['event_fine_id' => $fine->id],
+                [
+                    'student_id' => $fine->student_id,
+                    'student_name' => $fine->student_name,
+                    'school_id' => $fine->school_id,
+                    'event_name' => $fine->event_name,
+                    'original_amount' => $fine->original_amount,
+                    'amount_to_pay' => $fine->amount_to_pay,
+                    'paid_amount' => $fine->paid_amount,
+                    'remaining_amount' => 0,
+                    'status' => 'paid',
+                    'reason' => $fine->reason,
+                    'paid_at' => now(),
+                ]
+            );
+        }
+
+        return response()->json(['status' => 'success', 'message' => 'Payment recorded.', 'data' => $fine->fresh()]);
     }
 }

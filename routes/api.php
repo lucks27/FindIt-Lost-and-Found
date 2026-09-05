@@ -116,11 +116,15 @@ Route::middleware(['web', 'auth:admin'])->group(function () {
 
     Route::post('/admin/event-fines/{id}/approve-conversion', [App\Http\Controllers\AdminWorkflowController::class, 'approveEventFineConversion']);
     Route::post('/admin/event-fines/{id}/reject-conversion', [App\Http\Controllers\AdminWorkflowController::class, 'rejectEventFineConversion']);
+    Route::post('/admin/event-fines', [App\Http\Controllers\AdminWorkflowController::class, 'storeEventFine']);
+    Route::post('/admin/event-fines/{id}/payment', [App\Http\Controllers\AdminWorkflowController::class, 'recordEventFinePayment']);
 
     Route::get('/admin/verifications', [App\Http\Controllers\AdminWorkflowController::class, 'indexItemVerifications']);
     Route::get('/admin/matches', [App\Http\Controllers\AdminWorkflowController::class, 'indexPotentialMatches']);
     Route::get('/admin/surrenders', [App\Http\Controllers\AdminWorkflowController::class, 'indexSurrenderRequests']);
     Route::get('/admin/event-fines', [App\Http\Controllers\AdminWorkflowController::class, 'indexEventFines']);
+    Route::get('/admin/event-fine-events', [App\Http\Controllers\AdminWorkflowController::class, 'indexEventFineEvents']);
+    Route::post('/admin/event-fine-events', [App\Http\Controllers\AdminWorkflowController::class, 'storeEventFineEvent']);
     Route::get('/admin/claims', [App\Http\Controllers\AdminWorkflowController::class, 'indexClaimReviews']);
     Route::get('/admin/releases', [App\Http\Controllers\AdminWorkflowController::class, 'indexItemReleases']);
     Route::get('/admin/settings', [App\Http\Controllers\AdminWorkflowController::class, 'indexAdminSettings']);
