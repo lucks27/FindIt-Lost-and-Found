@@ -8,7 +8,7 @@
             </div>
             <div class="header-actions">
                 <button type="button" class="secondary-button" :disabled="loading" @click="loadRules">Refresh</button>
-                <button type="button" class="primary-button" @click="openCreateModal">Add category</button>
+                <button type="button" class="primary-button" @click="openCreateModal">Add new category</button>
             </div>
         </header>
 
@@ -19,11 +19,14 @@
                     <p class="section-copy">{{ filteredRules.length }} {{ filteredRules.length === 1 ? 'category' :
                         'categories' }} configured</p>
                 </div>
-                <label class="search-field">
-                    <span class="sr-only">Search categories</span>
-                    <input v-model.trim="query" type="search" placeholder="Search categories"
-                        aria-label="Search categories" />
-                </label>
+                <div class="toolbar-actions">
+                    <label class="search-field">
+                        <span class="sr-only">Search categories</span>
+                        <input v-model.trim="query" type="search" placeholder="Search categories"
+                            aria-label="Search categories" />
+                    </label>
+                    <button type="button" class="primary-button" @click="openCreateModal">Add new category</button>
+                </div>
             </div>
 
             <div v-if="errorMessage" class="inline-alert error-alert">{{ errorMessage }}</div>
@@ -39,6 +42,7 @@
                     <thead>
                         <tr>
                             <th>Category name</th>
+                            <th>Description</th>
                             <th>Base points</th>
                             <th>Last updated by</th>
                             <th class="actions-heading">Actions</th>
@@ -48,6 +52,7 @@
                         <tr v-for="rule in paginatedRules" :key="rule.id">
                             <td><strong class="category-name">{{ rule.category_name || rule.item_category }}</strong>
                             </td>
+                            <td>{{ rule.description || 'No description' }}</td>
                             <td><span class="points-value">{{ rule.base_points }}</span> points</td>
                             <td>{{ rule.updated_by_admin?.name || 'System' }}</td>
                             <td class="action-cell">
@@ -81,13 +86,15 @@
                     <div class="modal-header">
                         <div>
                             <p class="page-kicker">{{ editRule ? 'Update rule' : 'New rule' }}</p>
-                            <h2>{{ editRule ? 'Edit point rule' : 'Add point rule' }}</h2>
+                            <h2>{{ editRule ? 'Edit point rule' : 'Add new category' }}</h2>
                         </div><button type="button" class="close-button" aria-label="Close"
                             @click="closeModal">×</button>
                     </div>
                     <p class="modal-copy">Categories remain visible until you choose to delete them.</p>
                     <label class="form-field"><span>Category name</span><input v-model.trim="form.category_name"
                             type="text" maxlength="120" placeholder="e.g. Electronics" required /></label>
+                    <label class="form-field"><span>Description</span><textarea v-model.trim="form.description" rows="3"
+                            maxlength="1000" placeholder="Describe the items in this category"></textarea></label>
                     <label class="form-field"><span>Base points</span><input v-model.number="form.base_points"
                             type="number" min="0" required /></label>
                     <div v-if="modalError" class="inline-alert error-alert">{{ modalError }}</div>
@@ -132,14 +139,14 @@ const editRule = ref(null)
 const ruleToDelete = ref(null)
 const currentPage = ref(1)
 const rowsPerPage = 10
-const form = ref({ category_name: '', base_points: 0 })
+const form = ref({ category_name: '', description: '', base_points: 0 })
 const emptyStateMessage = computed(() => rules.value.length
     ? 'Try a different search term.'
     : 'Add a category to start assigning recognition points.')
 
 const filteredRules = computed(() => {
     const search = query.value.toLowerCase()
-    return rules.value.filter((rule) => `${rule.category_name || rule.item_category} ${rule.base_points}`.toLowerCase().includes(search))
+    return rules.value.filter((rule) => `${rule.category_name || rule.item_category} ${rule.description || ''} ${rule.base_points}`.toLowerCase().includes(search))
 })
 const pageCount = computed(() => Math.max(1, Math.ceil(filteredRules.value.length / rowsPerPage)))
 const paginatedRules = computed(() => filteredRules.value.slice((currentPage.value - 1) * rowsPerPage, currentPage.value * rowsPerPage))
@@ -149,8 +156,8 @@ const pageEnd = computed(() => Math.min(currentPage.value * rowsPerPage, filtere
 watch(query, () => { currentPage.value = 1 })
 watch(pageCount, (count) => { if (currentPage.value > count) currentPage.value = count })
 
-function openCreateModal() { editRule.value = null; form.value = { category_name: '', base_points: 0 }; modalError.value = ''; showModal.value = true }
-function openEditModal(rule) { editRule.value = rule; form.value = { category_name: rule.category_name || rule.item_category || '', base_points: Number(rule.base_points) || 0 }; modalError.value = ''; showModal.value = true }
+function openCreateModal() { editRule.value = null; form.value = { category_name: '', description: '', base_points: 0 }; modalError.value = ''; showModal.value = true }
+function openEditModal(rule) { editRule.value = rule; form.value = { category_name: rule.category_name || rule.item_category || '', description: rule.category?.description || '', base_points: Number(rule.base_points) || 0 }; modalError.value = ''; showModal.value = true }
 function closeModal() { showModal.value = false; editRule.value = null }
 
 async function loadRules() {
@@ -166,7 +173,7 @@ async function saveRule() {
     saving.value = true
     const editing = Boolean(editRule.value)
     try {
-        const payload = { category_name: form.value.category_name, base_points: form.value.base_points }
+        const payload = { category_name: form.value.category_name, description: form.value.description, base_points: form.value.base_points }
         if (editing) await api.put(`/api/admin/point-rules/${editRule.value.id}`, payload)
         else await api.post('/api/admin/point-rules', payload)
         closeModal()
@@ -319,6 +326,18 @@ button:disabled {
 
 .search-field {
     width: min(360px, 100%);
+}
+
+.toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toolbar-actions .primary-button {
+    padding: .58rem .8rem;
+    font-size: .85rem;
+    white-space: nowrap;
 }
 
 .search-field input,
@@ -512,12 +531,19 @@ button:disabled {
     }
 
     .header-actions,
-    .search-field {
+    .search-field,
+    .toolbar-actions {
         width: 100%;
     }
 
-    .header-actions button {
+    .header-actions button,
+    .toolbar-actions button {
         flex: 1;
+    }
+
+    .toolbar-actions {
+        align-items: stretch;
+        flex-direction: column;
     }
 
     .admin-table {

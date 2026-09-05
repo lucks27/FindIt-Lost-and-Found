@@ -828,6 +828,7 @@ class AdminWorkflowController extends Controller
                     ?: $item->item_category
                     ?: $item->category?->name;
                 $item->item_category = $item->category_name;
+                $item->description = $item->category?->description;
                 $item->active = true;
 
                 return $item;
@@ -846,13 +847,39 @@ class AdminWorkflowController extends Controller
 
         $validated = $request->validate([
             'category_name' => 'required|string|max:120',
+            'description' => 'nullable|string|max:1000',
             'base_points' => 'required|integer|min:0',
         ]);
 
         $pointRuleData = [
             'updated_by_admin_id' => $admin->id,
-            ...$validated,
+            'category_name' => $validated['category_name'],
+            'base_points' => $validated['base_points'],
         ];
+
+        if (Schema::hasColumn('point_rules', 'category_id')) {
+            $category = ItemCategory::firstOrCreate(
+                ['slug' => Str::slug($validated['category_name'])],
+                [
+                    'name' => $validated['category_name'],
+                    'description' => $validated['description'] ?? null,
+                    'is_active' => true,
+                ]
+            );
+
+            if (array_key_exists('description', $validated)) {
+                $category->update(['description' => $validated['description']]);
+            }
+
+            if (PointRule::where('category_id', $category->id)->exists()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'A point rule already exists for this category.',
+                ], 422);
+            }
+
+            $pointRuleData['category_id'] = $category->id;
+        }
 
         if (Schema::hasColumn('point_rules', 'item_category')) {
             $pointRuleData['item_category'] = $validated['category_name'];
@@ -874,6 +901,7 @@ class AdminWorkflowController extends Controller
         $item = PointRule::findOrFail($id);
         $validated = $request->validate([
             'category_name' => 'sometimes|required|string|max:120',
+            'description' => 'sometimes|nullable|string|max:1000',
             'base_points' => 'sometimes|required|integer|min:0',
         ]);
 
@@ -887,6 +915,10 @@ class AdminWorkflowController extends Controller
 
         if (!Schema::hasColumn('point_rules', 'item_category')) {
             unset($pointRuleData['item_category']);
+        }
+
+        if (array_key_exists('description', $validated) && $item->category) {
+            $item->category->update(['description' => $validated['description']]);
         }
 
         $item->update($pointRuleData);
