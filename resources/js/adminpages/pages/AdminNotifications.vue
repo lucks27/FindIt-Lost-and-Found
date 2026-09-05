@@ -2,10 +2,9 @@
     <main class="admin-page-body">
         <header class="page-header">
             <div>
-                <p class="page-kicker">Notifications</p>
-                <h1>Track workflow alerts and message history</h1>
-                <p class="page-copy">Review the notifications emitted by the workflow and their read state in a simple
-                    inbox view.</p>
+                <p class="page-kicker">Admin notifications</p>
+                <h1>Workflow alerts</h1>
+                <p class="page-copy">Review new requests and workflow events that need admin attention.</p>
             </div>
             <button type="button" class="primary-button" @click="loadNotifications">Refresh</button>
         </header>
@@ -14,22 +13,22 @@
             <article class="metric-card">
                 <span class="metric-label">Total</span>
                 <strong class="metric-value">{{ metrics.total }}</strong>
-                <small>All notifications</small>
+                <small>Admin workflow alerts</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Unread</span>
                 <strong class="metric-value">{{ metrics.unread }}</strong>
-                <small>Needs review</small>
+                <small>New alerts</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Read</span>
                 <strong class="metric-value">{{ metrics.read }}</strong>
-                <small>Already viewed</small>
+                <small>Reviewed alerts</small>
             </article>
             <article class="metric-card">
                 <span class="metric-label">Student alerts</span>
-                <strong class="metric-value">{{ metrics.studentAlerts }}</strong>
-                <small>Workflow events</small>
+                <strong class="metric-value">{{ metrics.workflowAlerts }}</strong>
+                <small>Supported alert types</small>
             </article>
         </section>
 
@@ -37,7 +36,7 @@
             <div class="toolbar-row">
                 <label class="search-field">
                     <span class="sr-only">Search notifications</span>
-                    <input v-model.trim="query" type="search" placeholder="Search title, message, or recipient"
+                    <input v-model.trim="query" type="search" placeholder="Search title, type, or details"
                         aria-label="Search notifications" />
                 </label>
             </div>
@@ -46,53 +45,85 @@
             <div v-if="loading" class="loading-state">Loading notifications…</div>
             <div v-else class="table-shell">
                 <div v-if="!visibleRows.length" class="empty-state-card" role="status">
-                    <h2>No notification history yet</h2>
-                    <p>Workflow alerts will appear here as soon as the backend creates them.</p>
+                    <h2>No admin notifications yet</h2>
+                    <p>New pending workflow requests will appear here.</p>
                 </div>
-                <table v-else class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>Title</th>
-                            <th>Recipient</th>
-                            <th>Status</th>
-                            <th>Sent</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="item in visibleRows" :key="item.id">
-                            <td>{{ item.title || 'Untitled' }}</td>
-                            <td>{{ item.recipient_role || 'student' }}</td>
-                            <td>{{ item.is_read ? 'Read' : 'Unread' }}</td>
-                            <td>{{ formatDate(item.created_at) }}</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div v-else class="notification-groups">
+                    <section v-for="group in notificationGroups" :key="group.key" class="notification-group">
+                        <div class="group-heading">
+                            <h2>{{ group.label }}</h2>
+                            <span>{{ group.items.length }}</span>
+                        </div>
+                        <button v-for="item in group.items" :key="item.id" type="button"
+                            :class="['notification-row', { unread: !item.is_read }]" @click="openNotification(item)">
+                            <span class="notification-copy">
+                                <strong>{{ item.title || 'Untitled notification' }}</strong>
+                                <span>{{ formatType(item.notification_type || item.type) }}</span>
+                            </span>
+                            <span class="notification-meta">
+                                <span>{{ item.status || 'pending' }}</span>
+                                <time>{{ formatDate(item.created_at) }}</time>
+                            </span>
+                        </button>
+                    </section>
+                </div>
             </div>
         </section>
+
+        <div v-if="selectedNotification" class="modal-overlay" @click.self="closeNotification">
+            <article class="notification-modal" role="dialog" aria-modal="true" aria-labelledby="notification-title">
+                <button type="button" class="modal-close" aria-label="Close notification"
+                    @click="closeNotification">×</button>
+                <p class="page-kicker">{{ formatType(selectedNotification.notification_type ||
+                    selectedNotification.type) }}</p>
+                <h2 id="notification-title">{{ selectedNotification.title || 'Notification details' }}</h2>
+                <dl class="detail-list">
+                    <div>
+                        <dt>Type</dt>
+                        <dd>{{ formatType(selectedNotification.notification_type || selectedNotification.type) }}</dd>
+                    </div>
+                    <div>
+                        <dt>Status</dt>
+                        <dd>{{ selectedNotification.status || 'pending' }}</dd>
+                    </div>
+                    <div>
+                        <dt>Date and time</dt>
+                        <dd>{{ formatDate(selectedNotification.created_at) }}</dd>
+                    </div>
+                </dl>
+                <p class="notification-message">{{ selectedNotification.message || 'No additional details available.' }}
+                </p>
+                <button type="button" class="primary-button modal-action" @click="goToNotification">Go to related
+                    page</button>
+            </article>
+        </div>
     </main>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '@/bootstrap'
 
 const query = ref('')
+const router = useRouter()
 const notifications = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
+const selectedNotification = ref(null)
 
 const metrics = computed(() => {
     const total = notifications.value.length
     const unread = notifications.value.filter((item) => !item.is_read).length
     const read = total - unread
-    const studentAlerts = notifications.value.filter((item) => String(item.recipient_role || '').toLowerCase() === 'student').length
-    return { total, unread, read, studentAlerts }
+    const workflowAlerts = notifications.value.length
+    return { total, unread, read, workflowAlerts }
 })
 
 const visibleRows = computed(() => {
     const search = query.value.toLowerCase()
     return notifications.value.filter((item) => {
-        const text = [item.title, item.message, item.actor_admin?.name, item.recipient_role]
+        const text = [item.title, item.message, item.notification_type, item.type, item.status]
             .filter(Boolean)
             .join(' ')
             .toLowerCase()
@@ -100,9 +131,61 @@ const visibleRows = computed(() => {
     })
 })
 
+const notificationGroups = computed(() => [
+    { key: 'unread', label: 'Unread', items: visibleRows.value.filter((item) => !item.is_read) },
+    { key: 'read', label: 'Read', items: visibleRows.value.filter((item) => item.is_read) },
+].filter((group) => group.items.length))
+
+function formatType(value) {
+    return String(value || 'workflow alert').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
 function formatDate(value) {
     if (!value) return '—'
     return new Date(value).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+async function openNotification(item) {
+    selectedNotification.value = item
+    if (!item.is_read) {
+        try {
+            await api.post(`/api/admin/notifications/${item.id}/mark-read`)
+            item.is_read = true
+            window.dispatchEvent(new CustomEvent('admin-notifications-updated'))
+        } catch (error) {
+            errorMessage.value = 'The notification could not be marked as read.'
+        }
+    }
+}
+
+function closeNotification() {
+    selectedNotification.value = null
+}
+
+function goToNotification() {
+    const routeName = getNotificationRoute(selectedNotification.value)
+    if (routeName) {
+        router.push({ name: routeName })
+    }
+    closeNotification()
+}
+
+function getNotificationRoute(notification) {
+    if (!notification) return null
+    if (notification.link?.startsWith('superadmin.')) return notification.link
+
+    const text = [notification.notification_type, notification.type, notification.action, notification.title]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+    if (text.includes('surrender')) return 'superadmin.pending-surrender'
+    if (text.includes('report')) return 'superadmin.pending-report'
+    if (text.includes('verification')) return 'superadmin.item-verification'
+    if (text.includes('match')) return 'superadmin.matches'
+    if (text.includes('fine')) return 'superadmin.fines'
+
+    return 'superadmin.notifications'
 }
 
 async function loadNotifications() {
@@ -280,6 +363,160 @@ onMounted(loadNotifications)
 .table-shell {
     border-radius: 16px;
     overflow: hidden;
+}
+
+.notification-group+.notification-group {
+    margin-top: 24px;
+}
+
+.group-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.group-heading h2 {
+    margin: 0;
+    color: #f8f5e8;
+    font-size: 1.1rem;
+}
+
+.group-heading span {
+    color: #c1b37a;
+    font-weight: 700;
+}
+
+.notification-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 0;
+    background: rgba(255, 255, 255, 0.025);
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.notification-row:first-of-type {
+    border-radius: 12px 12px 0 0;
+}
+
+.notification-row:last-of-type {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0 0 12px 12px;
+}
+
+.notification-row:hover,
+.notification-row:focus-visible {
+    background: rgba(196, 157, 59, 0.12);
+    outline: none;
+}
+
+.notification-row.unread {
+    border-left: 3px solid #c49d3b;
+}
+
+.notification-copy,
+.notification-meta {
+    display: grid;
+    gap: 5px;
+}
+
+.notification-copy strong {
+    color: #fbf7eb;
+}
+
+.notification-copy span,
+.notification-meta time {
+    color: #b0b59b;
+    font-size: 0.85rem;
+}
+
+.notification-meta {
+    flex: 0 0 auto;
+    text-align: right;
+}
+
+.notification-meta span {
+    color: #f6cf77;
+    text-transform: capitalize;
+}
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(3, 10, 5, 0.78);
+}
+
+.notification-modal {
+    position: relative;
+    width: min(560px, 100%);
+    padding: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    background: #18351f;
+    color: #eef1e5;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+}
+
+.notification-modal h2 {
+    margin: 0 32px 22px 0;
+    color: #fbf7eb;
+}
+
+.modal-close {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    border: 0;
+    background: transparent;
+    color: #eef1e5;
+    font-size: 1.7rem;
+    cursor: pointer;
+}
+
+.detail-list {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+}
+
+.detail-list div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 10px;
+}
+
+.detail-list dt {
+    color: #b0b59b;
+}
+
+.detail-list dd {
+    margin: 0;
+    color: #fbf7eb;
+    text-align: right;
+    text-transform: capitalize;
+}
+
+.notification-message {
+    margin: 22px 0;
+    color: #d5dac8;
+    line-height: 1.6;
+}
+
+.modal-action {
+    width: 100%;
 }
 
 .empty-state-card {

@@ -407,13 +407,29 @@ class AdminWorkflowController extends Controller
         }
 
         $items = Notification::query()
+            ->where('recipient_role', 'admin')
             ->with('actorAdmin')
             ->latest()
-            ->get();
+            ->get()
+            ->map(function (Notification $notification) {
+                $links = [
+                    'pending_surrender' => 'superadmin.pending-surrender',
+                    'pending_report' => 'superadmin.pending-report',
+                    'item_verification' => 'superadmin.item-verification',
+                    'potential_match' => 'superadmin.matches',
+                    'fine_request' => 'superadmin.fines',
+                ];
+
+                return array_merge($notification->toArray(), [
+                    'notification_type' => $notification->type,
+                    'link' => $links[$notification->type] ?? 'superadmin.notifications',
+                ]);
+            });
 
         return response()->json([
             'status' => 'success',
             'data' => $items,
+            'unread_count' => $items->where('is_read', false)->count(),
         ]);
     }
 
@@ -640,6 +656,18 @@ class AdminWorkflowController extends Controller
             'reference_number' => 'EF-' . now()->format('ymd') . '-' . strtoupper(Str::random(6)),
             'status' => 'pending',
             'issued_by_admin_id' => $admin->id,
+        ]);
+
+        Notification::create([
+            'type' => 'fine_request',
+            'title' => 'New Fine Request',
+            'message' => "A fine request for {$student->name} is waiting for review.",
+            'action' => 'fine_request',
+            'status' => 'pending',
+            'recipient_role' => 'admin',
+            'subject_type' => EventFine::class,
+            'subject_id' => $fine->id,
+            'is_read' => false,
         ]);
 
         return response()->json([
@@ -1054,7 +1082,7 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $notification = Notification::findOrFail($id);
+        $notification = Notification::where('recipient_role', 'admin')->findOrFail($id);
         $notification->update(['is_read' => true]);
 
         return response()->json(['status' => 'success', 'message' => 'Notification marked as read.', 'data' => $notification]);
@@ -1243,6 +1271,18 @@ class AdminWorkflowController extends Controller
                     'recipient_role' => 'student',
                     'subject_type' => SurrenderRequest::class,
                     'subject_id' => $surrender->id,
+                    'is_read' => false,
+                ]);
+
+                Notification::create([
+                    'type' => 'item_verification',
+                    'title' => 'New Item Verification',
+                    'message' => "The found item '{$report->title}' is ready for verification.",
+                    'action' => 'item_verification',
+                    'status' => 'pending',
+                    'recipient_role' => 'admin',
+                    'subject_type' => ItemVerification::class,
+                    'subject_id' => $verification->id,
                     'is_read' => false,
                 ]);
 

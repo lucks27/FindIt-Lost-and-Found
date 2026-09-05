@@ -162,6 +162,30 @@ class ReportController extends Controller
                 'subject_id' => $report->id,
                 'is_read' => false,
             ]);
+
+            Notification::create([
+                'type' => 'pending_surrender',
+                'title' => 'New Pending Surrender',
+                'message' => "A found-item surrender request for '{$report->title}' is waiting for review.",
+                'action' => 'pending_surrender',
+                'status' => 'pending',
+                'recipient_role' => 'admin',
+                'subject_type' => SurrenderRequest::class,
+                'subject_id' => $surrender->id,
+                'is_read' => false,
+            ]);
+        } elseif ($status === 'pending_approval') {
+            Notification::create([
+                'type' => 'pending_report',
+                'title' => 'New Pending Report',
+                'message' => "A lost-item report for '{$report->title}' is waiting for review.",
+                'action' => 'pending_report',
+                'status' => 'pending',
+                'recipient_role' => 'admin',
+                'subject_type' => Report::class,
+                'subject_id' => $report->id,
+                'is_read' => false,
+            ]);
         }
 
         if (!empty($validated['reward_amount'])) {
@@ -382,6 +406,18 @@ class ReportController extends Controller
                 'report_id' => $matchedReport->id,
                 'matched_report_id' => $report->id,
             ],
+        ]);
+
+        Notification::create([
+            'type' => 'potential_match',
+            'title' => 'New Potential Match',
+            'message' => "A potential match for '{$report->title}' is waiting for review.",
+            'action' => 'potential_match',
+            'status' => 'pending',
+            'recipient_role' => 'admin',
+            'subject_type' => PotentialMatch::class,
+            'subject_id' => $existingMatch->id,
+            'is_read' => false,
         ]);
 
         Notification::create([

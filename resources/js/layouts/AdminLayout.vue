@@ -3,7 +3,8 @@
         <div v-if="mobileSidebarOpen" class="mobile-sidebar-backdrop" @click="closeMobileMenu" aria-hidden="true" />
         <AdminSidebar :current-page="currentPage" :mobile-open="mobileSidebarOpen"
             @close-mobile-menu="closeMobileMenu" />
-        <AdminHeader :page-title="pageCategory" :title="pageTitle" @toggle-mobile-menu="toggleMobileMenu" />
+        <AdminHeader :page-title="pageCategory" :title="pageTitle" :notification-count="notificationCount"
+            @toggle-mobile-menu="toggleMobileMenu" />
         <main class="admin-main">
             <router-view />
         </main>
@@ -11,13 +12,15 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import api from '@/bootstrap'
 import AdminSidebar from '@/adminpages/components/AdminSidebar.vue'
 import AdminHeader from '@/adminpages/components/AdminHeader.vue'
 
 const route = useRoute()
 const mobileSidebarOpen = ref(false)
+const notificationCount = ref(0)
 
 const currentPage = computed(() => {
     if (!route.name) return 'dashboard'
@@ -94,6 +97,17 @@ function toggleMobileMenu() {
 function closeMobileMenu() {
     mobileSidebarOpen.value = false
 }
+
+async function loadNotificationCount() {
+    try {
+        const response = await api.get('/api/admin/notifications')
+        notificationCount.value = Number(response.data?.unread_count || 0)
+    } catch (error) {
+        notificationCount.value = 0
+    }
+}
+
+onMounted(loadNotificationCount)
 </script>
 
 <style scoped>

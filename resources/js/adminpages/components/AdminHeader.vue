@@ -66,6 +66,7 @@ const menuOpen = ref(false)
 const profileImage = ref('')
 const profileName = ref('Super Admin')
 const profileEmail = ref('superadmin@snsu.edu.ph')
+const notificationCount = ref(props.notificationCount)
 
 function normalizeImage(path) {
     if (!path) return ''
@@ -91,6 +92,15 @@ async function loadProfileImage() {
         profileEmail.value = admin.email || profileEmail.value
     } catch (error) {
         profileImage.value = ''
+    }
+}
+
+async function loadNotificationCount() {
+    try {
+        const response = await api.get('/api/admin/notifications')
+        notificationCount.value = Number(response.data?.unread_count || 0)
+    } catch (error) {
+        notificationCount.value = 0
     }
 }
 
@@ -126,13 +136,20 @@ function handleClickOutside(event) {
     }
 }
 
+function handleNotificationsUpdated() {
+    loadNotificationCount()
+}
+
 onMounted(() => {
     document.addEventListener('click', handleClickOutside)
+    window.addEventListener('admin-notifications-updated', handleNotificationsUpdated)
     loadProfileImage()
+    loadNotificationCount()
 })
 
 onBeforeUnmount(() => {
     document.removeEventListener('click', handleClickOutside)
+    window.removeEventListener('admin-notifications-updated', handleNotificationsUpdated)
 })
 </script>
 
