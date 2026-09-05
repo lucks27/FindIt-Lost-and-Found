@@ -3,8 +3,9 @@
         <main class="profile-shell">
             <section class="profile-hero">
                 <div class="profile-header-text">
-                    <p class="profile-kicker">Account Center</p>
                     <h1>Super Admin Profile</h1>
+                    <p class="profile-intro">Manage your identity, profile presence, and account security from one
+                        place.</p>
                 </div>
 
                 <Transition name="fade">
@@ -18,7 +19,8 @@
             <section class="profile-layout">
 
                 <aside class="profile-sidebar">
-                    <div class="glass-card text-center">
+                    <div class="glass-card profile-card text-center">
+                        <div class="profile-card-label">Account identity</div>
                         <div class="profile-avatar-wrap">
                             <img :src="imagePreview || normalizeImage(admin?.profile_picture) || '/assets/logo.png'"
                                 alt="Admin profile" class="profile-avatar" />
@@ -40,13 +42,14 @@
                                 </button>
                             </Transition>
                         </div>
-                    </div>
 
-                    <div class="glass-card danger-zone">
-                        <button type="button" class="action-button logout" :disabled="loading.logout"
-                            @click="handleLogout">
-                            {{ loading.logout ? 'Ending session...' : 'Log Out of Account' }}
-                        </button>
+                        <div class="account-note">
+                            <span class="status-dot"></span>
+                            <div>
+                                <strong>Account active</strong>
+                                <span>Super admin access enabled</span>
+                            </div>
+                        </div>
                     </div>
                 </aside>
 
@@ -300,7 +303,7 @@ async function handleLogout() {
     height: 100%;
     min-height: 0;
     overflow: auto;
-    background: transparent;
+    background: #092d22;
     position: relative;
     color: #f8f4ea;
     display: grid;
@@ -311,8 +314,8 @@ async function handleLogout() {
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(circle at top left, rgba(246, 214, 109, 0.08), transparent 22%),
-        radial-gradient(circle at top right, rgba(255, 255, 255, 0.04), transparent 18%);
+        radial-gradient(circle at top left, rgba(42, 154, 111, 0.3), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(217, 180, 91, 0.1), transparent 24%);
     pointer-events: none;
 }
 
@@ -321,7 +324,7 @@ async function handleLogout() {
     z-index: 1;
     max-width: 1140px;
     margin: 0 auto;
-    padding: 32px 36px;
+    padding: 22px 28px;
     min-height: 100%;
     height: 100%;
     overflow: auto;
@@ -332,39 +335,41 @@ async function handleLogout() {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 30px;
+    margin-bottom: 18px;
 }
 
 .profile-kicker {
     display: inline-flex;
     align-items: center;
-    padding: 8px 14px;
+    padding: 6px 11px;
     border-radius: 999px;
-    background: rgba(246, 214, 109, 0.16);
-    color: #f3d46a;
+    background: rgba(217, 180, 91, 0.14);
+    color: #e8cc84;
     font-size: 11px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     font-weight: 700;
-    margin: 0 0 14px;
+    margin: 0 0 9px;
 }
 
 .profile-hero h1 {
-    font-size: clamp(32px, 4vw, 42px);
+    font-size: clamp(26px, 3vw, 34px);
     margin: 0 0 8px 0;
     font-weight: 800;
-    color: #f8f4ea;
+    color: #ffffff;
 }
 
-.profile-hero p {
+.profile-intro {
     color: rgba(248, 244, 234, 0.82);
-    font-size: 16px;
+    font-size: 13px;
+    line-height: 1.6;
+    max-width: 620px;
     margin: 0;
 }
 
 /* MESSAGES */
 .profile-message {
-    padding: 14px 20px;
+    padding: 10px 14px;
     border-radius: 12px;
     font-weight: 600;
     font-size: 14px;
@@ -399,25 +404,38 @@ async function handleLogout() {
 /* LAYOUT GRID */
 .profile-layout {
     display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: 24px;
+    grid-template-columns: 250px 1fr;
+    gap: 16px;
     align-items: start;
-    min-height: 0;
-    overflow: hidden;
     min-height: 0;
     overflow: hidden;
 }
 
 /* GLASS CARDS */
 .glass-card {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(13, 89, 64, 0.42);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 24px;
-    padding: 30px;
+    border-radius: 16px;
+    padding: 18px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     min-height: 0;
+}
+
+.profile-card {
+    border-color: rgba(141, 198, 173, 0.18);
+    background: linear-gradient(160deg, rgba(42, 154, 111, 0.32), rgba(13, 89, 64, 0.38));
+}
+
+.profile-card-label {
+    margin-bottom: 14px;
+    color: #a9cdbb;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-align: left;
+    text-transform: uppercase;
 }
 
 .text-center {
@@ -432,29 +450,29 @@ async function handleLogout() {
 }
 
 .profile-avatar {
-    width: 130px;
-    height: 130px;
+    width: 92px;
+    height: 92px;
     border-radius: 50%;
     object-fit: cover;
-    border: 4px solid rgba(246, 214, 109, 0.2);
+    border: 4px solid rgba(217, 180, 91, 0.32);
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
 }
 
 .glass-card h2 {
-    color: #f8f4ea;
-    font-size: 24px;
-    margin: 0 0 8px 0;
+    color: #ffffff;
+    font-size: 19px;
+    margin: 0 0 6px 0;
 }
 
 .role-badge {
-    color: #f3d46a;
+    color: #e8cc84;
     font-size: 13px;
     font-weight: 600;
-    background: rgba(246, 214, 109, 0.1);
-    padding: 6px 14px;
+    background: rgba(217, 180, 91, 0.1);
+    padding: 5px 11px;
     border-radius: 20px;
     display: inline-block;
-    margin-bottom: 24px;
+    margin-bottom: 14px;
     border: 1px solid rgba(246, 214, 109, 0.2);
 }
 
@@ -464,20 +482,65 @@ async function handleLogout() {
     gap: 12px;
 }
 
+.account-note {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: left;
+}
+
+.account-note div {
+    display: grid;
+    gap: 3px;
+}
+
+.account-note strong {
+    color: #ffffff;
+    font-size: 13px;
+}
+
+.account-note span:last-child {
+    color: #a9c1b5;
+    font-size: 12px;
+}
+
+.status-dot {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #63c18f;
+    box-shadow: 0 0 0 4px rgba(99, 193, 143, 0.14);
+}
+
 /* RIGHT COLUMN DETAILS */
+.profile-details {
+    display: grid;
+    grid-template-columns: minmax(190px, 0.8fr) minmax(280px, 1.2fr);
+    align-items: start;
+    gap: 16px;
+}
+
+.profile-details .glass-card {
+    height: 100%;
+}
+
 .card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .card-header h3 {
     margin: 0;
-    font-size: 20px;
-    color: #f3d46a;
+    font-size: 16px;
+    color: #e8cc84;
     /* Gold accent for headers */
 }
 
@@ -486,23 +549,23 @@ async function handleLogout() {
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: #f8f4ea;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 12px;
     cursor: pointer;
-    padding: 8px 14px;
+    padding: 6px 10px;
     border-radius: 12px;
     transition: 0.2s ease;
 }
 
 .edit-toggle-btn:hover {
     background: rgba(255, 255, 255, 0.1);
-    border-color: #f3d46a;
+    border-color: #d9b45b;
 }
 
 /* INFO DISPLAY */
 .info-display {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 14px;
 }
 
 .info-group {
@@ -512,7 +575,7 @@ async function handleLogout() {
 }
 
 .info-label {
-    font-size: 13px;
+    font-size: 11px;
     color: rgba(248, 244, 234, 0.6);
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -520,7 +583,7 @@ async function handleLogout() {
 }
 
 .info-value {
-    font-size: 17px;
+    font-size: 14px;
     color: #f8f4ea;
     font-weight: 500;
 }
@@ -529,27 +592,27 @@ async function handleLogout() {
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-bottom: 18px;
+    gap: 5px;
+    margin-bottom: 10px;
 }
 
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    gap: 10px;
 }
 
 .form-group label {
-    font-size: 14px;
+    font-size: 12px;
     color: rgba(248, 244, 234, 0.9);
     font-weight: 600;
 }
 
 .form-group input {
-    padding: 14px 16px;
+    padding: 10px 12px;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 14px;
-    font-size: 15px;
+    border-radius: 9px;
+    font-size: 13px;
     color: #ffffff;
     background: rgba(0, 0, 0, 0.2);
     transition: all 0.2s ease;
@@ -560,7 +623,7 @@ async function handleLogout() {
 }
 
 .form-group input:focus {
-    border-color: #f3d46a;
+    border-color: #d9b45b;
     box-shadow: 0 0 0 3px rgba(246, 214, 109, 0.15);
     outline: none;
     background: rgba(0, 0, 0, 0.4);
@@ -575,8 +638,8 @@ async function handleLogout() {
 
 .form-actions {
     display: flex;
-    gap: 12px;
-    margin-top: 24px;
+    gap: 8px;
+    margin-top: 14px;
 }
 
 .right-align {
@@ -586,10 +649,10 @@ async function handleLogout() {
 /* BUTTONS */
 .action-button,
 .ghost-button {
-    padding: 14px 20px;
-    border-radius: 14px;
+    padding: 10px 14px;
+    border-radius: 9px;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 12px;
     cursor: pointer;
     border: none;
     transition: all 0.2s ease;
@@ -623,28 +686,13 @@ async function handleLogout() {
     transform: none !important;
 }
 
-/* DANGER ZONE */
-.danger-zone {
-    margin-top: 24px;
-    padding: 24px;
-    text-align: center;
-}
-
-.action-button.logout {
-    width: 100%;
-    background: rgba(165, 43, 43, 0.15);
-    color: #ff8e8e;
-    border: 1px solid rgba(255, 182, 182, 0.15);
-}
-
-.action-button.logout:hover {
-    background: rgba(165, 43, 43, 0.3);
-    border-color: rgba(255, 182, 182, 0.3);
-}
-
 /* RESPONSIVE */
 @media (max-width: 900px) {
     .profile-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-details {
         grid-template-columns: 1fr;
     }
 
