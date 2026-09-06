@@ -164,7 +164,7 @@ onBeforeUnmount(() => {
     padding: 0 18px;
     height: 60px;
     min-height: 60px;
-    background: linear-gradient(90deg, #1f8c5d 0%, #176d4c 100%);
+    background: linear-gradient(90deg, var(--admin-green-600) 0%, var(--admin-forest-900) 100%);
     border-bottom: 1px solid rgba(255, 255, 255, 0.16);
     box-shadow: 0 8px 20px rgba(11, 51, 37, 0.18);
     overflow: visible;

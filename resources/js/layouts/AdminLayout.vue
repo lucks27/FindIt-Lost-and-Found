@@ -119,9 +119,9 @@ onMounted(loadNotificationCount)
     grid-template-columns: 230px minmax(0, 1fr);
     grid-template-rows: 60px minmax(0, 1fr);
     overflow: hidden;
-    background: radial-gradient(circle at 12% 8%, rgba(217, 185, 104, 0.15), transparent 34%),
-        radial-gradient(circle at 84% 6%, rgba(247, 242, 230, 0.1), transparent 24%),
-        linear-gradient(180deg, rgba(7, 23, 12, 0.96) 0%, rgba(11, 33, 17, 0.96) 46%, rgba(8, 24, 13, 0.98) 100%);
+    background: radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.22), transparent 34%),
+        radial-gradient(circle at 84% 6%, rgba(255, 255, 255, 0.12), transparent 24%),
+        linear-gradient(180deg, #398ba3 0%, #0c7894 100%);
 }
 
 .mobile-sidebar-backdrop {
@@ -134,7 +134,7 @@ onMounted(loadNotificationCount)
     min-width: 0;
     min-height: 0;
     overflow: auto;
-    background: rgba(248, 247, 244, 0.98);
+    background: linear-gradient(180deg, #9edfe3 0%, #64bcc6 52%, #4ba5b6 100%);
 }
 
 @media (max-width: 1024px) {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Admin;
 use App\Models\AdminAnnouncement;
 use App\Models\ArchiveItem;
 use App\Models\AuditLog;
@@ -51,9 +52,21 @@ class AdminWorkflowController extends Controller
             ->latest()
             ->get()
             ->map(function (Student $student) {
-                return array_merge($student->toArray(), [
+                return [
+                    'id' => $student->id,
+                    'student_id_number' => $student->student_id_number,
+                    'name' => $student->name,
+                    'email' => $student->email,
+                    'course' => $student->course,
+                    'department' => $student->department,
+                    'year_level' => $student->year_level,
+                    'profile_photo' => $student->profile_photo,
+                    'status' => $student->status,
+                    'account_status' => $student->status,
+                    'created_at' => $student->created_at,
+                    'updated_at' => $student->updated_at,
                     'recognition_points' => (int) ($student->recognitionRecord?->recognition_points ?? 0),
-                ]);
+                ];
             });
 
         return response()->json([
@@ -473,6 +486,7 @@ class AdminWorkflowController extends Controller
         }
 
         $items = ItemVerification::query()
+            ->where('status', '!=', 'archived')
             ->with(['report.student', 'report.images', 'report.category', 'verifierAdmin'])
             ->latest()
             ->get();
@@ -1210,9 +1224,22 @@ class AdminWorkflowController extends Controller
         }
 
         $report = Report::findOrFail($id);
-        $report->update(['status' => 'approved']);
+        $report->update([
+            'status' => 'approved',
+            'published_at' => Carbon::now(),
+        ]);
 
-        return response()->json(['status' => 'success', 'message' => 'Report approved successfully.', 'data' => $report]);
+        VisiblePostedItem::updateOrCreate(
+            ['report_id' => $report->id],
+            [
+                'post_type' => 'public',
+                'is_visible' => true,
+                'posted_at' => Carbon::now(),
+                'posted_by_admin_id' => $admin->id,
+            ]
+        );
+
+        return response()->json(['status' => 'success', 'message' => 'Report approved and posted to mobile successfully.', 'data' => $report->fresh('student')]);
     }
 
     public function rejectLostReport($id)
@@ -1248,6 +1275,39 @@ class AdminWorkflowController extends Controller
         return response()->json(['status' => 'success', 'message' => 'Correction requested successfully.', 'data' => $report]);
     }
 
+    private function resolveSurrenderRequest($id): SurrenderRequest
+    {
+        if (is_string($id) && str_starts_with($id, 'report:')) {
+            $report = Report::findOrFail(substr($id, 7));
+
+            return SurrenderRequest::firstOrCreate(
+                ['report_id' => $report->id],
+                [
+                    'student_id' => $report->student_id,
+                    'status' => 'pending',
+                    'deadline_at' => $report->created_at?->copy()->addDays(3),
+                ]
+            );
+        }
+
+        $surrender = SurrenderRequest::find($id);
+
+        if ($surrender) {
+            return $surrender;
+        }
+
+        $report = Report::findOrFail($id);
+
+        return SurrenderRequest::firstOrCreate(
+            ['report_id' => $report->id],
+            [
+                'student_id' => $report->student_id,
+                'status' => 'pending',
+                'deadline_at' => $report->created_at?->copy()->addDays(3),
+            ]
+        );
+    }
+
     public function receiveSurrenderRequest(Request $request, $id)
     {
         $admin = Auth::guard('admin')->user();
@@ -1258,10 +1318,9 @@ class AdminWorkflowController extends Controller
 
         try {
             return DB::transaction(function () use ($request, $id, $admin) {
-                $surrender = SurrenderRequest::where('id', $id)
-                    ->where('status', 'pending')
-                    ->lockForUpdate()
-                    ->firstOrFail();
+                $surrender = SurrenderRequest::whereKey(
+                    $this->resolveSurrenderRequest($id)->id
+                )->lockForUpdate()->firstOrFail();
 
                 if ($surrender->received_at || $surrender->received_by_admin_id) {
                     return response()->json(['status' => 'error', 'message' => 'This surrender request has already been received.'], 409);
@@ -1269,36 +1328,36 @@ class AdminWorkflowController extends Controller
 
                 $report = $surrender->report()->lockForUpdate()->firstOrFail();
 
-                if ($report->status !== 'pending_surrender') {
-                    return response()->json(['status' => 'error', 'message' => 'This report is not pending surrender.'], 422);
+                if ($report->type !== 'found' || in_array($report->status, ['rejected', 'completed', 'archived'], true)) {
+                    return response()->json(['status' => 'error', 'message' => 'This report cannot be approved for mobile posting.'], 422);
                 }
 
                 $surrender->update([
-                    'status' => 'received',
+                    'status' => 'approved',
                     'received_by_admin_id' => $admin->id,
                     'received_at' => Carbon::now(),
                 ]);
 
-                $report->update(['status' => 'pending_verification']);
+                $report->update([
+                    'status' => 'verified',
+                    'published_at' => Carbon::now(),
+                ]);
 
-                $verification = ItemVerification::where('report_id', $report->id)->first();
-                if (!$verification) {
-                    $verification = ItemVerification::create([
-                        'report_id' => $report->id,
-                        'status' => 'pending',
-                        'checklist' => [
-                            'item_condition_checked' => false,
-                            'serial_or_identifier_checked' => false,
-                            'owner_details_confirmed' => false,
-                        ],
-                    ]);
-                }
+                VisiblePostedItem::updateOrCreate(
+                    ['report_id' => $report->id],
+                    [
+                        'post_type' => 'public',
+                        'is_visible' => true,
+                        'posted_at' => Carbon::now(),
+                        'posted_by_admin_id' => $admin->id,
+                    ]
+                );
 
                 Notification::create([
                     'student_id' => $report->student_id,
-                    'title' => 'Item Received by USC',
-                    'message' => "USC has received your found item '{$report->title}'. Verification is now in progress.",
-                    'action' => 'item_received',
+                    'title' => 'Found Item Approved',
+                    'message' => "Your found item '{$report->title}' was approved and posted to the mobile app.",
+                    'action' => 'item_approved',
                     'recipient_id' => $report->student_id,
                     'recipient_role' => 'student',
                     'subject_type' => SurrenderRequest::class,
@@ -1306,19 +1365,7 @@ class AdminWorkflowController extends Controller
                     'is_read' => false,
                 ]);
 
-                Notification::create([
-                    'type' => 'item_verification',
-                    'title' => 'New Item Verification',
-                    'message' => "The found item '{$report->title}' is ready for verification.",
-                    'action' => 'item_verification',
-                    'status' => 'pending',
-                    'recipient_role' => 'admin',
-                    'subject_type' => ItemVerification::class,
-                    'subject_id' => $verification->id,
-                    'is_read' => false,
-                ]);
-
-                $this->recordAuditLog($admin, 'surrender_received', SurrenderRequest::class, $surrender->id, 'Surrender Request', [
+                $this->recordAuditLog($admin, 'surrender_approved', SurrenderRequest::class, $surrender->id, 'Surrender Request', [
                     'report_id' => $report->id,
                     'received_by_admin_id' => $admin->id,
                     'received_at' => $surrender->received_at?->toDateTimeString(),
@@ -1326,7 +1373,7 @@ class AdminWorkflowController extends Controller
 
                 return response()->json([
                     'status' => 'success',
-                    'message' => 'Surrender request marked as received.',
+                    'message' => 'Surrender request approved and posted to mobile.',
                     'data' => $surrender->fresh(['report', 'student', 'receivedByAdmin']),
                 ]);
             });
@@ -1343,7 +1390,7 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $surrender = SurrenderRequest::findOrFail($id);
+        $surrender = $this->resolveSurrenderRequest($id);
         $surrender->update(['status' => 'rejected']);
 
         $report = $surrender->report()->first();
@@ -1364,15 +1411,38 @@ class AdminWorkflowController extends Controller
         }
 
         $validated = $request->validate([
+            'requested_details' => 'nullable|array',
+            'requested_details.*' => 'string|max:100',
+            'note' => 'nullable|string|max:1000',
             'message' => 'nullable|string|max:1000',
         ]);
 
-        $surrender = SurrenderRequest::findOrFail($id);
-        $message = $validated['message'] ?? 'Requesting more details for this surrender request.';
+        $surrender = $this->resolveSurrenderRequest($id);
+        $requestedDetails = $validated['requested_details'] ?? [];
+        $message = $validated['note'] ?? $validated['message'] ?? '';
+        if ($requestedDetails) {
+            $message = trim($message . ($message ? "\n" : '') . 'Please provide: ' . implode(', ', $requestedDetails));
+        }
+        $message = $message ?: 'Please provide more details for this surrender request.';
 
         $surrender->update([
             'notes' => trim($surrender->notes ? $surrender->notes . "\n" : '') . $message,
         ]);
+
+        $report = $surrender->report;
+        if ($report?->student_id) {
+            Notification::create([
+                'student_id' => $report->student_id,
+                'title' => 'More Details Needed',
+                'message' => $message,
+                'action' => 'surrender_details_requested',
+                'recipient_id' => $report->student_id,
+                'recipient_role' => 'student',
+                'subject_type' => SurrenderRequest::class,
+                'subject_id' => $surrender->id,
+                'is_read' => false,
+            ]);
+        }
 
         return response()->json([
             'status' => 'success',
@@ -1476,7 +1546,7 @@ class AdminWorkflowController extends Controller
 
                 $report = $verification->report()->lockForUpdate()->firstOrFail();
                 $verification->update([
-                    'status' => 'rejected',
+                    'status' => 'archived',
                     'verifier_admin_id' => $admin->id,
                     'verified_at' => Carbon::now(),
                     'notes' => $validated['notes'],
@@ -1552,6 +1622,130 @@ class AdminWorkflowController extends Controller
                 ], $request->ip());
 
                 return response()->json(['status' => 'success', 'message' => 'Verification details requested.', 'data' => $verification->fresh(['report', 'verifierAdmin'])]);
+            });
+        } catch (\Throwable $exception) {
+            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+        }
+    }
+
+    public function sendClaimInstructions(Request $request, $id)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $validated = $request->validate([
+            'message' => 'required|string|max:1000',
+        ]);
+
+        try {
+            return DB::transaction(function () use ($request, $id, $admin, $validated) {
+                $verification = ItemVerification::with('report')->findOrFail($id);
+                $claim = ClaimReview::where('report_id', $verification->report_id)
+                    ->whereNotNull('claimant_student_id')
+                    ->latest()
+                    ->first();
+                $recipientStudentId = $claim?->claimant_student_id ?: $verification->report?->student_id;
+
+                if (!$recipientStudentId) {
+                    return response()->json(['status' => 'error', 'message' => 'No claimant student is associated with this verification.'], 422);
+                }
+
+                Notification::create([
+                    'student_id' => $recipientStudentId,
+                    'title' => 'Pickup Instructions',
+                    'message' => $validated['message'],
+                    'action' => 'claim_pickup_instructions',
+                    'recipient_id' => $recipientStudentId,
+                    'recipient_role' => 'student',
+                    'subject_type' => $claim ? ClaimReview::class : ItemVerification::class,
+                    'subject_id' => $claim?->id ?: $verification->id,
+                    'is_read' => false,
+                ]);
+
+                $this->recordAuditLog($admin, 'claim_pickup_instructions_sent', $claim ? ClaimReview::class : ItemVerification::class, $claim?->id ?: $verification->id, $claim ? 'Claim Review' : 'Item Verification', [
+                    'report_id' => $verification->report_id,
+                    'claimant_student_id' => $recipientStudentId,
+                    'message' => $validated['message'],
+                ], $request->ip());
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Pickup instruction sent to the claimant.',
+                    'data' => $claim?->fresh(['report', 'claimantStudent']) ?: $verification->fresh('report'),
+                ]);
+            });
+        } catch (\Throwable $exception) {
+            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+        }
+    }
+
+    public function completeVerificationTransaction(Request $request, $id)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        try {
+            return DB::transaction(function () use ($request, $id, $admin) {
+                $verification = ItemVerification::where('id', $id)
+                    ->whereIn('status', ['verified', 'completed'])
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                $report = $verification->report()->lockForUpdate()->firstOrFail();
+
+                $verification->update([
+                    'status' => 'completed',
+                    'notes' => trim(($verification->notes ? $verification->notes . "\n" : '') . 'Transaction completed by admin.'),
+                ]);
+                $report->update(['status' => 'completed_return']);
+                $this->syncArchiveRecord($report, 'completed', 'Claim transaction completed.');
+
+                $this->recordAuditLog($admin, 'verification_transaction_completed', ItemVerification::class, $verification->id, 'Item Verification', [
+                    'report_id' => $report->id,
+                    'completed_at' => Carbon::now()->toDateTimeString(),
+                ], $request->ip());
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Transaction completed and archived.',
+                    'data' => $verification->fresh(['report', 'verifierAdmin']),
+                ]);
+            });
+        } catch (\Throwable $exception) {
+            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+        }
+    }
+
+    public function archiveVerification(Request $request, $id)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        try {
+            return DB::transaction(function () use ($request, $id, $admin) {
+                $verification = ItemVerification::lockForUpdate()->findOrFail($id);
+                $report = $verification->report()->lockForUpdate()->firstOrFail();
+
+                $verification->update(['status' => 'archived']);
+                $this->syncArchiveRecord($report, $report->status === 'rejected' ? 'rejected' : 'completed', 'Archived from claimant verification.');
+
+                $this->recordAuditLog($admin, 'verification_archived', ItemVerification::class, $verification->id, 'Item Verification', [
+                    'report_id' => $report->id,
+                ], $request->ip());
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Verification archived successfully.',
+                    'data' => $verification->fresh(['report', 'verifierAdmin']),
+                ]);
             });
         } catch (\Throwable $exception) {
             return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
@@ -1946,17 +2140,36 @@ class AdminWorkflowController extends Controller
 
     private function recordAuditLog($admin, string $action, string $subjectType, int $subjectId, string $subjectLabel, array $details = [], ?string $ipAddress = null): void
     {
-        AuditLog::create([
-            'actor_admin_id' => $admin?->id,
+        $auditDetails = array_merge($details, [
+            'module' => 'workflow',
+        ]);
+        $payload = [
             'action' => $action,
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
-            'subject_label' => $subjectLabel,
-            'details' => array_merge($details, [
-                'module' => 'workflow',
-            ]),
             'ip_address' => $ipAddress,
-        ]);
+        ];
+
+        if (Schema::hasColumn('audit_logs', 'actor_admin_id')) {
+            $payload['actor_admin_id'] = $admin?->id;
+        } elseif (Schema::hasColumn('audit_logs', 'actor_id')) {
+            $payload['actor_id'] = $admin?->id;
+            if (Schema::hasColumn('audit_logs', 'actor_type')) {
+                $payload['actor_type'] = Admin::class;
+            }
+        }
+
+        if (Schema::hasColumn('audit_logs', 'subject_label')) {
+            $payload['subject_label'] = $subjectLabel;
+        }
+
+        if (Schema::hasColumn('audit_logs', 'details')) {
+            $payload['details'] = $auditDetails;
+        } elseif (Schema::hasColumn('audit_logs', 'description')) {
+            $payload['description'] = $subjectLabel . ': ' . json_encode($auditDetails);
+        }
+
+        AuditLog::create($payload);
     }
 
     public function approveEventFineConversion($id)

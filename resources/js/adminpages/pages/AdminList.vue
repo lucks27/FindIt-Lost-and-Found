@@ -105,7 +105,7 @@
                                 <div>
                                     <div class="student-name">{{ student.name }}</div>
                                     <div class="student-subtext">{{ student.department || student.course || 'No program'
-                                        }}</div>
+                                    }}</div>
                                 </div>
                             </td>
                             <td>{{ studentId(student) }}</td>
@@ -117,13 +117,6 @@
                                         <path
                                             d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10z" />
                                         <circle cx="12" cy="12" r="2.5" />
-                                    </svg>
-                                </button>
-                                <button type="button" class="icon-button" title="Edit student"
-                                    @click="openStudentModal('edit', student)">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path
-                                            d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM21.41 6.34a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0L14.13 4.51l3.75 3.75 3.53-3.92z" />
                                     </svg>
                                 </button>
                                 <button type="button" class="icon-button danger" title="Delete student"
@@ -164,12 +157,8 @@
             <div class="modal-card modal-card-large">
                 <div class="modal-header">
                     <div>
-                        <h2>{{ studentModalMode === 'create' ? 'Add Student' : 'Edit Student' }}</h2>
-                        <p class="modal-copy">
-                            {{ studentModalMode === 'create'
-                                ? 'Add a new student account to the directory.'
-                                : 'Update student account details.' }}
-                        </p>
+                        <h2>Add Student</h2>
+                        <p class="modal-copy">Add a new student account to the directory.</p>
                     </div>
                     <button type="button" class="close-button" @click="closeStudentModal" aria-label="Close">×</button>
                 </div>
@@ -187,7 +176,7 @@
                             <span>Student ID *</span>
                             <input v-model.trim="studentForm.student_id" type="text" placeholder="e.g. 2026-00123" />
                             <span v-if="studentErrors.student_id" class="field-error">{{ studentErrors.student_id
-                                }}</span>
+                            }}</span>
                         </label>
                     </div>
 
@@ -200,7 +189,7 @@
                                 <option v-for="course in COURSES" :key="course" :value="course">{{ course }}</option>
                             </select>
                             <span v-if="studentErrors.course_base" class="field-error">{{ studentErrors.course_base
-                                }}</span>
+                            }}</span>
                         </label>
 
                         <label v-if="needsMajorSelection">
@@ -221,7 +210,7 @@
                                 </option>
                             </select>
                             <span v-if="studentErrors.concentration" class="field-error">{{ studentErrors.concentration
-                                }}</span>
+                            }}</span>
                         </label>
 
                         <label>
@@ -231,7 +220,7 @@
                                 <option v-for="year in YEAR_LEVELS" :key="year" :value="year">{{ year }}</option>
                             </select>
                             <span v-if="studentErrors.year_level" class="field-error">{{ studentErrors.year_level
-                                }}</span>
+                            }}</span>
                         </label>
 
                         <label>
@@ -241,13 +230,13 @@
                                 <option v-for="dept in DEPARTMENTS" :key="dept" :value="dept">{{ dept }}</option>
                             </select>
                             <span v-if="studentErrors.department" class="field-error">{{ studentErrors.department
-                                }}</span>
+                            }}</span>
                         </label>
                     </div>
 
                     <div class="form-section">
                         <h3>Account Information</h3>
-                        <label v-if="studentModalMode === 'create'">
+                        <label>
                             <span>Email</span>
                             <div class="email-input-row">
                                 <input v-model.trim="studentForm.emailPrefix" type="text" placeholder="username"
@@ -257,34 +246,18 @@
                             <span v-if="studentErrors.email" class="field-error">{{ studentErrors.email }}</span>
                         </label>
 
-                        <label v-else>
-                            <span>Email</span>
-                            <input :value="selectedStudent?.email || '—'" type="email" readonly class="locked-field" />
-                            <span class="field-hint">Protected and cannot be changed here.</span>
-                        </label>
-
-                        <label v-if="studentModalMode === 'create'">
+                        <label>
                             <span>Temporary password *</span>
                             <input v-model="studentForm.password" type="password" placeholder="Set password" />
                             <span v-if="studentErrors.password" class="field-error">{{ studentErrors.password }}</span>
                         </label>
                     </div>
 
-                    <div v-if="studentModalMode === 'edit'" class="protected-student-fields">
-                        <div><span>Status</span><strong>{{ studentStatus(selectedStudent)
-                        }}</strong></div>
-                        <div><span>Created date</span><strong>{{ formatDate(selectedStudent?.created_at) }}</strong>
-                        </div>
-                        <div><span>Updated date</span><strong>{{ formatDate(selectedStudent?.updated_at) }}</strong>
-                        </div>
-                    </div>
-
                     <div class="modal-actions modal-actions-full">
                         <button type="button" class="ghost-btn" @click="closeStudentModal">Cancel</button>
                         <button type="submit" class="primary-action-btn" :disabled="studentModalLoading">
                             <span v-if="studentModalLoading">Saving...</span>
-                            <span v-else-if="studentModalMode === 'create'">Create Student</span>
-                            <span v-else>Save Changes</span>
+                            <span>Create Student</span>
                         </button>
                     </div>
                 </form>
@@ -308,30 +281,28 @@
 
                 <div class="details-grid profile-details-grid">
                     <div class="detail-row"><span>School ID</span><strong>{{ studentId(selectedStudent)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row"><span>Status</span><strong>{{ studentStatus(selectedStudent) }}</strong>
                     </div>
                     <div class="detail-row detail-row-wide"><span>Email</span><strong>{{ selectedStudent.email || '—'
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row detail-row-wide"><span>Course</span><strong>{{ selectedStudent.course || '—'
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row"><span>Department</span><strong>{{ selectedStudent.department || '—'
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row"><span>Year level</span><strong>{{ selectedStudent.year_level || '—'
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row"><span>Recognition points</span><strong>{{ recognitionPoints(selectedStudent)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row"><span>Peso value</span><strong>₱{{ pesoValue(selectedStudent) }}</strong>
                     </div>
                     <div class="detail-row"><span>Created date</span><strong>{{ formatDate(selectedStudent.created_at)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row"><span>Updated date</span><strong>{{ formatDate(selectedStudent.updated_at)
-                    }}</strong></div>
+                            }}</strong></div>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="ghost-btn" @click="closeDetailsModal">Close</button>
-                    <button type="button" class="primary-action-btn"
-                        @click="closeDetailsModal(); openStudentModal('edit', selectedStudent)">Edit profile</button>
                 </div>
             </div>
         </div>
@@ -414,9 +385,7 @@ const showDetailsModal = ref(false)
 const showDeleteDialog = ref(false)
 const selectedStudent = ref(null)
 const studentToDelete = ref(null)
-const studentModalMode = ref('create')
 const studentModalLoading = ref(false)
-const editingStudentId = ref(null)
 
 const studentEmailEdited = ref(false)
 const studentForm = ref({
@@ -452,7 +421,7 @@ function studentInitials(name) {
 }
 
 function studentImage(student) {
-    const path = student?.profile_picture || student?.profile_photo || student?.profilePhoto
+    const path = student?.profile_photo || student?.profile_picture || student?.profilePhoto
     if (!path) return '/assets/logo.png'
     if (/^https?:\/\//i.test(path) || path.startsWith('/')) return path
     return `/${String(path).replace(/^\/+/, '')}`
@@ -497,7 +466,7 @@ function generateEmailPrefix(fullName) {
 watch(
     () => studentForm.value.name,
     (newVal) => {
-        if (studentModalMode.value === 'create' && !studentEmailEdited.value) {
+        if (!studentEmailEdited.value) {
             studentForm.value.emailPrefix = generateEmailPrefix(newVal)
         }
     },
@@ -674,12 +643,10 @@ function validateStudentForm() {
         errors.email = 'Enter a valid email username.'
     }
 
-    if (studentModalMode.value === 'create') {
-        if (!studentForm.value.password) {
-            errors.password = 'Password is required.'
-        } else if (studentForm.value.password.length < 6) {
-            errors.password = 'Password must be at least 6 characters.'
-        }
+    if (!studentForm.value.password) {
+        errors.password = 'Password is required.'
+    } else if (studentForm.value.password.length < 6) {
+        errors.password = 'Password must be at least 6 characters.'
     }
 
     studentErrors.value = errors
@@ -690,44 +657,9 @@ const isStudentFormDirty = computed(() => {
     return JSON.stringify(studentForm.value) !== JSON.stringify(initialStudentForm.value)
 })
 
-function openStudentModal(mode, student = null) {
+function openStudentModal() {
     resetMessages()
-    studentModalMode.value = mode
-    editingStudentId.value = student?.id || null
-
-    if (mode === 'create') {
-        resetStudentForm(true)
-    } else {
-        let base = student.course || ''
-        let maj = ''
-        let conc = ''
-
-        if (base.includes(' Major in ')) {
-            const parts = base.split(' Major in ')
-            base = parts[0]
-            maj = parts[1]
-        } else if (base.includes(' Concentration in ')) {
-            const parts = base.split(' Concentration in ')
-            base = parts[0]
-            conc = parts[1]
-        }
-
-        studentForm.value = {
-            name: student?.name || '',
-            student_id: studentId(student) === '—' ? '' : studentId(student),
-            course_base: base,
-            major: maj,
-            concentration: conc,
-            year_level: student?.year_level || '',
-            department: student?.department || '',
-            emailPrefix: student?.email ? student.email.replace('@snsu.edu.ph', '') : '',
-            password: '',
-        }
-        initialStudentForm.value = JSON.parse(JSON.stringify(studentForm.value))
-    }
-
-    studentEmailEdited.value = false
-    studentErrors.value = {}
+    resetStudentForm(true)
     showStudentModal.value = true
 }
 
@@ -735,7 +667,6 @@ function closeStudentModal() {
     if (isStudentFormDirty.value && !studentModalLoading.value && window.confirm('Discard unsaved changes?')) {
         showStudentModal.value = false
         studentModalLoading.value = false
-        editingStudentId.value = null
         resetStudentForm(false)
         return
     }
@@ -743,7 +674,6 @@ function closeStudentModal() {
     if (!isStudentFormDirty.value) {
         showStudentModal.value = false
         studentModalLoading.value = false
-        editingStudentId.value = null
         resetStudentForm(false)
     }
 }
@@ -770,25 +700,14 @@ async function submitStudent() {
     }
 
     try {
-        let response
-        if (studentModalMode.value === 'create') {
-            response = await api.post('/api/admin/students', {
-                ...payload,
-                email: `${studentForm.value.emailPrefix}@snsu.edu.ph`,
-                password: studentForm.value.password,
-            })
-            students.value = [response.data?.data, ...students.value.filter(Boolean)]
-            statusMessage.value = response.data?.message || 'Student account created successfully.'
-        } else {
-            response = await api.put(`/api/admin/students/${editingStudentId.value}`, payload)
-            const updatedStudent = response.data?.data
-            students.value = students.value.map((student) => (
-                student.id === updatedStudent.id ? updatedStudent : student
-            ))
-            statusMessage.value = response.data?.message || 'Student record updated successfully.'
-        }
+        const response = await api.post('/api/admin/students', {
+            ...payload,
+            email: `${studentForm.value.emailPrefix}@snsu.edu.ph`,
+            password: studentForm.value.password,
+        })
+        students.value = [response.data?.data, ...students.value.filter(Boolean)]
+        statusMessage.value = response.data?.message || 'Student account created successfully.'
         showStudentModal.value = false
-        editingStudentId.value = null
         resetStudentForm(false)
     } catch (error) {
         errorMessage.value = error.response?.data?.message || 'Failed to save student record.'

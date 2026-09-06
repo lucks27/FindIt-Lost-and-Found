@@ -103,6 +103,9 @@ Route::middleware(['web', 'auth:admin'])->group(function () {
     Route::post('/admin/verifications/{id}/verify', [App\Http\Controllers\AdminWorkflowController::class, 'verifyItem']);
     Route::post('/admin/verifications/{id}/reject', [App\Http\Controllers\AdminWorkflowController::class, 'rejectVerification']);
     Route::post('/admin/verifications/{id}/request-details', [App\Http\Controllers\AdminWorkflowController::class, 'requestVerificationDetails']);
+    Route::post('/admin/verifications/{id}/claim-instructions', [App\Http\Controllers\AdminWorkflowController::class, 'sendClaimInstructions']);
+    Route::post('/admin/verifications/{id}/complete', [App\Http\Controllers\AdminWorkflowController::class, 'completeVerificationTransaction']);
+    Route::post('/admin/verifications/{id}/archive', [App\Http\Controllers\AdminWorkflowController::class, 'archiveVerification']);
 
     Route::post('/admin/claims/{id}/approve', [App\Http\Controllers\AdminWorkflowController::class, 'approveClaim']);
     Route::post('/admin/claims/{id}/reject', [App\Http\Controllers\AdminWorkflowController::class, 'rejectClaim']);

@@ -283,7 +283,7 @@ function getInitials(name) {
 
 function getProfilePhoto(student) {
     const path = student?.profile_photo || student?.profile_picture || student?.photo || student?.profilePhoto || student?.avatar_url
-    if (!path) return null
+    if (!path) return '/assets/logo.png'
     return path.startsWith('http') || path.startsWith('/') ? path : `/${String(path).replace(/^\/+/, '')}`
 }
 

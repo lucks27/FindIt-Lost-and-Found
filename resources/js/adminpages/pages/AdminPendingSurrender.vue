@@ -257,16 +257,10 @@
                                         action-btn
                                         approve-btn
                                     " @click="
-                                        hasSurrenderRecord(
-                                            item
+                                        runAction(
+                                            'approve',
+                                            actionIdentifier(item)
                                         )
-                                            ? runAction(
-                                                'approve',
-                                                item.id
-                                            )
-                                            : openDetailModal(
-                                                item
-                                            )
                                         ">
                                 Approve
                             </button>
@@ -279,16 +273,10 @@
                                         action-btn
                                         reject-btn
                                     " @click="
-                                        hasSurrenderRecord(
-                                            item
+                                        runAction(
+                                            'reject',
+                                            actionIdentifier(item)
                                         )
-                                            ? runAction(
-                                                'reject',
-                                                item.id
-                                            )
-                                            : openDetailModal(
-                                                item
-                                            )
                                         ">
                                 Reject
                             </button>
@@ -1097,14 +1085,10 @@ img,
                                 reject-btn
                                 modal-action
                             " @click="
-                                hasSurrenderRecord(
-                                    selectedSurrender
+                                runAction(
+                                    'reject',
+                                    actionIdentifier(selectedSurrender)
                                 )
-                                    ? runAction(
-                                        'reject',
-                                        selectedSurrender.id
-                                    )
-                                    : null
                                 ">
                             Reject
                         </button>
@@ -1114,14 +1098,10 @@ img,
                                 approve-btn
                                 modal-action
                             " @click="
-                                hasSurrenderRecord(
-                                    selectedSurrender
+                                runAction(
+                                    'approve',
+                                    actionIdentifier(selectedSurrender)
                                 )
-                                    ? runAction(
-                                        'approve',
-                                        selectedSurrender.id
-                                    )
-                                    : null
                                 ">
                             Approve
                         </button>
@@ -1449,6 +1429,14 @@ function hasSurrenderRecord(
             ?.has_surrender_record !==
         false
     )
+}
+
+function actionIdentifier(
+    item
+) {
+    return hasSurrenderRecord(item)
+        ? item.id
+        : `report:${item.report_id || item.id}`
 }
 
 function isPending(
@@ -2012,7 +2000,7 @@ async function submitRequestDetails() {
 
     try {
         await api.post(
-            `/api/admin/surrenders/${selectedSurrender.value.id}/request-details`,
+            `/api/admin/surrenders/${actionIdentifier(selectedSurrender.value)}/request-details`,
 
             {
                 requested_details:

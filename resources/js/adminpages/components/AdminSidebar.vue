@@ -180,7 +180,7 @@ watch(
     display: flex;
     flex-direction: column;
     gap: 12px;
-    background: linear-gradient(180deg, #1d9a62 0%, #166f4e 100%);
+    background: linear-gradient(180deg, var(--admin-green-600) 0%, var(--admin-forest-900) 100%);
     border-right: 1px solid rgba(255, 255, 255, 0.14);
     overflow-y: auto;
 }

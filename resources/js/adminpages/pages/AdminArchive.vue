@@ -96,17 +96,34 @@
                                 <dt>Category</dt>
                                 <dd>{{ getCategory(selectedItem) }}</dd>
                             </div>
+                            <div>
+                                <dt>Type</dt>
+                                <dd>{{ selectedItem.item?.type || selectedItem.type || 'Not provided' }}</dd>
+                            </div>
                             <div class="wide">
                                 <dt>Description</dt>
                                 <dd>{{ selectedItem.item?.description || 'No description provided.' }}</dd>
                             </div>
                             <div>
+                                <dt>Time found</dt>
+                                <dd>{{ selectedItem.item?.time_found || 'Not provided' }}</dd>
+                            </div>
+                            <div>
                                 <dt>Location</dt>
                                 <dd>{{ selectedItem.item?.location || 'Not provided' }}</dd>
                             </div>
+                            <div class="wide">
+                                <dt>Additional details</dt>
+                                <dd>{{ selectedItem.item?.additional_details || 'None provided' }}</dd>
+                            </div>
+                            <div class="wide">
+                                <dt>Private details</dt>
+                                <dd>{{ selectedItem.item?.private_identifying_details || 'None provided' }}</dd>
+                            </div>
                             <div>
-                                <dt>Reported</dt>
-                                <dd>{{ formatDate(selectedItem.item?.created_at) }}</dd>
+                                <dt>Reported date</dt>
+                                <dd>{{ formatDate(selectedItem.item?.created_at || selectedItem.item?.date_occurred) }}
+                                </dd>
                             </div>
                         </dl>
                     </section>
@@ -149,8 +166,8 @@
                         <h3>Archive source</h3>
                         <dl>
                             <div>
-                                <dt>Archive action</dt>
-                                <dd>{{ formatArchiveType(selectedItem.archive_type) }}</dd>
+                                <dt>Archived from</dt>
+                                <dd>{{ getArchiveSource(selectedItem.archive_type) }}</dd>
                             </div>
                             <div>
                                 <dt>Archived on</dt>
@@ -223,6 +240,7 @@ const filteredItems = computed(() => {
 function openDetails(item) { selectedItem.value = item }
 function formatStatus(value) { return String(value || 'Unknown').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()) }
 function formatArchiveType(value) { return formatStatus(value || 'Manual archive') }
+function getArchiveSource(value) { return value === 'mobile_archive' ? 'Mobile post' : formatArchiveType(value) }
 function formatDate(value) { return value ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not provided' }
 function getCategory(item) { return item.item?.category?.name || item.item?.category || item.item?.item_category || 'Uncategorized' }
 function getItemImage(item) { const image = item.item?.images?.find((entry) => entry.is_primary) || item.item?.images?.[0]; const path = image?.file_path || image?.path; if (!path) return null; return path.startsWith('http') || path.startsWith('/') ? path : `/storage/${path}` }
@@ -230,7 +248,7 @@ function getReporter(item) { return item?.student || item?.item?.student || null
 function getStudentId(student) { return student?.student_id_number || student?.student_id || student?.id || 'Not provided' }
 function getProfilePhoto(student) {
     const path = student?.profile_photo || student?.profile_picture || student?.profilePhoto || student?.avatar_url
-    if (!path) return null
+    if (!path) return '/assets/logo.png'
     return path.startsWith('http') || path.startsWith('/') ? path : `/${String(path).replace(/^\/+/, '')}`
 }
 

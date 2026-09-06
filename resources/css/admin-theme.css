@@ -1,25 +1,25 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --admin-forest-950: #071d15;
-  --admin-forest-900: #0d3528;
-  --admin-forest-800: #114f39;
-  --admin-forest-700: #1b7a4e;
-  --admin-green-600: #1d9b60;
-  --admin-green-500: #29b46d;
-  --admin-green-400: #4ed28b;
-  --admin-green-300: #8fe1aa;
-  --admin-green-200: #c7f0d4;
-  --admin-green-100: #e2f8e8;
-  --admin-sand-100: #f7f2e6;
-  --admin-sand-200: #eae0c7;
+  --admin-forest-950: #07566a;
+  --admin-forest-900: #0c7894;
+  --admin-forest-800: #167f98;
+  --admin-forest-700: #398ba3;
+  --admin-green-600: #398ba3;
+  --admin-green-500: #4ba5b6;
+  --admin-green-400: #78cbd2;
+  --admin-green-300: #a9e1e4;
+  --admin-green-200: #c9eff0;
+  --admin-green-100: #e5f8f8;
+  --admin-sand-100: #e7f8f8;
+  --admin-sand-200: #c4e9eb;
   --admin-gold-400: #edd078;
   --admin-gold-500: #d9b968;
   --admin-white: #ffffff;
-  --admin-ink: #123c2d;
-  --admin-muted: #4b6d5a;
+  --admin-ink: #063d4c;
+  --admin-muted: #216477;
   --admin-danger: #d45d5d;
-  --admin-shadow: 0 24px 80px rgba(4, 29, 21, 0.28);
+  --admin-shadow: 0 24px 80px rgba(6, 61, 76, 0.28);
 }
 
 html, body, #admin-app {
@@ -53,9 +53,9 @@ p, button, input, textarea, select, label {
 
 body:has(#admin-app) {
   background:
-    radial-gradient(circle at top left, rgba(237, 208, 120, 0.22), transparent 24%),
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.1), transparent 20%),
-    linear-gradient(180deg, #dff7e4 0%, #bde9c4 20%, #1c8b57 48%, #0d4132 100%);
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.32), transparent 24%),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.18), transparent 20%),
+    linear-gradient(180deg, #bcecef 0%, #64bcc6 52%, #398ba3 100%);
 }
 
 #admin-app,
@@ -102,24 +102,24 @@ body:has(#admin-app) {
 }
 
 :root {
-  --admin-page-surface-top: #dff7e4;
-  --admin-page-surface-mid: #c7efd0;
-  --admin-page-surface-bottom: #8ec89a;
-  --admin-card-top: #1c7d57;
-  --admin-card-bottom: #143f34;
-  --admin-panel-top: #2e7f5c;
-  --admin-panel-bottom: #1c6349;
-  --admin-ink-900: #123c2d;
-  --admin-ink-800: #1e463a;
+  --admin-page-surface-top: #9edfe3;
+  --admin-page-surface-mid: #64bcc6;
+  --admin-page-surface-bottom: #4ba5b6;
+  --admin-card-top: #1590a8;
+  --admin-card-bottom: #0c7894;
+  --admin-panel-top: #1590a8;
+  --admin-panel-bottom: #0c7894;
+  --admin-ink-900: #063d4c;
+  --admin-ink-800: #0b5366;
   --admin-gold-500: #f4d46c;
   --admin-gold-600: #e6bd49;
   --admin-white-soft: #f4f8f6;
-  --admin-text-soft: rgba(235, 243, 238, 0.86);
-  --admin-text-soft-strong: rgba(244, 248, 246, 0.92);
-  --admin-text-dark-soft: rgba(26, 53, 43, 0.86);
-  --admin-card-border: rgba(8, 35, 27, 0.22);
-  --admin-shadow-soft: 0 18px 42px rgba(10, 57, 38, 0.18);
-  --admin-input-bg: rgba(10, 25, 19, 0.72);
+  --admin-text-soft: rgba(235, 250, 250, 0.9);
+  --admin-text-soft-strong: rgba(244, 255, 255, 0.96);
+  --admin-text-dark-soft: rgba(6, 61, 76, 0.86);
+  --admin-card-border: rgba(255, 255, 255, 0.2);
+  --admin-shadow-soft: 0 18px 42px rgba(6, 61, 76, 0.2);
+  --admin-input-bg: rgba(4, 54, 68, 0.62);
   --admin-input-border: rgba(255, 255, 255, 0.14);
 }
 
@@ -566,4 +566,145 @@ body:has(#admin-app) {
   #admin-app .admin-profile-page .profile-layout {
     grid-template-columns: 1fr;
   }
+}
+
+/* Keep authenticated admin screens on the shared aqua and teal palette. */
+#admin-app .admin-page-body,
+#admin-app .student-management-page,
+#admin-app .admin-profile-page,
+#admin-app .dashboard-page {
+  background: linear-gradient(180deg, #9edfe3 0%, #64bcc6 52%, #4ba5b6 100%) !important;
+  color: var(--admin-ink-900) !important;
+}
+
+#admin-app .page-header,
+#admin-app .panel-card,
+#admin-app .metric-card,
+#admin-app .report-card,
+#admin-app .form-card,
+#admin-app .student-directory-card,
+#admin-app .directory-card,
+#admin-app .queue-card,
+#admin-app .panel,
+#admin-app .glass-card,
+#admin-app .content-section {
+  background: linear-gradient(145deg, #1590a8 0%, #0c7894 100%) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: var(--admin-white-soft) !important;
+}
+
+#admin-app .modal-card,
+#admin-app .modal-content,
+#admin-app .archive-modal,
+#admin-app .review-modal,
+#admin-app .verification-card,
+#admin-app .item-card,
+#admin-app .match-card,
+#admin-app .detail-panel,
+#admin-app .evidence-panel,
+#admin-app .description-panel,
+#admin-app .workflow-panel,
+#admin-app .pickup-message-card,
+#admin-app .transaction-complete-card,
+#admin-app .modal-scroll,
+#admin-app .modal-overview {
+  background: linear-gradient(145deg, #1590a8 0%, #0c7894 100%) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: var(--admin-white-soft) !important;
+}
+
+#admin-app .modal-header,
+#admin-app .modal-actions,
+#admin-app .detail-panel-header,
+#admin-app .detail-panel-heading,
+#admin-app .match-card-header,
+#admin-app .card-header {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  background: rgba(12, 120, 148, 0.42) !important;
+}
+
+#admin-app .admin-page-body table,
+#admin-app .student-management-page table,
+#admin-app .admin-page-body .table-shell,
+#admin-app .admin-page-body .table-wrap,
+#admin-app .student-management-page .table-wrapper,
+#admin-app .student-management-page .table-container {
+  background: linear-gradient(180deg, #1590a8 0%, #0c7894 100%) !important;
+  color: var(--admin-white-soft) !important;
+}
+
+#admin-app .admin-page-body .admin-table thead th,
+#admin-app .admin-page-body .admin-table tbody tr,
+#admin-app .admin-page-body .admin-table tbody tr:nth-child(even),
+#admin-app .admin-page-body .admin-table tbody tr:hover {
+  background: linear-gradient(90deg, #1590a8 0%, #0c7894 100%) !important;
+}
+
+#admin-app .admin-page-body .detail-modal,
+#admin-app .admin-page-body .detail-modal .modal-top,
+#admin-app .admin-page-body .detail-modal .detail-grid {
+  background: linear-gradient(145deg, #1590a8 0%, #0c7894 100%) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: var(--admin-white-soft) !important;
+}
+
+#admin-app .modal-body,
+#admin-app .modal-reports,
+#admin-app .report-detail,
+#admin-app .detail-section,
+#admin-app .reason-detail,
+#admin-app .archive-source,
+#admin-app .report-preview,
+#admin-app .modal-actions {
+  background: rgba(12, 120, 148, 0.42) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+#admin-app .notification-modal,
+#admin-app .notification-modal .detail-list,
+#admin-app .notification-modal .detail-list div {
+  background: linear-gradient(145deg, #1590a8 0%, #0c7894 100%) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: var(--admin-white-soft) !important;
+}
+
+#admin-app .notification-modal .modal-action {
+  border-color: #07566a !important;
+  background: linear-gradient(135deg, #398ba3 0%, #0c7894 100%) !important;
+  color: #ffffff !important;
+}
+
+/* Green action states are teal as well; warning and danger actions keep their meaning. */
+#admin-app .toggle.active,
+#admin-app .approve-btn,
+#admin-app .modal-approve-button,
+#admin-app .complete-transaction-button,
+#admin-app .approve-button,
+#admin-app .confirm-button,
+#admin-app .green-button {
+  border-color: #07566a !important;
+  background: linear-gradient(135deg, #398ba3 0%, #0c7894 100%) !important;
+  color: #ffffff !important;
+}
+
+#admin-app .toggle.active:hover,
+#admin-app .approve-btn:hover,
+#admin-app .modal-approve-button:hover,
+#admin-app .complete-transaction-button:hover,
+#admin-app .approve-button:hover,
+#admin-app .confirm-button:hover,
+#admin-app .green-button:hover {
+  background: linear-gradient(135deg, #4ba5b6 0%, #0c7894 100%) !important;
+}
+
+#admin-app .admin-page-body input,
+#admin-app .admin-page-body select,
+#admin-app .admin-page-body textarea,
+#admin-app .student-management-page input,
+#admin-app .student-management-page select,
+#admin-app .admin-profile-page input,
+#admin-app .admin-profile-page select {
+  background: rgba(4, 54, 68, 0.62) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: var(--admin-white-soft) !important;
 }

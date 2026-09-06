@@ -68,7 +68,7 @@ class AdminAuthController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'student_id' => 'required|string|max:20|unique:students,student_id',
+            'student_id' => 'required|string|max:20|unique:students,student_id_number',
             'email' => 'required|email|unique:students,email',
             'department' => 'required|string|max:255',
             'course' => 'required|string|max:255',
@@ -76,15 +76,18 @@ class AdminAuthController extends Controller
             'password' => 'required|string|min:6',
         ]);
 
+        $nameParts = $this->splitStudentName($validated['name']);
         $student = Student::create([
-            'name' => $validated['name'],
-            'student_id' => $validated['student_id'],
+            'student_id_number' => $validated['student_id'],
+            'first_name' => $nameParts['first_name'],
+            'middle_name' => $nameParts['middle_name'],
+            'last_name' => $nameParts['last_name'],
             'email' => $validated['email'],
             'department' => $validated['department'],
             'course' => $validated['course'],
             'year_level' => $validated['year_level'],
             'password' => Hash::make($validated['password']),
-            'profile_picture' => '/assets/logo.png',
+            'profile_photo' => '/assets/logo.png',
         ]);
 
         return response()->json([
@@ -105,14 +108,24 @@ class AdminAuthController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'student_id' => 'required|string|max:20|unique:students,student_id,' . $student->id,
+            'student_id' => 'required|string|max:20|unique:students,student_id_number,' . $student->id,
             'course' => 'required|string|max:255',
             'year_level' => 'required|string|max:255',
             'department' => 'required|string|max:255',
             'email' => 'required|email|unique:students,email,' . $student->id,
         ]);
 
-        $student->update($validated);
+        $nameParts = $this->splitStudentName($validated['name']);
+        $student->update([
+            'student_id_number' => $validated['student_id'],
+            'first_name' => $nameParts['first_name'],
+            'middle_name' => $nameParts['middle_name'],
+            'last_name' => $nameParts['last_name'],
+            'course' => $validated['course'],
+            'year_level' => $validated['year_level'],
+            'department' => $validated['department'],
+            'email' => $validated['email'],
+        ]);
 
         return response()->json([
             'status' => 'success',
@@ -147,6 +160,19 @@ class AdminAuthController extends Controller
         }
 
         abort(403, $message);
+    }
+
+    private function splitStudentName(string $name): array
+    {
+        $parts = preg_split('/\s+/', trim($name), -1, PREG_SPLIT_NO_EMPTY);
+        $firstName = $parts[0] ?? '';
+        $lastName = count($parts) > 1 ? array_pop($parts) : $firstName;
+
+        return [
+            'first_name' => $firstName,
+            'middle_name' => $parts ? implode(' ', array_slice($parts, 1)) : null,
+            'last_name' => $lastName,
+        ];
     }
 
     private function adminUser(): Admin

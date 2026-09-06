@@ -1256,6 +1256,41 @@ image,
                         </button>
                     </footer>
 
+                    <footer v-else-if="
+                        isRejected(
+                            selectedVerification
+                        )
+                    " class="
+                            modal-actions
+                            completed-actions
+                        ">
+                        <div class="approved-footer-copy">
+                            <span>
+                                Claim Rejected
+                            </span>
+
+                            <small>
+                                Archive this rejected record to remove it
+                                from the active claimant queue.
+                            </small>
+                        </div>
+
+                        <button type="button" class="
+                                modal-action-button
+                                archive-modal-button
+                            " :disabled="archivingClaim" @click="
+                                archiveClaim(
+                                    selectedVerification
+                                )
+                                ">
+                            {{
+                                archivingClaim
+                                    ? 'Archiving...'
+                                    : 'Archive'
+                            }}
+                        </button>
+                    </footer>
+
                     <footer v-else class="
                             modal-actions
                             completed-status-footer

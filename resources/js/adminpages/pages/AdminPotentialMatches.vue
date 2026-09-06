@@ -843,7 +843,7 @@ button:disabled {
 
 .report-detail>img {
     width: 100%;
-    height: 90px;
+    height: 200px;
     margin-bottom: 13px;
     padding: 8px;
     object-fit: contain;
@@ -853,7 +853,7 @@ button:disabled {
 
 .report-detail>.image-placeholder {
     display: grid;
-    width: 100%;
+    width: 50%;
     height: 50px;
     margin-bottom: 13px;
     place-items: center;
@@ -1138,7 +1138,7 @@ button:disabled {
 
     .report-detail>img,
     .report-detail>.image-placeholder {
-        height: 84px;
+        height: 200px;
     }
 
     .report-detail dl {
