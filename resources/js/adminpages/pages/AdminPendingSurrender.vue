@@ -2327,10 +2327,10 @@ onMounted(() => {
         8px;
 
     background:
-        #edf8ef;
+        #e5f8f8;
 
     color:
-        #123c2d;
+        #0c7894;
 
     font:
         inherit;
@@ -2611,10 +2611,10 @@ onMounted(() => {
             0.18);
 
     background:
-        #123c2d;
+        linear-gradient(135deg, #398ba3 0%, #0c7894 100%);
 
     color:
-        #edf8ef;
+        #ffffff;
 }
 
 .sr-only {

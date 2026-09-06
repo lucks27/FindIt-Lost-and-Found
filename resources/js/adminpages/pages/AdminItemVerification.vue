@@ -3498,10 +3498,10 @@ onMounted(
         8px;
 
     background:
-        #f1f7ed;
+        #e5f8f8;
 
     color:
-        #123c2d;
+        #0c7894;
 
     font:
         inherit;
@@ -3692,10 +3692,10 @@ onMounted(
         8px;
 
     background:
-        #f1f7ed;
+        #e5f8f8;
 
     color:
-        #123c2d;
+        #0c7894;
 
     font:
         inherit;
@@ -3713,10 +3713,10 @@ onMounted(
 .sort-button:hover,
 .sort-button.active {
     background:
-        #123c2d;
+        linear-gradient(135deg, #398ba3 0%, #0c7894 100%);
 
     border-color:
-        #123c2d;
+        #0c7894;
 
     color:
         #ffffff;
@@ -7157,8 +7157,8 @@ onMounted(
 .category-field select,
 .sort-button {
     border-color: rgba(18, 60, 45, 0.2);
-    background: #edf8ef;
-    color: #123c2d;
+    background: #e5f8f8;
+    color: #0c7894;
 }
 
 .search-field input::placeholder,

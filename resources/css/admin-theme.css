@@ -691,8 +691,8 @@ body:has(#admin-app) {
 #admin-app .approve-button,
 #admin-app .confirm-button,
 #admin-app .green-button {
-  border-color: #07566a !important;
-  background: linear-gradient(135deg, #398ba3 0%, #0c7894 100%) !important;
+  border-color: #16a34a !important;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
   color: #ffffff !important;
 }
 
@@ -703,7 +703,7 @@ body:has(#admin-app) {
 #admin-app .approve-button:hover,
 #admin-app .confirm-button:hover,
 #admin-app .green-button:hover {
-  background: linear-gradient(135deg, #4ba5b6 0%, #0c7894 100%) !important;
+  background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%) !important;
 }
 
 #admin-app .admin-page-body input,
@@ -716,4 +716,56 @@ body:has(#admin-app) {
   background: rgba(4, 54, 68, 0.62) !important;
   border-color: rgba(255, 255, 255, 0.2) !important;
   color: var(--admin-white-soft) !important;
+}
+
+#admin-app .admin-page-body select,
+#admin-app .student-management-page select,
+#admin-app .admin-profile-page select {
+  appearance: auto;
+  background: #0c7894 !important;
+  box-sizing: border-box;
+  color: #ffffff !important;
+  color-scheme: dark;
+  font-size: 0.78rem !important;
+  line-height: 1.2;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 2rem 0 0.75rem !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+#admin-app .filters select,
+#admin-app .category-field select,
+#admin-app .filter-field select,
+#admin-app .status-filter select,
+#admin-app .score-filter select {
+  appearance: auto;
+  background: #0c7894 !important;
+  box-sizing: border-box;
+  color: #ffffff !important;
+  font-size: 0.78rem !important;
+  line-height: 1.2;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 2rem 0 0.75rem !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+#admin-app .admin-page-body select option,
+#admin-app .student-management-page select option,
+#admin-app .admin-profile-page select option {
+  background: #0c7894;
+  color: #ffffff;
+}
+
+#admin-app .admin-page-body select:focus,
+#admin-app .student-management-page select:focus,
+#admin-app .admin-profile-page select:focus {
+  outline: 2px solid #64bcc6;
+  outline-offset: 1px;
+  border-color: #64bcc6 !important;
 }

@@ -2189,8 +2189,8 @@ onMounted(() => {
 
     border-radius: 8px;
 
-    background: #edf8ef;
-    color: #123c2d;
+    background: #e5f8f8;
+    color: #0c7894;
 
     font: inherit;
     font-size: 0.75rem;
@@ -2391,9 +2391,9 @@ onMounted(() => {
     border-color:
         rgba(18, 60, 45, 0.18);
 
-    background: #123c2d;
+    background: linear-gradient(135deg, #398ba3 0%, #0c7894 100%);
 
-    color: #edf8ef;
+    color: #ffffff;
 }
 
 /* =====================================================

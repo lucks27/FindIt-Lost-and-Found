@@ -155,6 +155,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .admin-header {
+    position: relative;
     grid-column: 2;
     grid-row: 1;
     display: flex;
@@ -168,6 +169,7 @@ onBeforeUnmount(() => {
     border-bottom: 1px solid rgba(255, 255, 255, 0.16);
     box-shadow: 0 8px 20px rgba(11, 51, 37, 0.18);
     overflow: visible;
+    z-index: 1000;
 }
 
 .header-left {
@@ -257,7 +259,7 @@ onBeforeUnmount(() => {
 
 .profile-menu-wrap {
     position: relative;
-    z-index: 2;
+    z-index: 1001;
 }
 
 .profile-trigger {
@@ -338,7 +340,7 @@ onBeforeUnmount(() => {
     background: linear-gradient(145deg, #398ba3 0%, #0c7894 100%);
     border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow: 0 12px 24px rgba(10, 41, 29, 0.2);
-    z-index: 2000;
+    z-index: 1100;
     transform-origin: top right;
 }
 
