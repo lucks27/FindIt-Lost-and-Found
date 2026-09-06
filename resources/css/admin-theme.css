@@ -595,6 +595,7 @@ body:has(#admin-app) {
 
 #admin-app .modal-card,
 #admin-app .modal-content,
+#admin-app .modal,
 #admin-app .archive-modal,
 #admin-app .review-modal,
 #admin-app .verification-card,
@@ -613,12 +614,20 @@ body:has(#admin-app) {
   color: var(--admin-white-soft) !important;
 }
 
+#admin-app .modal .preview-details,
+#admin-app .modal .item-details,
+#admin-app .modal .details,
+#admin-app .modal .detail-list {
+  background: rgba(12, 120, 148, 0.42) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: var(--admin-white-soft) !important;
+}
+
 #admin-app .modal-header,
 #admin-app .modal-actions,
 #admin-app .detail-panel-header,
 #admin-app .detail-panel-heading,
-#admin-app .match-card-header,
-#admin-app .card-header {
+#admin-app .match-card-header {
   border-color: rgba(255, 255, 255, 0.16) !important;
   background: rgba(12, 120, 148, 0.42) !important;
 }

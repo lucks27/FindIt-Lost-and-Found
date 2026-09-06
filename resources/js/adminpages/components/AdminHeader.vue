@@ -335,7 +335,7 @@ onBeforeUnmount(() => {
     min-width: 140px;
     padding: 6px;
     border-radius: 12px;
-    background: rgba(17, 107, 71, 0.96);
+    background: linear-gradient(145deg, #398ba3 0%, #0c7894 100%);
     border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow: 0 12px 24px rgba(10, 41, 29, 0.2);
     z-index: 2000;

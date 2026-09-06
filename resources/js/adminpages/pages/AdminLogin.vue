@@ -277,7 +277,7 @@ const handleLogin = async () => {
     border: none;
     padding: 15px 18px;
     border-radius: 16px;
-    background: linear-gradient(135deg, #18451d 0%, #2d6a33 100%);
+    background: linear-gradient(135deg, #398ba3 0%, #0c7894 100%);
     color: #fff;
     font-weight: 800;
     cursor: pointer;
