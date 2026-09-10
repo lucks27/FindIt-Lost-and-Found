@@ -81,6 +81,7 @@ Route::middleware(['web', 'auth:admin'])->group(function () {
     Route::patch('/admin/mobile-posts/{id}/visibility', [App\Http\Controllers\AdminWorkflowController::class, 'toggleMobilePostVisibility']);
     Route::post('/admin/mobile-posts/{id}/archive', [App\Http\Controllers\AdminWorkflowController::class, 'archiveMobilePost']);
     Route::get('/admin/dashboard', [App\Http\Controllers\AdminWorkflowController::class, 'dashboardMetrics']);
+    Route::get('/admin/audit-logs', [App\Http\Controllers\AdminWorkflowController::class, 'indexAuditLogs']);
     Route::get('/admin/point-rules', [App\Http\Controllers\AdminWorkflowController::class, 'indexPointRules']);
     Route::post('/admin/point-rules', [App\Http\Controllers\AdminWorkflowController::class, 'storePointRule']);
     Route::put('/admin/point-rules/{id}', [App\Http\Controllers\AdminWorkflowController::class, 'updatePointRule']);

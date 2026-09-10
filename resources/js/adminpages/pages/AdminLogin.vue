@@ -32,7 +32,7 @@
                     <input type="hidden" name="_token" :value="csrf" />
                     <label>
                         Email Address
-                        <input v-model="email" type="email" name="email" placeholder="name@snsu.edu.ph"
+                        <input v-model="email" type="email" name="email" placeholder="name@ssct.edu.ph"
                             autocomplete="email" required />
                     </label>
 

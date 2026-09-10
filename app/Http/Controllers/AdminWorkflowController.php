@@ -99,7 +99,9 @@ class AdminWorkflowController extends Controller
 
                 return [
                     'id' => $log->id,
-                    'date' => $log->created_at?->toDateTimeString(),
+                    'date' => $log->created_at instanceof \DateTimeInterface
+                        ? $log->created_at->format('Y-m-d H:i:s')
+                        : $log->created_at,
                     'user_name' => $log->actorAdmin?->name ?? 'System',
                     'action' => $log->action,
                     'module' => $module,
@@ -113,7 +115,7 @@ class AdminWorkflowController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $logs,
-        ]);
+        ], 200, [], JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     public function exportAuditLogs(Request $request)
@@ -1339,9 +1341,14 @@ class AdminWorkflowController extends Controller
                 ]);
 
                 $report->update([
-                    'status' => 'verified',
+                    'status' => 'pending_verification',
                     'published_at' => Carbon::now(),
                 ]);
+
+                ItemVerification::firstOrCreate(
+                    ['report_id' => $report->id],
+                    ['status' => 'pending']
+                );
 
                 VisiblePostedItem::updateOrCreate(
                     ['report_id' => $report->id],

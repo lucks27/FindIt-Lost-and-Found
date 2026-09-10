@@ -74,6 +74,8 @@ class ResetLostFoundDatabaseCommand extends Command
             'cache',
             'cache_locks',
             'personal_access_tokens',
+            'students',
+            'reports',
         ];
 
         $driver = DB::getDriverName();
@@ -111,14 +113,16 @@ class ResetLostFoundDatabaseCommand extends Command
             'item_verifications',
             'surrender_requests',
             'report_images',
-            'reports',
             'item_categories',
             'students',
+            'reports',
         ];
 
-        $tablesToDrop = array_values(array_unique(array_filter(array_merge($dropOrder, $allTables), function ($tableName) use ($tablesToPreserve) {
-            return $tableName !== '' && !in_array($tableName, $tablesToPreserve, true);
-        })));
+        $tablesToDrop = array_values(array_filter($allTables, function ($tableName) use ($tablesToPreserve) {
+            return $tableName !== ''
+                && !in_array($tableName, $tablesToPreserve, true)
+                && str_starts_with($tableName, 'legacy_');
+        }));
 
         if (DB::getDriverName() === 'sqlite') {
             DB::statement('PRAGMA foreign_keys = OFF');
@@ -126,8 +130,16 @@ class ResetLostFoundDatabaseCommand extends Command
             Schema::disableForeignKeyConstraints();
         }
 
+        if (Schema::hasTable('reports')) {
+            DB::table('reports')->delete();
+        }
+        if (Schema::hasTable('students')) {
+            DB::table('students')->delete();
+        }
+
         foreach ($tablesToDrop as $table) {
-            Schema::dropIfExists($table);
+            $quotedTable = str_replace('"', '""', $table);
+            DB::statement('DROP TABLE IF EXISTS "' . $quotedTable . '"');
         }
 
         if (DB::getDriverName() === 'sqlite') {
@@ -136,27 +148,17 @@ class ResetLostFoundDatabaseCommand extends Command
             Schema::enableForeignKeyConstraints();
         }
 
-        if (Schema::hasTable('migrations')) {
-            DB::table('migrations')
-                ->where('migration', '2026_08_05_000002_create_lost_found_core_tables')
-                ->delete();
-        }
-
-        $this->call('migrate', ['--path' => 'database/migrations/2026_08_05_000002_create_lost_found_core_tables.php', '--force' => true]);
-
         $this->info('Administrator records verified: ' . DB::table($adminTable)->count());
 
         if (!Admin::query()->exists()) {
             Admin::create([
                 'name' => 'Super Admin',
-                'email' => 'superadmin@snsu.edu.ph',
+                'email' => 'superadmin@ssct.edu.ph',
                 'password' => bcrypt('password'),
                 'status' => true,
                 'role' => 'super_admin',
             ]);
         }
-
-        $this->call('db:seed', ['--class' => 'Database\\Seeders\\LostFoundDatabaseSeeder']);
 
         return self::SUCCESS;
     }

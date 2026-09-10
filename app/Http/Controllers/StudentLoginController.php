@@ -39,7 +39,7 @@ class StudentLoginController extends Controller
         }
 
         // Check university email domain
-        if (!str_ends_with($student->email, '@snsu.edu.ph') && !str_ends_with($student->email, '@ssnsu.edu')) {
+        if (!str_ends_with($student->email, '@ssct.edu.ph')) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Only university emails are allowed.'
@@ -110,7 +110,7 @@ class StudentLoginController extends Controller
         ]);
 
         // Ensure university email
-        if (!str_ends_with($validatedData['email'], '@snsu.edu.ph') && !str_ends_with($validatedData['email'], '@ssnsu.edu')) {
+        if (!str_ends_with($validatedData['email'], '@ssct.edu.ph')) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Only university emails are allowed.'

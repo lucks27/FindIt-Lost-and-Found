@@ -57,7 +57,7 @@ class LostFoundDatabaseSeeder extends Seeder
             ]
         );
 
-        Admin::query()->firstOrCreate(['email' => 'superadmin@snsu.edu.ph'], [
+        Admin::query()->firstOrCreate(['email' => 'superadmin@ssct.edu.ph'], [
             'name' => 'Super Admin',
             'password' => Hash::make('password'),
             'status' => true,

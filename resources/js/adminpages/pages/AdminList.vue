@@ -241,7 +241,7 @@
                             <div class="email-input-row">
                                 <input v-model.trim="studentForm.emailPrefix" type="text" placeholder="username"
                                     @input="studentEmailEdited = true" />
-                                <span class="email-domain">@snsu.edu.ph</span>
+                                <span class="email-domain">@ssct.edu.ph</span>
                             </div>
                             <span v-if="studentErrors.email" class="field-error">{{ studentErrors.email }}</span>
                         </label>
@@ -636,7 +636,7 @@ function validateStudentForm() {
     if (!studentForm.value.year_level) errors.year_level = 'Year level is required.'
     if (!studentForm.value.department) errors.department = 'Department is required.'
 
-    const fullEmail = `${studentForm.value.emailPrefix}@snsu.edu.ph`
+    const fullEmail = `${studentForm.value.emailPrefix}@ssct.edu.ph`
     if (!studentForm.value.emailPrefix) {
         errors.email = 'Email username is required.'
     } else if (!validateEmail(fullEmail)) {
@@ -702,7 +702,7 @@ async function submitStudent() {
     try {
         const response = await api.post('/api/admin/students', {
             ...payload,
-            email: `${studentForm.value.emailPrefix}@snsu.edu.ph`,
+            email: `${studentForm.value.emailPrefix}@ssct.edu.ph`,
             password: studentForm.value.password,
         })
         students.value = [response.data?.data, ...students.value.filter(Boolean)]

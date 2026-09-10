@@ -38,6 +38,7 @@ class AuditLog extends Model
     ];
 
     protected $casts = [
+        'created_at' => 'datetime',
         'old_values' => 'array',
         'new_values' => 'array',
         'details' => 'array',
