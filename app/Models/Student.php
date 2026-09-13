@@ -34,6 +34,7 @@ class Student extends Authenticatable
         'password',
         'course',
         'department',
+        'department_id',
         'year_level',
         'profile_photo',
         'status',
@@ -103,6 +104,17 @@ class Student extends Authenticatable
         }
 
         $this->attributes['password'] = Hash::needsRehash($value) ? Hash::make($value) : $value;
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function setEmailAttribute($value)
+    {
+        $normalized = strtolower(trim((string) $value));
+        $this->attributes['email'] = $normalized;
     }
 
     /**

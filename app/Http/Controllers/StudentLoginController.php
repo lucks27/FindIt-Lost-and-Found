@@ -22,14 +22,17 @@ class StudentLoginController extends Controller
      */
     public function login(Request $request)
     {
+        $email = strtolower(trim((string) $request->input('email', '')));
+        $request->merge(['email' => $email]);
+
         // Validate input
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
         ]);
 
-        // Check if student exists
-        $student = Student::where('email', $request->email)->first();
+        // Check if student exists using a case-insensitive email comparison.
+        $student = Student::whereRaw('LOWER(email) = ?', [$email])->first();
 
         if (!$student) {
             return response()->json([
@@ -39,7 +42,7 @@ class StudentLoginController extends Controller
         }
 
         // Check university email domain
-        if (!str_ends_with($student->email, '@ssct.edu.ph')) {
+        if (!str_ends_with(strtolower($student->email), '@ssct.edu.ph')) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Only university emails are allowed.'
@@ -98,6 +101,10 @@ class StudentLoginController extends Controller
      */
     public function register(Request $request)
     {
+        $request->merge([
+            'email' => strtolower(trim((string) $request->input('email', ''))),
+        ]);
+
         // Validate input
         $validatedData = $request->validate([
             'student_id' => 'required|string|unique:students,student_id',
@@ -108,6 +115,8 @@ class StudentLoginController extends Controller
             'department' => 'required|string|max:255',
             'password' => 'required|min:6|confirmed',
         ]);
+
+        $validatedData['email'] = strtolower(trim((string) $validatedData['email']));
 
         // Ensure university email
         if (!str_ends_with($validatedData['email'], '@ssct.edu.ph')) {
