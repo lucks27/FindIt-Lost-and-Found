@@ -166,11 +166,26 @@
                 <form class="student-form" @submit.prevent="submitStudent">
                     <div class="form-section">
                         <h3>Personal Information</h3>
-                        <label>
-                            <span>First and last name *</span>
-                            <input v-model.trim="studentForm.name" type="text" placeholder="Full name" />
-                            <span v-if="studentErrors.name" class="field-error">{{ studentErrors.name }}</span>
-                        </label>
+                        <div class="name-input-grid">
+                            <label>
+                                <span>First name *</span>
+                                <input v-model.trim="studentForm.first_name" type="text" placeholder="First name" />
+                                <span v-if="studentErrors.first_name" class="field-error">{{ studentErrors.first_name
+                                }}</span>
+                            </label>
+
+                            <label>
+                                <span>Middle name</span>
+                                <input v-model.trim="studentForm.middle_name" type="text" placeholder="Middle name" />
+                            </label>
+
+                            <label>
+                                <span>Last name *</span>
+                                <input v-model.trim="studentForm.last_name" type="text" placeholder="Last name" />
+                                <span v-if="studentErrors.last_name" class="field-error">{{ studentErrors.last_name
+                                }}</span>
+                            </label>
+                        </div>
 
                         <label>
                             <span>Student ID *</span>
@@ -430,7 +445,9 @@ const studentEmailEdited = ref(false)
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 const studentForm = ref({
-    name: '',
+    first_name: '',
+    middle_name: '',
+    last_name: '',
     student_id: '',
     course_base: '',
     major: '',
@@ -498,18 +515,20 @@ function resetMessages() {
     statusMessage.value = ''
 }
 
-function generateEmailPrefix(fullName) {
-    if (!fullName) return ''
-    const parts = fullName.trim().split(/\s+/)
-    if (parts.length === 1) return parts[0].toLowerCase()
-    return `${parts[0].charAt(0).toLowerCase()}${parts[parts.length - 1].toLowerCase()}`
+function generateEmailPrefix(firstName, lastName) {
+    const first = (firstName || '').trim()
+    const last = (lastName || '').trim()
+    if (!first && !last) return ''
+    if (!first) return last.toLowerCase()
+    if (!last) return first.toLowerCase()
+    return `${first.charAt(0).toLowerCase()}${last.toLowerCase()}`
 }
 
 watch(
-    () => studentForm.value.name,
-    (newVal) => {
+    [() => studentForm.value.first_name, () => studentForm.value.last_name],
+    ([firstName, lastName]) => {
         if (!studentEmailEdited.value) {
-            studentForm.value.emailPrefix = generateEmailPrefix(newVal)
+            studentForm.value.emailPrefix = generateEmailPrefix(firstName, lastName)
         }
     },
 )
@@ -644,7 +663,9 @@ function generateStudentID() {
 
 function resetStudentForm(isCreate = true) {
     studentForm.value = {
-        name: '',
+        first_name: '',
+        middle_name: '',
+        last_name: '',
         student_id: isCreate ? generateStudentID() : '',
         course_base: '',
         major: '',
@@ -669,7 +690,8 @@ function validateEmail(value) {
 function validateStudentForm() {
     const errors = {}
 
-    if (!studentForm.value.name) errors.name = 'Name is required.'
+    if (!studentForm.value.first_name) errors.first_name = 'First name is required.'
+    if (!studentForm.value.last_name) errors.last_name = 'Last name is required.'
     if (!studentForm.value.student_id) errors.student_id = 'Student ID is required.'
     if (!studentForm.value.course_base) errors.course_base = 'Course is required.'
     if (needsMajorSelection.value && !studentForm.value.major) {
@@ -742,8 +764,14 @@ async function submitStudent() {
         fullCourseName += ` Concentration in ${studentForm.value.concentration}`
     }
 
+    const studentFullName = [studentForm.value.first_name, studentForm.value.middle_name, studentForm.value.last_name]
+        .filter(Boolean)
+        .join(' ')
+    const middleNameValue = studentForm.value.middle_name?.trim() ? studentForm.value.middle_name.trim() : null
+
     const payload = {
-        name: studentForm.value.name,
+        name: studentFullName,
+        middle_name: middleNameValue,
         student_id: studentForm.value.student_id,
         course: fullCourseName,
         year_level: studentForm.value.year_level,
@@ -986,6 +1014,17 @@ onMounted(loadListData)
     background: #0d2b1e;
     color: #e5f3e8;
     font-size: 14px;
+}
+
+.name-input-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.name-input-grid label {
+    display: grid;
+    gap: 8px;
 }
 
 .password-input-wrap {

@@ -93,8 +93,6 @@
                 </dl>
                 <p class="notification-message">{{ selectedNotification.message || 'No additional details available.' }}
                 </p>
-                <button type="button" class="primary-button modal-action" @click="goToNotification">Go to related
-                    page</button>
             </article>
         </div>
     </main>
@@ -102,11 +100,9 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import api from '@/bootstrap'
 
 const query = ref('')
-const router = useRouter()
 const notifications = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
@@ -160,32 +156,6 @@ async function openNotification(item) {
 
 function closeNotification() {
     selectedNotification.value = null
-}
-
-function goToNotification() {
-    const routeName = getNotificationRoute(selectedNotification.value)
-    if (routeName) {
-        router.push({ name: routeName })
-    }
-    closeNotification()
-}
-
-function getNotificationRoute(notification) {
-    if (!notification) return null
-    if (notification.link?.startsWith('superadmin.')) return notification.link
-
-    const text = [notification.notification_type, notification.type, notification.action, notification.title]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-
-    if (text.includes('surrender')) return 'superadmin.pending-surrender'
-    if (text.includes('report')) return 'superadmin.pending-report'
-    if (text.includes('verification')) return 'superadmin.item-verification'
-    if (text.includes('match')) return 'superadmin.matches'
-    if (text.includes('fine')) return 'superadmin.fines'
-
-    return 'superadmin.notifications'
 }
 
 async function loadNotifications() {
