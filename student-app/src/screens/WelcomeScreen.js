@@ -10,13 +10,8 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import bgImage from '../../assets/bg.png';
+import bgImage from '../../assets/building bg.png';
 import logoImage from '../../assets/logo.png';
-import cteLogo from '../../assets/cte.png';
-import coeLogo from '../../assets/coe.png';
-import ccisLogo from '../../assets/ccis.png';
-import cbtLogo from '../../assets/cbt.png';
-import casLogo from '../../assets/cas.png';
 
 export default function WelcomeScreen() {
   const navigation = useNavigation();
@@ -24,29 +19,29 @@ export default function WelcomeScreen() {
 
   return (
     <ImageBackground source={bgImage} style={styles.background} resizeMode="cover">
+      <View style={styles.photoWash} />
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.topSection}>
+        <View style={styles.header}>
           <Image source={logoImage} style={styles.mainLogo} resizeMode="contain" />
-          <View style={styles.topTextContainer}>
-            <Text style={styles.motto}>Integrity, Competence, Respect</Text>
-            <View style={styles.sealRow}>
-              <Image source={cteLogo} style={styles.seal} resizeMode="contain" />
-              <Image source={coeLogo} style={styles.seal} resizeMode="contain" />
-              <Image source={ccisLogo} style={styles.seal} resizeMode="contain" />
-              <Image source={cbtLogo} style={styles.seal} resizeMode="contain" />
-              <Image source={casLogo} style={styles.seal} resizeMode="contain" />
-            </View>
+          <View style={styles.headerCopy}>
+            <Text style={styles.brand}>FindIt</Text>
+            <Text style={styles.motto}>Together, we find what matters.</Text>
           </View>
         </View>
 
-        <View style={styles.heroCard}>
-          <Text style={styles.title}>Your SNSU Campus Space</Text>
-          <Text style={styles.heroTitle}>Welcome, {user?.name?.split(' ')[0] || 'Student'}!</Text>
-          <Text style={styles.heroText}>Access, Click, Manage</Text>
-          <TouchableOpacity style={styles.exploreButton} onPress={() => navigation.navigate('Dashboard')}>
-            <Text style={styles.exploreButtonText}>Explore Now</Text>
+        <View style={styles.content}>
+          <Text style={styles.eyebrow}>SURIGAO DEL NORTE STATE UNIVERSITY</Text>
+          <Text style={styles.heroTitle}>Welcome back, {user?.name?.split(' ')[0] || 'Student'}.</Text>
+          <Text style={styles.heroText}>Lost something on campus? Find it, report it, and help bring it home.</Text>
+          <View style={styles.rule} />
+          <Text style={styles.prompt}>Ready to find what matters?</Text>
+          <TouchableOpacity style={styles.exploreButton} onPress={() => navigation.navigate('Dashboard')} activeOpacity={0.88}>
+            <Text style={styles.exploreButtonText}>Get Started</Text>
+            <Text style={styles.arrow}>→</Text>
           </TouchableOpacity>
         </View>
+
+        <Text style={styles.footer}>Integrity  •  Competence  •  Respect</Text>
       </SafeAreaView>
     </ImageBackground>
   );
@@ -55,94 +50,112 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   background: {
     flex: 1,
-    justifyContent: 'center',
+  },
+  photoWash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(4, 50, 31, 0.48)',
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-  },
-  topSection: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 40,
-    paddingTop: 0,
+    paddingHorizontal: 26,
+    paddingTop: 20,
+    paddingBottom: 24,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   mainLogo: {
-    width: 90,
-    height: 90,
+    width: 72,
+    height: 72,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderRadius: 18,
   },
-  topTextContainer: {
-    flex: 1,
-    marginLeft: 30,
-    alignItems: 'center',
-    marginVertical: 15,
+  headerCopy: {
+    marginLeft: 14,
+  },
+  brand: {
+    color: '#ffffff',
+    fontSize: 27,
+    fontWeight: '900',
   },
   motto: {
-    fontSize: 15,
+    color: '#e5f4e8',
+    fontSize: 12,
     fontStyle: 'italic',
-    color: '#154e2a',
-    marginBottom: 20,
-    textAlign: 'center',
+    marginTop: 2,
   },
-  sealRow: {
-    flexDirection: 'row',
+  content: {
     alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'nowrap',
-    gap: 5,
+    marginTop: 42,
   },
-  seal: {
-    width: 32,
-    height: 32,
-    marginLeft: 12,
-    marginBottom: 15,
-  },
-  heroCard: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 26,
-    padding: 28,
-    alignItems: 'center',
-    marginHorizontal: 8,
-    marginVertical: 100,
-    shadowColor: '#000',
-    shadowOpacity: 0.16,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
-  },
-  title: {
-    fontSize: 20,
+  eyebrow: {
+    color: '#f7c52c',
+    fontSize: 11,
     fontWeight: '800',
-    color: '#27401f',
+    letterSpacing: 1.2,
     textAlign: 'center',
-    marginBottom: 10,
-    textTransform: 'uppercase',
+    marginBottom: 18,
   },
   heroTitle: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#1d3b1f',
+    color: '#ffffff',
+    fontSize: 38,
+    lineHeight: 44,
+    fontWeight: '900',
     textAlign: 'center',
-    marginBottom: 10,
   },
   heroText: {
+    maxWidth: 310,
+    color: '#eaf6ed',
     fontSize: 16,
-    color: '#23432d',
+    lineHeight: 24,
     textAlign: 'center',
-    marginBottom: 24,
+    marginTop: 18,
   },
-  exploreButton: {
-    backgroundColor: '#1d4ed8',
-    borderRadius: 999,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
+  rule: {
+    width: 48,
+    height: 4,
+    borderRadius: 4,
+    backgroundColor: '#f7c52c',
+    marginTop: 28,
   },
-  exploreButtonText: {
+  prompt: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
+    marginTop: 26,
+    marginBottom: 16,
+  },
+  exploreButton: {
+    minWidth: 236,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#08613d',
+    borderColor: '#f7c52c',
+    borderWidth: 1.5,
+    borderRadius: 999,
+    paddingVertical: 16,
+    paddingHorizontal: 28,
+  },
+  exploreButtonText: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  arrow: {
+    color: '#f7c52c',
+    fontSize: 25,
+    fontWeight: '700',
+    marginLeft: 12,
+    lineHeight: 25,
+  },
+  footer: {
+    color: '#e5f4e8',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textAlign: 'center',
   },
 });
