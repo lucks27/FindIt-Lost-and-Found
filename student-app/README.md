@@ -11,9 +11,15 @@ This Expo app is built for students to log in using existing Laravel backend acc
     npm install
     ```
 
-2. If needed, update the API backend URL in `src/api/api.js`.
-   The app now auto-detects the local development host for Expo/devices,
-   but you can still override it with `process.env.API_BASE_URL`.
+2. The app auto-detects the Expo development host for phones on the same Wi-Fi.
+    To use a specific backend URL, create `student-app/.env` with:
+
+     ```text
+     EXPO_PUBLIC_API_BASE_URL=http://YOUR_COMPUTER_IP:8000
+     ```
+
+    The computer and phone must be on the same Wi-Fi, and Laravel must listen on
+    `0.0.0.0` rather than only `127.0.0.1`.
 
 3. Run the app:
     ```bash
