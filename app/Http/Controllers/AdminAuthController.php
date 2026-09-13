@@ -79,7 +79,7 @@ class AdminAuthController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'student_id' => 'required|string|max:20|unique:students,student_id_number',
-            'email' => 'required|email|unique:students,email',
+            'email' => 'required|email|ends_with:@ssct.edu.ph|unique:students,email',
             'department' => 'required|string|max:255',
             'course' => 'required|string|max:255',
             'year_level' => 'required|string|max:255',
@@ -132,7 +132,7 @@ class AdminAuthController extends Controller
             'course' => 'required|string|max:255',
             'year_level' => 'required|string|max:255',
             'department' => 'required|string|max:255',
-            'email' => 'required|email|unique:students,email,' . $student->id,
+            'email' => 'required|email|ends_with:@ssct.edu.ph|unique:students,email,' . $student->id,
         ]);
 
         if (!str_ends_with(strtolower($validated['email']), '@ssct.edu.ph')) {

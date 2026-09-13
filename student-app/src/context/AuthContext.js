@@ -3,7 +3,6 @@ import { Alert } from 'react-native';
 import * as api from '../api/api';
 import EventBus from '../utils/EventBus';
 import RealtimeSync from '../utils/RealtimeSync';
-import { registerSavedPushToken } from '../utils/PushTokenManager';
 import { registerPushToken, unregisterPushToken } from '../utils/NotificationService';
 
 const AuthContext = createContext({
@@ -26,21 +25,12 @@ export function AuthProvider({ children }) {
   async function restoreSession() {
     setLoading(true);
     try {
-      // When the app starts, restore the saved auth token (if any).
-      // This keeps the mobile user logged in across app restarts.
-      const hasToken = await api.initializeApiClient();
-      if (hasToken) {
-        const userResponse = await api.fetchUser();
-        setUser(userResponse.data);
-        // Start real-time sync when user is authenticated
-        RealtimeSync.startRealtimeSync();
-        await registerSavedPushToken();
-      } else {
-        setUser(null);
-      }
+      // Always begin at Login so the app follows Opening -> Login -> Welcome.
+      // A successful login still stores the token for authenticated requests.
+      await api.setSavedToken(null);
+      setUser(null);
     } catch (err) {
       console.error('Error restoring session:', err);
-      await api.setSavedToken(null);
       setUser(null);
     } finally {
       setLoading(false);

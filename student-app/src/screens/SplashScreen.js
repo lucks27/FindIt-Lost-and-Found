@@ -1,22 +1,19 @@
 import React, { useEffect } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import logoImage from '../../assets/logo.png';
 
 export default function SplashScreen({ onFinished }) {
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (onFinished) onFinished();
-    }, 1800);
-
+    const timer = setTimeout(onFinished, 1300);
     return () => clearTimeout(timer);
   }, [onFinished]);
 
   return (
     <View style={styles.screen}>
-      <View style={styles.frame}>
-        <View style={styles.panel}>
-          <Image source={logoImage} style={styles.logo} resizeMode="contain" />
-        </View>
+      <View style={styles.panel}>
+        <Image source={logoImage} style={styles.logo} resizeMode="contain" />
+        <Text style={styles.wordmark}>FindIt</Text>
+        <Text style={styles.caption}>Lost and Found Management</Text>
       </View>
     </View>
   );
@@ -25,39 +22,32 @@ export default function SplashScreen({ onFinished }) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#17191a',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-  },
-  frame: {
-    width: '96%',
-    height: '97%',
-    maxWidth: 420,
-    padding: 12,
-    borderRadius: 34,
-    backgroundColor: '#ffffff',
-    borderWidth: 4,
-    borderColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 10,
   },
   panel: {
-    flex: 1,
-    width: '100%',
-    borderRadius: 28,
-    backgroundColor: '#0d9a3c',
+    width: '92%',
+    height: '94%',
+    borderRadius: 22,
+    backgroundColor: '#238d32',
     alignItems: 'center',
     justifyContent: 'center',
   },
   logo: {
-    width: 190,
-    height: 190,
-    opacity: 1,
+    width: 126,
+    height: 126,
+  },
+  wordmark: {
+    marginTop: 8,
+    color: '#ffffff',
+    fontSize: 30,
+    fontWeight: '800',
+  },
+  caption: {
+    marginTop: 4,
+    color: '#d8f4dc',
+    fontSize: 12,
+    letterSpacing: 0.4,
   },
 });

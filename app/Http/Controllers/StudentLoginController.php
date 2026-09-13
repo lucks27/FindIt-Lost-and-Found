@@ -27,14 +27,17 @@ class StudentLoginController extends Controller
      */
     public function login(Request $request)
     {
+        $email = strtolower(trim((string) $request->input('email', '')));
+        $request->merge(['email' => $email]);
+
         // Validate input
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
         ]);
 
-        // Check if student exists
-        $student = Student::where('email', $request->email)->first();
+        // Check if student exists using a case-insensitive email comparison.
+        $student = Student::whereRaw('LOWER(email) = ?', [$email])->first();
 
         if (!$student) {
             return response()->json([
@@ -103,6 +106,10 @@ class StudentLoginController extends Controller
      */
     public function register(Request $request)
     {
+        $request->merge([
+            'email' => strtolower(trim((string) $request->input('email', ''))),
+        ]);
+
         // Validate input
         $validatedData = $request->validate([
             'student_id' => 'required|string|unique:students,student_id',
@@ -117,8 +124,10 @@ class StudentLoginController extends Controller
             'password.regex' => 'Password must be at least 6 characters and include at least one uppercase letter, one number, and one of these symbols: !, _, -, .',
         ]);
 
-        // Ensure SSCT email
-        if (!str_ends_with(strtolower($validatedData['email']), '@ssct.edu.ph')) {
+        $validatedData['email'] = strtolower(trim((string) $validatedData['email']));
+
+    // Ensure SSCT email
+        if (!str_ends_with($validatedData['email'], '@ssct.edu.ph')) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Only SSCT emails are allowed.'

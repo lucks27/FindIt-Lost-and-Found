@@ -1,52 +1,56 @@
 import React from 'react';
 import {
-  View,
+  Image,
+  ImageBackground,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  ImageBackground,
-  Image,
-  SafeAreaView,
+  View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import bgImage from '../../assets/bg.png';
+import backgroundImage from '../../assets/building bg.png';
 import logoImage from '../../assets/logo.png';
-import cteLogo from '../../assets/cte.png';
-import coeLogo from '../../assets/coe.png';
-import ccisLogo from '../../assets/ccis.png';
-import cbtLogo from '../../assets/cbt.png';
-import casLogo from '../../assets/cas.png';
 
 export default function WelcomeScreen() {
   const navigation = useNavigation();
   const { user } = useAuth();
+  const firstName = user?.name?.split(' ')[0] || 'Student';
 
   return (
-    <ImageBackground source={bgImage} style={styles.background} resizeMode="cover">
+    <ImageBackground source={backgroundImage} style={styles.background} resizeMode="cover">
+      <View style={styles.overlay} />
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.topSection}>
-          <Image source={logoImage} style={styles.mainLogo} resizeMode="contain" />
-          <View style={styles.topTextContainer}>
-            <Text style={styles.motto}>Integrity, Competence, Respect</Text>
-            <View style={styles.sealRow}>
-              <Image source={cteLogo} style={styles.seal} resizeMode="contain" />
-              <Image source={coeLogo} style={styles.seal} resizeMode="contain" />
-              <Image source={ccisLogo} style={styles.seal} resizeMode="contain" />
-              <Image source={cbtLogo} style={styles.seal} resizeMode="contain" />
-              <Image source={casLogo} style={styles.seal} resizeMode="contain" />
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <Image source={logoImage} style={styles.logo} resizeMode="contain" />
+            <View style={styles.headerText}>
+              <Text style={styles.university}>SURIGAO DEL NORTE</Text>
+              <Text style={styles.university}>STATE UNIVERSITY</Text>
+              <Text style={styles.motto}>Integrity  •  Competence  •  Respect</Text>
             </View>
           </View>
-        </View>
 
-        <View style={styles.heroCard}>
-          <Text style={styles.title}>Your SNSU Campus Space</Text>
-          <Text style={styles.heroTitle}>Welcome, {user?.name?.split(' ')[0] || 'Student'}!</Text>
-          <Text style={styles.heroText}>Access, Click, Manage</Text>
-          <TouchableOpacity style={styles.exploreButton} onPress={() => navigation.navigate('Dashboard')}>
-            <Text style={styles.exploreButtonText}>Explore Now</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.hero}>
+            <Text style={styles.brand}>Find<Text style={styles.brandAccent}>It.</Text></Text>
+            <Text style={styles.welcome}>WELCOME, {firstName.toUpperCase()}</Text>
+            <Text style={styles.title}>Lost Something?</Text>
+            <Text style={[styles.title, styles.titleAccent]}>FindIt.</Text>
+            <Text style={styles.description}>Report, search, and recover lost items across SNSU.</Text>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => navigation.navigate('Dashboard')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.buttonText}>Get Started</Text>
+              <Text style={styles.arrow}>→</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.footer}>Together, We Find What Matters.</Text>
+        </ScrollView>
       </SafeAreaView>
     </ImageBackground>
   );
@@ -55,94 +59,118 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   background: {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: '#075f3b',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 52, 30, 0.54)',
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 24,
   },
-  topSection: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+  content: {
+    flexGrow: 1,
     justifyContent: 'space-between',
-    marginBottom: 40,
-    paddingTop: 0,
+    paddingHorizontal: 24,
+    paddingVertical: 22,
   },
-  mainLogo: {
-    width: 90,
-    height: 90,
-  },
-  topTextContainer: {
-    flex: 1,
-    marginLeft: 30,
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 15,
+  },
+  logo: {
+    width: 76,
+    height: 76,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+  },
+  headerText: {
+    flex: 1,
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  university: {
+    color: '#ffffff',
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: '900',
+    textAlign: 'center',
   },
   motto: {
-    fontSize: 15,
+    color: '#f7c52c',
+    fontSize: 10,
     fontStyle: 'italic',
-    color: '#154e2a',
-    marginBottom: 20,
+    marginTop: 6,
     textAlign: 'center',
   },
-  sealRow: {
-    flexDirection: 'row',
+  hero: {
     alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'nowrap',
-    gap: 5,
+    paddingVertical: 40,
   },
-  seal: {
-    width: 32,
-    height: 32,
-    marginLeft: 12,
-    marginBottom: 15,
+  brand: {
+    color: '#ffffff',
+    fontSize: 46,
+    fontWeight: '900',
   },
-  heroCard: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 26,
-    padding: 28,
-    alignItems: 'center',
-    marginHorizontal: 8,
-    marginVertical: 100,
-    shadowColor: '#000',
-    shadowOpacity: 0.16,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
+  brandAccent: {
+    color: '#f7c52c',
+  },
+  welcome: {
+    color: '#f7c52c',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    marginTop: 26,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#27401f',
-    textAlign: 'center',
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
-  heroTitle: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#1d3b1f',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  heroText: {
-    fontSize: 16,
-    color: '#23432d',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  exploreButton: {
-    backgroundColor: '#1d4ed8',
-    borderRadius: 999,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-  },
-  exploreButtonText: {
     color: '#ffffff',
+    fontSize: 42,
+    lineHeight: 46,
+    fontWeight: '900',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  titleAccent: {
+    color: '#f7c52c',
+    marginTop: 0,
+  },
+  description: {
+    maxWidth: 320,
+    color: '#edf8ef',
     fontSize: 16,
-    fontWeight: '700',
+    lineHeight: 23,
+    textAlign: 'center',
+    marginTop: 18,
+  },
+  button: {
+    minWidth: 220,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#087044',
+    borderColor: '#f7c52c',
+    borderWidth: 1.5,
+    borderRadius: 999,
+    paddingHorizontal: 28,
+    paddingVertical: 15,
+    marginTop: 28,
+  },
+  buttonText: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  arrow: {
+    color: '#f7c52c',
+    fontSize: 24,
+    fontWeight: '800',
+    marginLeft: 12,
+  },
+  footer: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 });

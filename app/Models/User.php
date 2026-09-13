@@ -27,6 +27,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'department_id',
         'password',
     ];
 
@@ -63,5 +64,15 @@ class User extends Authenticatable
         }
 
         $this->attributes['password'] = Hash::needsRehash($value) ? Hash::make($value) : $value;
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function setEmailAttribute($value)
+    {
+        $this->attributes['email'] = strtolower(trim((string) $value));
     }
 }
