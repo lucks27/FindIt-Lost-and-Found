@@ -18,7 +18,7 @@ Route::get('/test-me', fn() => response()->json(['status' => 'success']));
 
 // Auth
 Route::post('/login', [StudentLoginController::class, 'login']);
-Route::post('/register', [StudentLoginController::class, 'register']);
+Route::middleware('web')->post('/register', [StudentLoginController::class, 'register']);
 
 // Admin Login Requests
 Route::middleware('web')->post('/admin/login/request', [AdminAuthController::class, 'loginRequest']);

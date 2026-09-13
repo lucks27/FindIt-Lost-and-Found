@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Admin;
 use App\Models\ClaimReview;
+use App\Models\ItemVerification;
 use App\Models\ItemRelease;
+use App\Models\PotentialMatch;
 use App\Models\Report;
 use App\Models\Student;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -46,6 +48,37 @@ class AdminReportsAnalyticsApiTest extends TestCase
             'status' => 'verified',
         ]);
 
+        $pendingFoundReport = Report::create([
+            'student_id' => $student->id,
+            'type' => 'found',
+            'title' => 'Found Keys',
+            'description' => 'Keys found near the gate',
+            'location' => 'Main gate',
+            'date_occurred' => now()->subDay()->toDateString(),
+            'status' => 'pending_surrender',
+        ]);
+
+        ItemVerification::create([
+            'report_id' => $pendingFoundReport->id,
+            'status' => 'pending',
+        ]);
+
+        $lostReport = Report::create([
+            'student_id' => $student->id,
+            'type' => 'lost',
+            'title' => 'Lost Keys',
+            'description' => 'Keys lost near the gate',
+            'location' => 'Main gate',
+            'date_occurred' => now()->subDay()->toDateString(),
+            'status' => 'published',
+        ]);
+
+        $potentialMatch = PotentialMatch::create([
+            'lost_report_id' => $lostReport->id,
+            'found_report_id' => $pendingFoundReport->id,
+            'status' => 'pending',
+        ]);
+
         ClaimReview::create([
             'report_id' => $report->id,
             'claimant_student_id' => $student->id,
@@ -72,8 +105,11 @@ class AdminReportsAnalyticsApiTest extends TestCase
         $this->actingAs($admin, 'admin')
             ->getJson('/api/admin/dashboard')
             ->assertOk()
-            ->assertJsonPath('data.summary.total_reports', 1)
-            ->assertJsonPath('data.summary.open_reports', 0);
+            ->assertJsonPath('data.summary.total_reports', 3)
+            ->assertJsonPath('data.summary.open_reports', 1)
+            ->assertJsonPath('data.summary.pending_surrenders', 1)
+            ->assertJsonPath('data.summary.pending_verifications', 1)
+            ->assertJsonPath('data.summary.potential_matches', 1);
 
         $this->actingAs($admin, 'admin')
             ->getJson('/api/admin/claims')
@@ -84,5 +120,16 @@ class AdminReportsAnalyticsApiTest extends TestCase
             ->getJson('/api/admin/releases')
             ->assertOk()
             ->assertJsonCount(1, 'data');
+
+        $this->actingAs($admin, 'admin')
+            ->putJson("/api/admin/matches/{$potentialMatch->id}/reject")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'rejected');
+
+        $this->assertDatabaseHas('archive_items', [
+            'report_id' => $pendingFoundReport->id,
+            'archive_type' => 'rejected',
+            'reason' => 'Potential match rejected by admin review.',
+        ]);
     }
 }

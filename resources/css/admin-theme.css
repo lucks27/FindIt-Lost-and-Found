@@ -765,7 +765,7 @@ body:has(#admin-app) {
 #admin-app .admin-page-body select:focus,
 #admin-app .student-management-page select:focus,
 #admin-app .admin-profile-page select:focus {
-  outline: 2px solid #64bcc6;
-  outline-offset: 1px;
-  border-color: #64bcc6 !important;
+  outline: none;
+  border-color: transparent !important;
+  box-shadow: none;
 }

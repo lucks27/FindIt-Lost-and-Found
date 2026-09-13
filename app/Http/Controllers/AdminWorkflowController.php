@@ -786,16 +786,28 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
+        $pendingSurrenderStatuses = ['pending', 'pending_surrender', 'published', 'approved'];
+        $pendingSurrenders = Report::where('type', 'found')
+            ->whereIn('status', $pendingSurrenderStatuses)
+            ->where(function ($reportQuery) {
+                $reportQuery->whereDoesntHave('surrenderRequest')
+                    ->orWhereHas('surrenderRequest', function ($surrenderQuery) {
+                        $surrenderQuery->whereNotIn('status', ['received', 'rejected']);
+                    });
+            });
+
         $summary = [
             'total_reports' => Report::count(),
             'open_reports' => Report::whereIn('status', ['pending', 'pending_approval', 'pending_surrender', 'pending_verification', 'correction_requested'])->count(),
-            'pending_surrenders' => SurrenderRequest::whereHas('report', function ($reportQuery) {
-                $reportQuery->where('type', 'found')
-                    ->whereIn('status', ['pending_surrender', 'published', 'approved']);
-            })->whereNotIn('status', ['received', 'rejected'])->count(),
+            'pending_surrenders' => $pendingSurrenders->count(),
             'pending_reports' => Report::where('type', 'lost')->whereIn('status', ['pending', 'pending_approval', 'correction_requested'])->count(),
-            'pending_verifications' => ItemVerification::where('status', 'pending')->count(),
-            'mobile_posts' => Report::whereNotNull('published_at')->count(),
+            'pending_verifications' => ItemVerification::where('status', 'pending')
+                ->whereHas('report', function ($reportQuery) {
+                    $reportQuery->where('type', 'found')
+                        ->whereNotIn('status', ['rejected', 'completed', 'completed_return', 'archived', 'returned']);
+                })
+                ->count(),
+            'mobile_posts' => VisiblePostedItem::whereHas('report')->count(),
             'potential_matches' => PotentialMatch::where('status', 'pending')->count(),
             'archived_items' => ArchiveItem::whereHas('report')->count(),
             'total_claims' => ClaimReview::count(),
@@ -1808,10 +1820,21 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $match = PotentialMatch::findOrFail($id);
-        $match->update(['status' => 'rejected']);
+        $match = PotentialMatch::with('foundReport')->findOrFail($id);
 
-        return response()->json(['status' => 'success', 'message' => 'Potential match rejected.', 'data' => $match]);
+        DB::transaction(function () use ($match) {
+            $match->update(['status' => 'rejected']);
+
+            if ($match->foundReport) {
+                $this->syncArchiveRecord(
+                    $match->foundReport,
+                    'rejected',
+                    'Potential match rejected by admin review.'
+                );
+            }
+        });
+
+        return response()->json(['status' => 'success', 'message' => 'Potential match rejected and archived.', 'data' => $match->fresh(['foundReport'])]);
     }
 
     public function resetPotentialMatch($id)

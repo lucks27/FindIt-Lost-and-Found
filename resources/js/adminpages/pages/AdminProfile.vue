@@ -108,6 +108,8 @@
                                     <input v-model="passwordForm.new_password" type="password"
                                         autocomplete="new-password" :disabled="loading.password"
                                         placeholder="••••••••" />
+                                    <small class="password-warning">At least 6 characters, 1 uppercase, 1 number, and
+                                        one of !, _, -, .</small>
                                 </div>
                                 <div class="form-group">
                                     <label>Confirm Password</label>
@@ -231,7 +233,21 @@ async function submitProfile() {
     }
 }
 
+function validatePasswordStrength(value) {
+    return /^(?=.*[A-Z])(?=.*\d)(?=.*[!_.\-]).{6,}$/.test(value)
+}
+
 async function submitPassword() {
+    if (!validatePasswordStrength(passwordForm.new_password)) {
+        setMessage('Password must be at least 6 characters and include at least one uppercase letter, one number, and one of !, _, -, .', 'error')
+        return
+    }
+
+    if (passwordForm.new_password !== passwordForm.new_password_confirmation) {
+        setMessage('Password confirmation does not match.', 'error')
+        return
+    }
+
     loading.password = true
     setMessage('')
 
