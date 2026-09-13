@@ -248,10 +248,47 @@
 
                         <label>
                             <span>Temporary password *</span>
-                            <input v-model="studentForm.password" type="password" placeholder="Set password" />
+                            <div class="password-input-wrap">
+                                <input v-model="studentForm.password" :type="showPassword ? 'text' : 'password'"
+                                    placeholder="Set password" />
+                                <button type="button" class="password-toggle-btn"
+                                    :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                                    @click="showPassword = !showPassword">
+                                    <svg v-if="!showPassword" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path
+                                            d="M12 5c5.4 0 9.8 3.5 11 7-1.2 3.5-5.6 7-11 7S2.2 15.5 1 12c1.2-3.5 5.6-7 11-7zm0 2.2A4.8 4.8 0 0 0 7.2 12 4.8 4.8 0 0 0 12 16.8 4.8 4.8 0 0 0 16.8 12 4.8 4.8 0 0 0 12 7.2zm0 2.1a2.7 2.7 0 1 1 0 5.4 2.7 2.7 0 0 1 0-5.4z" />
+                                    </svg>
+                                    <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+                                        <path
+                                            d="M3.5 3.5 20.5 20.5l-1.4 1.4-3.2-3.1A11.5 11.5 0 0 1 12 18.8C6.6 18.8 2.2 15.3 1 12c.6-1.5 1.7-2.9 3.1-4.1L2.1 5l1.4-1.5zm5.4 5.4 2.1 2.1A2.7 2.7 0 0 1 14.3 12l2.1 2.1A4.8 4.8 0 0 0 12 7.2a4.8 4.8 0 0 0-3.1 1.7zm8.6-4.1-3 3A7.4 7.4 0 0 1 18.4 12a7.4 7.4 0 0 1-7.7 6.2L8.6 20c1.3.5 2.6.8 3.4.8 5.4 0 9.8-3.5 11-7-1.2-3.5-5.6-7-11-7-.9 0-1.8.1-2.7.4z" />
+                                    </svg>
+                                </button>
+                            </div>
                             <small class="password-warning">Use at least 6 characters with 1 uppercase, 1 number, and
                                 one of !, _, -, .</small>
                             <span v-if="studentErrors.password" class="field-error">{{ studentErrors.password }}</span>
+                        </label>
+
+                        <label>
+                            <span>Confirm password *</span>
+                            <div class="password-input-wrap">
+                                <input v-model="studentForm.confirm_password"
+                                    :type="showConfirmPassword ? 'text' : 'password'" placeholder="Confirm password" />
+                                <button type="button" class="password-toggle-btn"
+                                    :aria-label="showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'"
+                                    @click="showConfirmPassword = !showConfirmPassword">
+                                    <svg v-if="!showConfirmPassword" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path
+                                            d="M12 5c5.4 0 9.8 3.5 11 7-1.2 3.5-5.6 7-11 7S2.2 15.5 1 12c1.2-3.5 5.6-7 11-7zm0 2.2A4.8 4.8 0 0 0 7.2 12 4.8 4.8 0 0 0 12 16.8 4.8 4.8 0 0 0 16.8 12 4.8 4.8 0 0 0 12 7.2zm0 2.1a2.7 2.7 0 1 1 0 5.4 2.7 2.7 0 0 1 0-5.4z" />
+                                    </svg>
+                                    <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+                                        <path
+                                            d="M3.5 3.5 20.5 20.5l-1.4 1.4-3.2-3.1A11.5 11.5 0 0 1 12 18.8C6.6 18.8 2.2 15.3 1 12c.6-1.5 1.7-2.9 3.1-4.1L2.1 5l1.4-1.5zm5.4 5.4 2.1 2.1A2.7 2.7 0 0 1 14.3 12l2.1 2.1A4.8 4.8 0 0 0 12 7.2a4.8 4.8 0 0 0-3.1 1.7zm8.6-4.1-3 3A7.4 7.4 0 0 1 18.4 12a7.4 7.4 0 0 1-7.7 6.2L8.6 20c1.3.5 2.6.8 3.4.8 5.4 0 9.8-3.5 11-7-1.2-3.5-5.6-7-11-7-.9 0-1.8.1-2.7.4z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <span v-if="studentErrors.confirm_password" class="field-error">{{
+                                studentErrors.confirm_password }}</span>
                         </label>
                     </div>
 
@@ -390,6 +427,8 @@ const studentToDelete = ref(null)
 const studentModalLoading = ref(false)
 
 const studentEmailEdited = ref(false)
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
 const studentForm = ref({
     name: '',
     student_id: '',
@@ -400,6 +439,7 @@ const studentForm = ref({
     department: '',
     emailPrefix: '',
     password: '',
+    confirm_password: '',
 })
 const initialStudentForm = ref({})
 const studentErrors = ref({})
@@ -613,7 +653,10 @@ function resetStudentForm(isCreate = true) {
         department: '',
         emailPrefix: '',
         password: '',
+        confirm_password: '',
     }
+    showPassword.value = false
+    showConfirmPassword.value = false
     studentEmailEdited.value = false
     studentErrors.value = {}
     initialStudentForm.value = JSON.parse(JSON.stringify(studentForm.value))
@@ -649,6 +692,12 @@ function validateStudentForm() {
         errors.password = 'Password is required.'
     } else if (!/^(?=.*[A-Z])(?=.*\d)(?=.*[!_.\-]).{6,}$/.test(studentForm.value.password)) {
         errors.password = 'Password must be at least 6 characters and include at least one uppercase letter, one number, and one of !, _, -, .'
+    }
+
+    if (!studentForm.value.confirm_password) {
+        errors.confirm_password = 'Please confirm your password.'
+    } else if (studentForm.value.password !== studentForm.value.confirm_password) {
+        errors.confirm_password = 'Passwords do not match.'
     }
 
     studentErrors.value = errors
@@ -787,16 +836,15 @@ onMounted(loadListData)
     min-height: 100%;
     padding: 24px 24px 32px;
     position: relative;
-    background: linear-gradient(180deg, #4cc0c2 0%, #45b1b8 100%);
-    color: #e5f3e8;
+    background: transparent;
+    color: #163128;
 }
 
 .student-management-page::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at top left, rgba(18, 114, 72, 0.08), transparent 22%),
-        radial-gradient(circle at top right, rgba(16, 95, 67, 0.06), transparent 18%);
+    background: none;
     pointer-events: none;
 }
 
@@ -808,6 +856,9 @@ onMounted(loadListData)
     margin-bottom: 24px;
     position: relative;
     z-index: 1;
+    background: transparent;
+    box-shadow: none;
+    border: none;
 }
 
 .page-kicker {
@@ -822,7 +873,7 @@ onMounted(loadListData)
     margin: 0;
     font-size: clamp(28px, 4vw, 38px);
     line-height: 1.05;
-    color: #eaf7ec;
+    color: #163128;
 }
 
 .page-header p {
@@ -935,6 +986,44 @@ onMounted(loadListData)
     background: #0d2b1e;
     color: #e5f3e8;
     font-size: 14px;
+}
+
+.password-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-wrap input {
+    padding-right: 44px;
+}
+
+.password-toggle-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    left: auto;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
+    color: #b9d8bf;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    transition: none;
+}
+
+.password-toggle-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+    display: block;
+    margin: 0 auto;
 }
 
 .field-label {
