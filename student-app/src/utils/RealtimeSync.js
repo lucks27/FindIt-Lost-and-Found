@@ -52,6 +52,7 @@ function startFacilitiesPoll() {
 
   const poll = async () => {
     try {
+      if (typeof api.fetchFacilities !== 'function') return;
       const response = await api.fetchFacilities();
       const facilities = response.data?.data || response.data || [];
 
@@ -94,6 +95,7 @@ function startBookingsPoll() {
 
   const poll = async () => {
     try {
+      if (typeof api.fetchCurrentUserBookings !== 'function') return;
       const response = await api.fetchCurrentUserBookings();
       const bookings = response.data?.data || response.data || [];
 
@@ -151,6 +153,7 @@ function startNotificationsPoll() {
 
   const poll = async () => {
     try {
+      if (typeof api.fetchNotifications !== 'function') return;
       const response = await api.fetchNotifications();
       const notifications = response.data?.data || response.data || [];
 
