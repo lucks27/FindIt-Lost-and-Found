@@ -105,7 +105,7 @@
                                 <div>
                                     <div class="student-name">{{ student.name }}</div>
                                     <div class="student-subtext">{{ student.department || student.course || 'No program'
-                                        }}</div>
+                                    }}</div>
                                 </div>
                             </td>
                             <td>{{ studentId(student) }}</td>
@@ -176,7 +176,7 @@
                             <span>Student ID *</span>
                             <input v-model.trim="studentForm.student_id" type="text" placeholder="e.g. 2026-00123" />
                             <span v-if="studentErrors.student_id" class="field-error">{{ studentErrors.student_id
-                                }}</span>
+                            }}</span>
                         </label>
                     </div>
 
@@ -189,7 +189,7 @@
                                 <option v-for="course in COURSES" :key="course" :value="course">{{ course }}</option>
                             </select>
                             <span v-if="studentErrors.course_base" class="field-error">{{ studentErrors.course_base
-                                }}</span>
+                            }}</span>
                         </label>
 
                         <label v-if="needsMajorSelection">
@@ -210,7 +210,7 @@
                                 </option>
                             </select>
                             <span v-if="studentErrors.concentration" class="field-error">{{ studentErrors.concentration
-                                }}</span>
+                            }}</span>
                         </label>
 
                         <label>
@@ -220,7 +220,7 @@
                                 <option v-for="year in YEAR_LEVELS" :key="year" :value="year">{{ year }}</option>
                             </select>
                             <span v-if="studentErrors.year_level" class="field-error">{{ studentErrors.year_level
-                                }}</span>
+                            }}</span>
                         </label>
 
                         <label>
@@ -230,7 +230,7 @@
                                 <option v-for="dept in DEPARTMENTS" :key="dept" :value="dept">{{ dept }}</option>
                             </select>
                             <span v-if="studentErrors.department" class="field-error">{{ studentErrors.department
-                                }}</span>
+                            }}</span>
                         </label>
                     </div>
 
@@ -249,7 +249,8 @@
                         <label>
                             <span>Temporary password *</span>
                             <input v-model="studentForm.password" type="password" placeholder="Set password" />
-                            <small class="password-warning">Use at least 6 characters with 1 uppercase, 1 number, and one of !, _, -, .</small>
+                            <small class="password-warning">Use at least 6 characters with 1 uppercase, 1 number, and
+                                one of !, _, -, .</small>
                             <span v-if="studentErrors.password" class="field-error">{{ studentErrors.password }}</span>
                         </label>
                     </div>
@@ -282,25 +283,25 @@
 
                 <div class="details-grid profile-details-grid">
                     <div class="detail-row"><span>School ID</span><strong>{{ studentId(selectedStudent)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row"><span>Status</span><strong>{{ studentStatus(selectedStudent) }}</strong>
                     </div>
                     <div class="detail-row detail-row-wide"><span>Email</span><strong>{{ selectedStudent.email || '—'
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row detail-row-wide"><span>Course</span><strong>{{ selectedStudent.course || '—'
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row"><span>Department</span><strong>{{ selectedStudent.department || '—'
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row"><span>Year level</span><strong>{{ selectedStudent.year_level || '—'
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row"><span>Recognition points</span><strong>{{ recognitionPoints(selectedStudent)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row"><span>Peso value</span><strong>₱{{ pesoValue(selectedStudent) }}</strong>
                     </div>
                     <div class="detail-row"><span>Created date</span><strong>{{ formatDate(selectedStudent.created_at)
-                    }}</strong></div>
+                            }}</strong></div>
                     <div class="detail-row"><span>Updated date</span><strong>{{ formatDate(selectedStudent.updated_at)
-                    }}</strong></div>
+                            }}</strong></div>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="ghost-btn" @click="closeDetailsModal">Close</button>
