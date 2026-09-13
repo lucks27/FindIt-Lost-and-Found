@@ -14,7 +14,7 @@ class StudentSeeder extends Seeder
             [
                 'student_id' => '2026-0001',
                 'name' => 'John Doe',
-                'email' => 'stratus@snsu.edu.ph',
+                'email' => 'stratus@ssct.edu.ph',
                 'course' => 'BSIT',
                 'year_level' => '3rd Year',
                 'department' => 'IT',
@@ -23,7 +23,7 @@ class StudentSeeder extends Seeder
             [
                 'student_id' => '2026-0002',
                 'name' => 'Jane Smith',
-                'email' => 'airx@snsu.edu.ph',
+                'email' => 'airx@ssct.edu.ph',
                 'course' => 'BSIT',
                 'year_level' => '2nd Year',
                 'department' => 'IT',

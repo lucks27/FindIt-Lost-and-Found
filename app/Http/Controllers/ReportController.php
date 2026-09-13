@@ -409,18 +409,6 @@ class ReportController extends Controller
         ]);
 
         Notification::create([
-            'type' => 'potential_match',
-            'title' => 'New Potential Match',
-            'message' => "A potential match for '{$report->title}' is waiting for review.",
-            'action' => 'potential_match',
-            'status' => 'pending',
-            'recipient_role' => 'admin',
-            'subject_type' => PotentialMatch::class,
-            'subject_id' => $existingMatch->id,
-            'is_read' => false,
-        ]);
-
-        Notification::create([
             'student_id' => $report->student_id,
             'title' => 'Potential Match Submitted',
             'message' => "A potential match has been created for your report '{$report->title}'.",

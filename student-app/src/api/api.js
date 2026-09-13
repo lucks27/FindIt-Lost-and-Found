@@ -1,8 +1,14 @@
 ﻿import axios from 'axios';
 import { fromByteArray } from 'base64-js';
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 
-export const API_BASE_URL = 'http://10.132.121.252:8000';
+const expoHost = Constants.expoConfig?.hostUri?.split(':')[0]
+  || Constants.manifest?.debuggerHost?.split(':')[0];
+const defaultApiHost = expoHost || '192.168.1.95';
+
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL
+  || `http://${defaultApiHost}:8000`;
 const TOKEN_KEY = 'student-app-auth-token';
 
 const apiClient = axios.create({

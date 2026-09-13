@@ -17,6 +17,7 @@
     "dependencies": {
         "@popperjs/core": "^2.11.8",
         "@vitejs/plugin-vue": "^6.0.4",
+        "expo": "^57.0.21",
         "lucide-vue-next": "^1.0.0",
         "sweetalert2": "^11.26.24",
         "v-calendar": "^3.1.2",

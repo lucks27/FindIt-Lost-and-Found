@@ -17,9 +17,9 @@ class AdminSeeder extends Seeder
 
         Admin::create([
             'name' => 'Super Admin',
-            'email' => 'superadmin@snsu.edu.ph',
+            'email' => 'superadmin@ssct.edu.ph',
             'password' => Hash::make('password'),
-            'status' => false,
+            'status' => true,
             'role' => 'super_admin',
             'profile_picture' => null,
         ]);

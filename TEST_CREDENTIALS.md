@@ -3,7 +3,7 @@
 ## Fixed Issues
 
 ✅ Separated `/admin/login` (Super Admin) and `/branchadmin/login` (Branch Admin) endpoints
-✅ Removed strict superadmin@snsu.com email check  
+✅ Admin accounts use the `@ssct.edu.ph` school email domain
 ✅ Added role-based validation - only super_admin role can access Super Admin portal
 ✅ Only admin role can access Branch Admin portal
 ✅ Added warning and success feedback messages with emojis
@@ -18,7 +18,7 @@
 
 **Account that SHOULD work:**
 
-- Email: `superadmin@snsu.edu.ph`
+- Email: `superadmin@ssct.edu.ph`
 - Password: `password`
 - Role: Super Admin
 - Expected: Login succeeds → Redirects to `/superadmin/welcome`
@@ -48,7 +48,7 @@ All redirect to `/branchadmin/welcome` on success.
 
 **Accounts that SHOULD be rejected:**
 
-- Email: `superadmin@snsu.com`
+- Email: `superadmin@ssct.edu.ph`
 - Password: `password`
 - Expected: "❌ This account does not have Branch Admin access..."
 
@@ -63,7 +63,7 @@ All redirect to `/branchadmin/welcome` on success.
 
 **Accounts that SHOULD be rejected:**
 
-- Any admin account (admin1@snsu.edu, superadmin@snsu.com, etc.)
+- Any admin account that is not registered with the student portal
 - Expected: "❌ Invalid email or password..."
 
 ---
@@ -72,7 +72,7 @@ All redirect to `/branchadmin/welcome` on success.
 
 ### Super Admin Login (/admin/login)
 
-- [ ] Login with `superadmin@snsu.com` + `password` → Success ✅
+- [ ] Login with `superadmin@ssct.edu.ph` + `password` → Success ✅
 - [ ] Try admin account email → Rejected with role error ❌
 - [ ] Try empty email → Warning message ⚠️
 - [ ] Try empty password → Warning message ⚠️
