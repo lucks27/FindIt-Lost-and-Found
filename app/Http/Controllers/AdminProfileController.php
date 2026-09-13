@@ -110,7 +110,10 @@ class AdminProfileController extends Controller
 
         $request->validate([
             'old_password' => 'required',
-            'new_password' => 'required|min:6|confirmed',
+            'new_password' => ['required', 'min:6', 'confirmed', 'regex:/^(?=.*[A-Z])(?=.*\d)(?=.*[!_.\-]).{6,}$/'],
+        ], [
+            'new_password.min' => 'Password must be at least 6 characters and include at least one uppercase letter, one number, and one of these symbols: !, _, -, .',
+            'new_password.regex' => 'Password must be at least 6 characters and include at least one uppercase letter, one number, and one of these symbols: !, _, -, .',
         ]);
 
         if (!Hash::check($request->old_password, $admin->password)) {

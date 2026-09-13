@@ -105,7 +105,7 @@
                                 <div>
                                     <div class="student-name">{{ student.name }}</div>
                                     <div class="student-subtext">{{ student.department || student.course || 'No program'
-                                    }}</div>
+                                        }}</div>
                                 </div>
                             </td>
                             <td>{{ studentId(student) }}</td>
@@ -176,7 +176,7 @@
                             <span>Student ID *</span>
                             <input v-model.trim="studentForm.student_id" type="text" placeholder="e.g. 2026-00123" />
                             <span v-if="studentErrors.student_id" class="field-error">{{ studentErrors.student_id
-                            }}</span>
+                                }}</span>
                         </label>
                     </div>
 
@@ -189,7 +189,7 @@
                                 <option v-for="course in COURSES" :key="course" :value="course">{{ course }}</option>
                             </select>
                             <span v-if="studentErrors.course_base" class="field-error">{{ studentErrors.course_base
-                            }}</span>
+                                }}</span>
                         </label>
 
                         <label v-if="needsMajorSelection">
@@ -210,7 +210,7 @@
                                 </option>
                             </select>
                             <span v-if="studentErrors.concentration" class="field-error">{{ studentErrors.concentration
-                            }}</span>
+                                }}</span>
                         </label>
 
                         <label>
@@ -220,7 +220,7 @@
                                 <option v-for="year in YEAR_LEVELS" :key="year" :value="year">{{ year }}</option>
                             </select>
                             <span v-if="studentErrors.year_level" class="field-error">{{ studentErrors.year_level
-                            }}</span>
+                                }}</span>
                         </label>
 
                         <label>
@@ -230,7 +230,7 @@
                                 <option v-for="dept in DEPARTMENTS" :key="dept" :value="dept">{{ dept }}</option>
                             </select>
                             <span v-if="studentErrors.department" class="field-error">{{ studentErrors.department
-                            }}</span>
+                                }}</span>
                         </label>
                     </div>
 
@@ -241,7 +241,7 @@
                             <div class="email-input-row">
                                 <input v-model.trim="studentForm.emailPrefix" type="text" placeholder="username"
                                     @input="studentEmailEdited = true" />
-                                <span class="email-domain">@snsu.edu.ph</span>
+                                <span class="email-domain">@ssct.edu.ph</span>
                             </div>
                             <span v-if="studentErrors.email" class="field-error">{{ studentErrors.email }}</span>
                         </label>
@@ -249,6 +249,7 @@
                         <label>
                             <span>Temporary password *</span>
                             <input v-model="studentForm.password" type="password" placeholder="Set password" />
+                            <small class="password-warning">Use at least 6 characters with 1 uppercase, 1 number, and one of !, _, -, .</small>
                             <span v-if="studentErrors.password" class="field-error">{{ studentErrors.password }}</span>
                         </label>
                     </div>
@@ -281,25 +282,25 @@
 
                 <div class="details-grid profile-details-grid">
                     <div class="detail-row"><span>School ID</span><strong>{{ studentId(selectedStudent)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Status</span><strong>{{ studentStatus(selectedStudent) }}</strong>
                     </div>
                     <div class="detail-row detail-row-wide"><span>Email</span><strong>{{ selectedStudent.email || '—'
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row detail-row-wide"><span>Course</span><strong>{{ selectedStudent.course || '—'
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Department</span><strong>{{ selectedStudent.department || '—'
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Year level</span><strong>{{ selectedStudent.year_level || '—'
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Recognition points</span><strong>{{ recognitionPoints(selectedStudent)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Peso value</span><strong>₱{{ pesoValue(selectedStudent) }}</strong>
                     </div>
                     <div class="detail-row"><span>Created date</span><strong>{{ formatDate(selectedStudent.created_at)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Updated date</span><strong>{{ formatDate(selectedStudent.updated_at)
-                            }}</strong></div>
+                    }}</strong></div>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="ghost-btn" @click="closeDetailsModal">Close</button>
@@ -636,17 +637,17 @@ function validateStudentForm() {
     if (!studentForm.value.year_level) errors.year_level = 'Year level is required.'
     if (!studentForm.value.department) errors.department = 'Department is required.'
 
-    const fullEmail = `${studentForm.value.emailPrefix}@snsu.edu.ph`
+    const fullEmail = `${studentForm.value.emailPrefix}@ssct.edu.ph`
     if (!studentForm.value.emailPrefix) {
         errors.email = 'Email username is required.'
     } else if (!validateEmail(fullEmail)) {
-        errors.email = 'Enter a valid email username.'
+        errors.email = 'Enter a valid SSCT email username.'
     }
 
     if (!studentForm.value.password) {
         errors.password = 'Password is required.'
-    } else if (studentForm.value.password.length < 6) {
-        errors.password = 'Password must be at least 6 characters.'
+    } else if (!/^(?=.*[A-Z])(?=.*\d)(?=.*[!_.\-]).{6,}$/.test(studentForm.value.password)) {
+        errors.password = 'Password must be at least 6 characters and include at least one uppercase letter, one number, and one of !, _, -, .'
     }
 
     studentErrors.value = errors
@@ -702,7 +703,7 @@ async function submitStudent() {
     try {
         const response = await api.post('/api/admin/students', {
             ...payload,
-            email: `${studentForm.value.emailPrefix}@snsu.edu.ph`,
+            email: `${studentForm.value.emailPrefix}@ssct.edu.ph`,
             password: studentForm.value.password,
         })
         students.value = [response.data?.data, ...students.value.filter(Boolean)]
@@ -785,7 +786,7 @@ onMounted(loadListData)
     min-height: 100%;
     padding: 24px 24px 32px;
     position: relative;
-    background: linear-gradient(180deg, #081c14 0%, #0d2b1e 54%, #123d2b 100%);
+    background: linear-gradient(180deg, #4cc0c2 0%, #45b1b8 100%);
     color: #e5f3e8;
 }
 
@@ -896,10 +897,10 @@ onMounted(loadListData)
 }
 
 .student-directory-card {
-    background: linear-gradient(145deg, #173d2b 0%, #1c5138 100%);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(18, 115, 120, 0.12) 100%);
     border-radius: 18px;
-    box-shadow: 0 16px 42px rgba(32, 91, 52, 0.1);
-    border: 1px solid rgba(175, 225, 186, 0.22);
+    box-shadow: 0 16px 42px rgba(17, 82, 88, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
     padding: 24px;
     backdrop-filter: blur(16px);
 }

@@ -9,6 +9,11 @@ use App\Models\Student;
 
 class StudentLoginController extends Controller
 {
+    private function strongPasswordRule(): string
+    {
+        return 'required|min:6|regex:/^(?=.*[A-Z])(?=.*\d)(?=.*[!_.\-]).{6,}$/';
+    }
+
     /**
      * Show login page (Vue entry)
      */
@@ -39,10 +44,10 @@ class StudentLoginController extends Controller
         }
 
         // Check university email domain
-        if (!str_ends_with($student->email, '@snsu.edu.ph') && !str_ends_with($student->email, '@ssnsu.edu')) {
+        if (!str_ends_with(strtolower($student->email), '@ssct.edu.ph')) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Only university emails are allowed.'
+                'message' => 'Only SSCT emails are allowed.'
             ], 401);
         }
 
@@ -106,26 +111,36 @@ class StudentLoginController extends Controller
             'email' => 'required|email|unique:students,email',
             'year_level' => 'required|string|max:255',
             'department' => 'required|string|max:255',
-            'password' => 'required|min:6|confirmed',
+            'password' => ['required', 'min:6', 'confirmed', 'regex:/^(?=.*[A-Z])(?=.*\d)(?=.*[!_.\-]).{6,}$/'],
+        ], [
+            'password.min' => 'Password must be at least 6 characters and include at least one uppercase letter, one number, and one of these symbols: !, _, -, .',
+            'password.regex' => 'Password must be at least 6 characters and include at least one uppercase letter, one number, and one of these symbols: !, _, -, .',
         ]);
 
-        // Ensure university email
-        if (!str_ends_with($validatedData['email'], '@snsu.edu.ph') && !str_ends_with($validatedData['email'], '@ssnsu.edu')) {
+        // Ensure SSCT email
+        if (!str_ends_with(strtolower($validatedData['email']), '@ssct.edu.ph')) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Only university emails are allowed.'
+                'message' => 'Only SSCT emails are allowed.'
             ], 422);
         }
 
         // Create student
+        $nameParts = preg_split('/\s+/', trim($validatedData['name']), -1, PREG_SPLIT_NO_EMPTY);
+        $firstName = $nameParts[0] ?? '';
+        $lastName = count($nameParts) > 1 ? array_pop($nameParts) : $firstName;
+
         $student = Student::create([
-            'student_id' => $validatedData['student_id'],
-            'name' => $validatedData['name'],
+            'student_id_number' => $validatedData['student_id'],
+            'first_name' => $firstName,
+            'middle_name' => count($nameParts) > 1 ? implode(' ', $nameParts) : null,
+            'last_name' => $lastName,
             'course' => $validatedData['course'],
             'email' => $validatedData['email'],
             'year_level' => $validatedData['year_level'],
             'department' => $validatedData['department'],
             'password' => Hash::make($validatedData['password']),
+            'profile_photo' => '/assets/logo.png',
         ]);
 
         // Auto login after register

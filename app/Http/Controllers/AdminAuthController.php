@@ -10,6 +10,16 @@ use Illuminate\Support\Facades\Hash;
 
 class AdminAuthController extends Controller
 {
+    private function strongPasswordRule(): array
+    {
+        return [
+            'required',
+            'string',
+            'min:6',
+            'regex:/^(?=.*[A-Z])(?=.*\d)(?=.*[!_.\-]).{6,}$/',
+        ];
+    }
+
     public function loginRequest(Request $request)
     {
         $validated = $request->validate([
@@ -73,8 +83,18 @@ class AdminAuthController extends Controller
             'department' => 'required|string|max:255',
             'course' => 'required|string|max:255',
             'year_level' => 'required|string|max:255',
-            'password' => 'required|string|min:6',
+            'password' => $this->strongPasswordRule(),
+        ], [
+            'password.min' => 'Password must be at least 6 characters and include at least one uppercase letter, one number, and one of these symbols: !, _, -, .',
+            'password.regex' => 'Password must be at least 6 characters and include at least one uppercase letter, one number, and one of these symbols: !, _, -, .',
         ]);
+
+        if (!str_ends_with(strtolower($validated['email']), '@ssct.edu.ph')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Only SSCT emails are allowed for student accounts.'
+            ], 422);
+        }
 
         $nameParts = $this->splitStudentName($validated['name']);
         $student = Student::create([
@@ -114,6 +134,13 @@ class AdminAuthController extends Controller
             'department' => 'required|string|max:255',
             'email' => 'required|email|unique:students,email,' . $student->id,
         ]);
+
+        if (!str_ends_with(strtolower($validated['email']), '@ssct.edu.ph')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Only SSCT emails are allowed for student accounts.'
+            ], 422);
+        }
 
         $nameParts = $this->splitStudentName($validated['name']);
         $student->update([

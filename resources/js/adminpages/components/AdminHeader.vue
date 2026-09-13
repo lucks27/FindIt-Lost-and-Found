@@ -65,7 +65,7 @@ const router = useRouter()
 const menuOpen = ref(false)
 const profileImage = ref('')
 const profileName = ref('Super Admin')
-const profileEmail = ref('superadmin@snsu.edu.ph')
+const profileEmail = ref('superadmin@ssct.edu.ph')
 const notificationCount = ref(props.notificationCount)
 
 function normalizeImage(path) {
