@@ -138,11 +138,12 @@ class StudentLoginController extends Controller
         $nameParts = preg_split('/\s+/', trim($validatedData['name']), -1, PREG_SPLIT_NO_EMPTY);
         $firstName = $nameParts[0] ?? '';
         $lastName = count($nameParts) > 1 ? array_pop($nameParts) : $firstName;
+        $middleName = count($nameParts) > 1 ? trim(implode(' ', $nameParts)) : '';
 
         $student = Student::create([
             'student_id_number' => $validatedData['student_id'],
             'first_name' => $firstName,
-            'middle_name' => count($nameParts) > 1 ? implode(' ', $nameParts) : null,
+            'middle_name' => $middleName !== '' ? $middleName : null,
             'last_name' => $lastName,
             'course' => $validatedData['course'],
             'email' => $validatedData['email'],

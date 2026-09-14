@@ -194,10 +194,11 @@ class AdminAuthController extends Controller
         $parts = preg_split('/\s+/', trim($name), -1, PREG_SPLIT_NO_EMPTY);
         $firstName = $parts[0] ?? '';
         $lastName = count($parts) > 1 ? array_pop($parts) : $firstName;
+        $middleName = $parts ? trim(implode(' ', array_slice($parts, 1))) : '';
 
         return [
             'first_name' => $firstName,
-            'middle_name' => $parts ? implode(' ', array_slice($parts, 1)) : null,
+            'middle_name' => $middleName !== '' ? $middleName : null,
             'last_name' => $lastName,
         ];
     }
