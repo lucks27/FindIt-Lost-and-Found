@@ -84,7 +84,19 @@ export default function DashboardScreen() {
       allowsEditing: true,
       quality: 0.8,
     });
-
+      if (reportMode) {
+        return (
+          <ReportForm
+            mode={reportMode}
+            form={form}
+            reportLoading={reportLoading}
+            onBack={() => setReportMode(null)}
+            updateForm={updateForm}
+            chooseImage={chooseReportImage}
+            submitReport={submitReport}
+          />
+        );
+      }
     if (!result.canceled && result.assets?.[0]) {
       updateForm('image', result.assets[0]);
     }
@@ -179,7 +191,19 @@ export default function DashboardScreen() {
     if (activeTab === 'Home') return renderHome();
 
     if (activeTab === 'Reports') {
-      if (reportMode) return <ReportForm />;
+      if (reportMode) {
+        return (
+          <ReportForm
+            mode={reportMode}
+            form={form}
+            reportLoading={reportLoading}
+            onBack={() => setReportMode(null)}
+            updateForm={updateForm}
+            chooseImage={chooseReportImage}
+            submitReport={submitReport}
+          />
+        );
+      }
       return (
         <View>
           <Text style={styles.pageTitle}>My Reports</Text>
@@ -234,41 +258,6 @@ export default function DashboardScreen() {
     );
   }
 
-  function ReportForm() {
-    const isFound = reportMode === 'found';
-    return (
-      <View>
-        <TouchableOpacity onPress={() => setReportMode(null)} style={styles.backLink}>
-          <Text style={styles.backLinkText}>‹  My Reports</Text>
-        </TouchableOpacity>
-        <Text style={styles.pageTitle}>{isFound ? 'Report Found Item' : 'Report Lost Item'}</Text>
-        <Text style={styles.pageCopy}>{isFound ? 'Provide enough detail for safe verification and surrender.' : 'Create a public report that helps others recognize your item.'}</Text>
-        {isFound && <View style={styles.notice}><Text style={styles.noticeText}>Found items must be surrendered to USC for verified storage after submission.</Text></View>}
-        <Text style={styles.fieldLabel}>Item name</Text>
-        <TextInput style={styles.formInput} placeholder="e.g. Black airplane with cute sign" value={form.title} onChangeText={(value) => updateForm('title', value)} />
-        <Text style={styles.fieldLabel}>Category</Text>
-        <TextInput style={styles.formInput} placeholder="Electronics" value={form.category} onChangeText={(value) => updateForm('category', value)} />
-        <Text style={styles.fieldLabel}>Color or identifying appearance</Text>
-        <TextInput style={styles.formInput} placeholder="e.g. Navy blue with red chicken" value={form.color} onChangeText={(value) => updateForm('color', value)} />
-        <Text style={styles.fieldLabel}>Public description</Text>
-        <TextInput style={[styles.formInput, styles.multiline]} placeholder="Describe what people may safely see in the public post." value={form.description} onChangeText={(value) => updateForm('description', value)} multiline />
-        <Text style={styles.fieldLabel}>Private verification note · admin only</Text>
-        <TextInput style={[styles.formInput, styles.privateInput, styles.multiline]} placeholder="Hidden details such as serial number, stickers, dents, or exact contents." value={form.privateNote} onChangeText={(value) => updateForm('privateNote', value)} multiline />
-        <Text style={styles.privateHint}>This note is never shown in the public item listing.</Text>
-        <Text style={styles.fieldLabel}>{isFound ? 'Where was it found?' : 'Last known location'}</Text>
-        <TextInput style={styles.formInput} placeholder="Main Library" value={form.location} onChangeText={(value) => updateForm('location', value)} />
-        <Text style={styles.fieldLabel}>Date {isFound ? 'found' : 'lost'} · YYYY-MM-DD</Text>
-        <TextInput style={styles.formInput} value={form.date} onChangeText={(value) => updateForm('date', value)} />
-        <TouchableOpacity style={styles.uploadBox} onPress={chooseReportImage}>
-          {form.image ? <Image source={{ uri: form.image.uri }} style={styles.previewImage} /> : <Text style={styles.uploadText}>＋  Add item photo{ '\n' }<Text style={styles.uploadHint}>A clear photo is required for verification</Text></Text>}
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.submitButton, isFound && styles.submitFound]} onPress={submitReport} disabled={reportLoading}>
-          <Text style={styles.submitText}>{reportLoading ? 'Submitting...' : isFound ? 'Submit Found Report' : 'Publish Lost Report'}</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -315,6 +304,42 @@ function ItemCard({ item }) {
         <Text style={styles.itemMeta}>⌖ {item.place}</Text>
         <Text style={styles.itemDate}>September 15, 2027</Text>
       </View>
+    </View>
+  );
+}
+
+function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage, submitReport }) {
+  const isFound = mode === 'found';
+
+  return (
+    <View>
+      <TouchableOpacity onPress={onBack} style={styles.backLink}>
+        <Text style={styles.backLinkText}>‹  My Reports</Text>
+      </TouchableOpacity>
+      <Text style={styles.pageTitle}>{isFound ? 'Report Found Item' : 'Report Lost Item'}</Text>
+      <Text style={styles.pageCopy}>{isFound ? 'Provide enough detail for safe verification and surrender.' : 'Create a public report that helps others recognize your item.'}</Text>
+      {isFound && <View style={styles.notice}><Text style={styles.noticeText}>Found items must be surrendered to USC for verified storage after submission.</Text></View>}
+      <Text style={styles.fieldLabel}>Item name</Text>
+      <TextInput style={styles.formInput} placeholder="e.g. Black airplane with cute sign" value={form.title} onChangeText={(value) => updateForm('title', value)} />
+      <Text style={styles.fieldLabel}>Category</Text>
+      <TextInput style={styles.formInput} placeholder="Electronics" value={form.category} onChangeText={(value) => updateForm('category', value)} />
+      <Text style={styles.fieldLabel}>Color or identifying appearance</Text>
+      <TextInput style={styles.formInput} placeholder="e.g. Navy blue with red chicken" value={form.color} onChangeText={(value) => updateForm('color', value)} />
+      <Text style={styles.fieldLabel}>Public description</Text>
+      <TextInput style={[styles.formInput, styles.multiline]} placeholder="Describe what people may safely see in the public post." value={form.description} onChangeText={(value) => updateForm('description', value)} multiline />
+      <Text style={styles.fieldLabel}>Private verification note · admin only</Text>
+      <TextInput style={[styles.formInput, styles.privateInput, styles.multiline]} placeholder="Hidden details such as serial number, stickers, dents, or exact contents." value={form.privateNote} onChangeText={(value) => updateForm('privateNote', value)} multiline />
+      <Text style={styles.privateHint}>This note is never shown in the public item listing.</Text>
+      <Text style={styles.fieldLabel}>{isFound ? 'Where was it found?' : 'Last known location'}</Text>
+      <TextInput style={styles.formInput} placeholder="Main Library" value={form.location} onChangeText={(value) => updateForm('location', value)} />
+      <Text style={styles.fieldLabel}>Date {isFound ? 'found' : 'lost'} · YYYY-MM-DD</Text>
+      <TextInput style={styles.formInput} value={form.date} onChangeText={(value) => updateForm('date', value)} />
+      <TouchableOpacity style={styles.uploadBox} onPress={chooseImage}>
+        {form.image ? <Image source={{ uri: form.image.uri }} style={styles.previewImage} /> : <Text style={styles.uploadText}>＋  Add item photo{ '\n' }<Text style={styles.uploadHint}>A clear photo is required for verification</Text></Text>}
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.submitButton, isFound && styles.submitFound]} onPress={submitReport} disabled={reportLoading}>
+        <Text style={styles.submitText}>{reportLoading ? 'Submitting...' : isFound ? 'Submit Found Report' : 'Publish Lost Report'}</Text>
+      </TouchableOpacity>
     </View>
   );
 }
