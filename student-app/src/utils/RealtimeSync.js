@@ -24,6 +24,16 @@ const cache = {
   notifications: new Map(), // notificationId -> data
 };
 
+function asList(value) {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.data)) return value.data;
+  return [];
+}
+
+function isMissingEndpoint(error) {
+  return error?.response?.status === 404;
+}
+
 /**
  * Check if two objects have meaningful differences (ignoring timestamps)
  */
@@ -54,7 +64,7 @@ function startFacilitiesPoll() {
     try {
       if (typeof api.fetchFacilities !== 'function') return;
       const response = await api.fetchFacilities();
-      const facilities = response.data?.data || response.data || [];
+      const facilities = asList(response.data);
 
       let changedFacilities = [];
 
@@ -74,7 +84,7 @@ function startFacilitiesPoll() {
         EventBus.emit('facilitiesUpdated', changedFacilities);
       }
     } catch (err) {
-      console.warn('⚠️ Facilities poll error:', err.message);
+      if (!isMissingEndpoint(err)) console.warn('⚠️ Facilities poll error:', err?.message || err);
     }
   };
 
@@ -97,7 +107,7 @@ function startBookingsPoll() {
     try {
       if (typeof api.fetchCurrentUserBookings !== 'function') return;
       const response = await api.fetchCurrentUserBookings();
-      const bookings = response.data?.data || response.data || [];
+      const bookings = asList(response.data);
 
       let changedBookings = [];
       let statusChanges = [];
@@ -132,7 +142,7 @@ function startBookingsPoll() {
         EventBus.emit('bookingsUpdated', changedBookings);
       }
     } catch (err) {
-      console.warn('⚠️ Bookings poll error:', err.message);
+      if (!isMissingEndpoint(err)) console.warn('⚠️ Bookings poll error:', err?.message || err);
     }
   };
 
@@ -155,7 +165,7 @@ function startNotificationsPoll() {
     try {
       if (typeof api.fetchNotifications !== 'function') return;
       const response = await api.fetchNotifications();
-      const notifications = response.data?.data || response.data || [];
+      const notifications = asList(response.data);
 
       let newNotifications = [];
 
@@ -173,7 +183,7 @@ function startNotificationsPoll() {
         EventBus.emit('notificationsUpdated', newNotifications);
       }
     } catch (err) {
-      console.warn('⚠️ Notifications poll error:', err.message);
+      if (!isMissingEndpoint(err)) console.warn('⚠️ Notifications poll error:', err?.message || err);
     }
   };
 
@@ -189,8 +199,8 @@ function startNotificationsPoll() {
  */
 export function startRealtimeSync() {
   console.log('🚀 Initializing real-time sync service...');
-  startFacilitiesPoll();
-  startBookingsPoll();
+  // Facilities and bookings endpoints are not part of the current mobile API.
+  // Keep notifications live and avoid polling routes that cannot respond.
   startNotificationsPoll();
 }
 
@@ -225,21 +235,21 @@ export async function manualSyncNow() {
     (async () => {
       try {
         const response = await api.fetchFacilities();
-        const facilities = response.data?.data || response.data || [];
+        const facilities = asList(response.data);
         facilities.forEach((f) => cache.facilities.set(f.id, f));
         EventBus.emit('facilitiesUpdated', facilities);
       } catch (err) {
-        console.warn('Manual facilities sync error:', err.message);
+        if (!isMissingEndpoint(err)) console.warn('Manual facilities sync error:', err?.message || err);
       }
     })(),
     (async () => {
       try {
         const response = await api.fetchCurrentUserBookings();
-        const bookings = response.data?.data || response.data || [];
+        const bookings = asList(response.data);
         bookings.forEach((b) => cache.bookings.set(b.id, b));
         EventBus.emit('bookingsUpdated', bookings);
       } catch (err) {
-        console.warn('Manual bookings sync error:', err.message);
+        if (!isMissingEndpoint(err)) console.warn('Manual bookings sync error:', err?.message || err);
       }
     })(),
   ]);

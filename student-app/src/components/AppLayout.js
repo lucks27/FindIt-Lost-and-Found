@@ -1,5 +1,6 @@
 import React from 'react';
-import { SafeAreaView, View, ScrollView, Image, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, ScrollView, Image, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 const logo = require('../../assets/logo.png');
