@@ -68,7 +68,7 @@ class ReportController extends Controller
     {
         $user = $request->user();
         $reports = Report::where('student_id', $user->id)
-            ->with(['student', 'rewards', 'images'])
+            ->with(['student', 'images'])
             ->latest()
             ->get();
 
@@ -79,7 +79,7 @@ class ReportController extends Controller
 
     public function show(Request $request, $id)
     {
-        $report = Report::with(['student', 'rewards', 'images'])->findOrFail($id);
+        $report = Report::with(['student', 'images'])->findOrFail($id);
         $user = $request->user();
 
         if ($report->student_id !== $user->id) {

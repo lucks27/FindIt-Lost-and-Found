@@ -2,13 +2,13 @@ import React, { useEffect, useState } from 'react';
 import {
   Image,
   ImageBackground,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -38,6 +38,7 @@ export default function DashboardScreen() {
   const [reportMode, setReportMode] = useState(null);
   const [myReports, setMyReports] = useState([]);
   const [reportLoading, setReportLoading] = useState(false);
+  const [notice, setNotice] = useState(null);
   const [form, setForm] = useState({
     title: '',
     category: 'Electronics',
@@ -49,6 +50,11 @@ export default function DashboardScreen() {
     image: null,
   });
   const firstName = user?.first_name || user?.name?.split(' ')[0] || 'Student';
+
+  function showNotice(title, message, tone = 'success') {
+    setNotice({ title, message, tone });
+    setTimeout(() => setNotice(null), 4200);
+  }
 
   useEffect(() => {
     if (activeTab === 'Reports' && !reportMode) {
@@ -62,7 +68,7 @@ export default function DashboardScreen() {
       const response = await api.fetchMyReports();
       setMyReports(response.data?.data || []);
     } catch (error) {
-      Alert.alert('Unable to load reports', error.response?.data?.message || 'Please try again.');
+      showNotice('Unable to load reports', error.response?.data?.message || 'Please try again.', 'error');
     } finally {
       setReportLoading(false);
     }
@@ -75,7 +81,7 @@ export default function DashboardScreen() {
   async function chooseReportImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Photo permission needed', 'Allow photo access to attach an item image.');
+      showNotice('Photo permission needed', 'Allow photo access to attach an item image.', 'error');
       return;
     }
 
@@ -84,19 +90,6 @@ export default function DashboardScreen() {
       allowsEditing: true,
       quality: 0.8,
     });
-      if (reportMode) {
-        return (
-          <ReportForm
-            mode={reportMode}
-            form={form}
-            reportLoading={reportLoading}
-            onBack={() => setReportMode(null)}
-            updateForm={updateForm}
-            chooseImage={chooseReportImage}
-            submitReport={submitReport}
-          />
-        );
-      }
     if (!result.canceled && result.assets?.[0]) {
       updateForm('image', result.assets[0]);
     }
@@ -104,7 +97,7 @@ export default function DashboardScreen() {
 
   async function submitReport() {
     if (!form.title.trim() || !form.description.trim() || !form.location.trim() || !form.image) {
-      Alert.alert('Complete your report', 'Add an item name, public description, location, and photo.');
+      showNotice('Complete your report', 'Add an item name, public description, location, and photo.', 'error');
       return;
     }
 
@@ -126,7 +119,7 @@ export default function DashboardScreen() {
       });
 
       await api.createReport(payload);
-      Alert.alert('Report submitted', reportMode === 'found'
+      showNotice('Report submitted', reportMode === 'found'
         ? 'Thank you. Please surrender the item to USC for verification.'
         : 'Your lost-item report is now waiting for admin approval.');
       setForm({ title: '', category: 'Electronics', color: '', description: '', privateNote: '', location: '', date: new Date().toISOString().slice(0, 10), image: null });
@@ -135,7 +128,7 @@ export default function DashboardScreen() {
     } catch (error) {
       const validation = error.response?.data?.errors;
       const message = validation ? Object.values(validation).flat().join('\n') : error.response?.data?.message || 'Please try again.';
-      Alert.alert('Report not submitted', message);
+      showNotice('Report not submitted', message, 'error');
     } finally {
       setReportLoading(false);
     }
@@ -200,6 +193,7 @@ export default function DashboardScreen() {
             onBack={() => setReportMode(null)}
             updateForm={updateForm}
             chooseImage={chooseReportImage}
+            removeImage={() => updateForm('image', null)}
             submitReport={submitReport}
           />
         );
@@ -260,6 +254,7 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
+      {notice && <NoticeModal notice={notice} onClose={() => setNotice(null)} />}
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Image source={logoImage} style={styles.logo} resizeMode="contain" />
@@ -308,7 +303,24 @@ function ItemCard({ item }) {
   );
 }
 
-function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage, submitReport }) {
+function NoticeModal({ notice, onClose }) {
+  return (
+    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+      <View style={styles.noticeBackdrop}>
+        <View style={[styles.noticeModal, notice.tone === 'error' && styles.noticeModalError]}>
+          <View style={styles.noticeMark}>{notice.tone === 'error' ? <Text style={styles.noticeMarkText}>!</Text> : <Text style={styles.noticeMarkText}>✓</Text>}</View>
+          <Text style={styles.noticeTitle}>{notice.title}</Text>
+          <Text style={styles.noticeMessage}>{notice.message}</Text>
+          <TouchableOpacity style={styles.noticeButton} onPress={onClose} activeOpacity={0.85}>
+            <Text style={styles.noticeButtonText}>OK</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage, removeImage, submitReport }) {
   const isFound = mode === 'found';
 
   return (
@@ -335,7 +347,16 @@ function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage
       <Text style={styles.fieldLabel}>Date {isFound ? 'found' : 'lost'} · YYYY-MM-DD</Text>
       <TextInput style={styles.formInput} value={form.date} onChangeText={(value) => updateForm('date', value)} />
       <TouchableOpacity style={styles.uploadBox} onPress={chooseImage}>
-        {form.image ? <Image source={{ uri: form.image.uri }} style={styles.previewImage} /> : <Text style={styles.uploadText}>＋  Add item photo{ '\n' }<Text style={styles.uploadHint}>A clear photo is required for verification</Text></Text>}
+        {form.image ? (
+          <View style={styles.previewWrap}>
+            <Image source={{ uri: form.image.uri }} style={styles.previewImage} />
+            <TouchableOpacity style={styles.removeImageButton} onPress={removeImage} hitSlop={8}>
+              <Text style={styles.removeImageText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={styles.uploadText}>＋  Add item photo{ '\n' }<Text style={styles.uploadHint}>A clear photo is required for verification</Text></Text>
+        )}
       </TouchableOpacity>
       <TouchableOpacity style={[styles.submitButton, isFound && styles.submitFound]} onPress={submitReport} disabled={reportLoading}>
         <Text style={styles.submitText}>{reportLoading ? 'Submitting...' : isFound ? 'Submit Found Report' : 'Publish Lost Report'}</Text>
@@ -422,7 +443,19 @@ const styles = StyleSheet.create({
   uploadText: { color: '#087044', fontSize: 15, fontWeight: '800', textAlign: 'center', lineHeight: 24 },
   uploadHint: { color: '#74927d', fontSize: 11, fontWeight: '400' },
   previewImage: { width: '100%', height: 160 },
+  removeImageButton: { position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#b64036', borderWidth: 2, borderColor: '#ffffff' },
+  removeImageText: { color: '#ffffff', fontSize: 22, lineHeight: 23, fontWeight: '900' },
   submitButton: { alignItems: 'center', backgroundColor: '#087044', borderRadius: 8, paddingVertical: 14, marginTop: 18, marginBottom: 12 },
   submitFound: { backgroundColor: '#ef3340' },
   submitText: { color: '#ffffff', fontSize: 13, fontWeight: '900' },
+  noticeBackdrop: { flex: 1, backgroundColor: 'rgba(0, 32, 18, 0.48)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  noticeModal: { width: '100%', maxWidth: 360, alignItems: 'center', backgroundColor: '#087044', borderRadius: 18, paddingHorizontal: 22, paddingVertical: 24, shadowColor: '#003b24', shadowOpacity: 0.3, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 12 },
+  noticeModalError: { backgroundColor: '#b64036' },
+  noticeMark: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  noticeMarkText: { color: '#ffffff', fontSize: 16, fontWeight: '900' },
+  noticeTitle: { color: '#ffffff', fontSize: 17, fontWeight: '900', textAlign: 'center', marginTop: 10 },
+  noticeMessage: { color: '#e4f7e7', fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 8 },
+  noticeButton: { minWidth: 110, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10, marginTop: 18 },
+  noticeButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '900' },
+  previewWrap: { width: '100%', height: 160, position: 'relative' },
 });
