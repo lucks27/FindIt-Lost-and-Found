@@ -59,6 +59,8 @@ class ReportController extends Controller
 
         $reports = $query->with(['student', 'images'])->latest()->paginate(20);
 
+        $reports->getCollection()->each->makeHidden('private_identifying_details');
+
         return response()->json(['status' => 'success', 'data' => $reports]);
     }
 
@@ -69,6 +71,8 @@ class ReportController extends Controller
             ->with(['student', 'rewards', 'images'])
             ->latest()
             ->get();
+
+        $reports->each->makeHidden('private_identifying_details');
 
         return response()->json(['status' => 'success', 'data' => $reports]);
     }
@@ -88,6 +92,8 @@ class ReportController extends Controller
             }
         }
 
+        $report->makeHidden('private_identifying_details');
+
         return response()->json(['status' => 'success', 'data' => $report]);
     }
 
@@ -99,6 +105,7 @@ class ReportController extends Controller
             'type' => 'required|in:lost,found',
             'title' => 'required|string|max:255',
             'description' => 'required|string',
+            'private_identifying_details' => 'nullable|string|max:5000',
             'category_id' => 'nullable|exists:item_categories,id',
             'location' => 'required|string|max:255',
             'date_occurred' => 'required|date',
@@ -201,6 +208,7 @@ class ReportController extends Controller
         }
 
         $report->load(['student', 'images']);
+        $report->makeHidden('private_identifying_details');
         return response()->json(['status' => 'success', 'message' => 'Report created successfully. Images uploaded.', 'data' => $report], 201);
     }
 
