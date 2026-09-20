@@ -89,6 +89,10 @@ export async function fetchProfile() {
   }
 }
 
+export function fetchRecognition() {
+  return apiClient.get('/api/student/recognition');
+}
+
 export function updateProfile(data) {
   return apiClient.put('/api/student/profile', data);
 }

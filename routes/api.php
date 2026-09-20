@@ -36,6 +36,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('student')->group(function () {
         Route::get('/profile', [StudentProfileController::class, 'apiProfile']);
+        Route::get('/recognition', [StudentProfileController::class, 'apiRecognition']);
+        Route::get('/recognition', [StudentProfileController::class, 'apiRecognition']);
         Route::put('/profile', [StudentProfileController::class, 'apiUpdateProfile']);
         Route::post('/profile/picture', [StudentProfileController::class, 'updateProfilePicture']);
         Route::post('/profile/change-password', [StudentProfileController::class, 'apiChangePassword']);

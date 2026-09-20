@@ -48,6 +48,8 @@ export default function DashboardScreen() {
   const [reportMode, setReportMode] = useState(null);
   const [myReports, setMyReports] = useState([]);
   const [reportLoading, setReportLoading] = useState(false);
+  const [recognition, setRecognition] = useState(null);
+  const [recognitionLoading, setRecognitionLoading] = useState(false);
   const [notice, setNotice] = useState(null);
   const [form, setForm] = useState({
     title: '',
@@ -73,6 +75,7 @@ export default function DashboardScreen() {
     if ((activeTab === 'Reports' || activeTab === 'Hub') && !reportMode) {
       loadMyReports();
     }
+    if (activeTab === 'Profile') loadRecognition();
   }, [activeTab, reportMode]);
 
   async function loadMyReports() {
@@ -84,6 +87,18 @@ export default function DashboardScreen() {
       showNotice('Unable to load reports', error.response?.data?.message || 'Please try again.', 'error');
     } finally {
       setReportLoading(false);
+    }
+  }
+
+  async function loadRecognition() {
+    setRecognitionLoading(true);
+    try {
+      const response = await api.fetchRecognition();
+      setRecognition(response.data?.data || null);
+    } catch (error) {
+      showNotice('Unable to load recognition', error.response?.data?.message || 'Please try again.', 'error');
+    } finally {
+      setRecognitionLoading(false);
     }
   }
 
@@ -257,12 +272,12 @@ export default function DashboardScreen() {
     }
 
     if (activeTab === 'Hub') return renderHub();
+    if (activeTab === 'Profile') return <ProfileContent user={user} reports={myReports} recognition={recognition} loading={recognitionLoading} logout={logout} onBack={() => setActiveTab('Home')} />;
 
     const tab = tabs.find((entry) => entry.key === activeTab);
     const content = {
       Reports: ['My Reports', 'Track the lost and found posts you submitted.'],
       Matches: ['Matches', 'Review possible matches connected to your reports.'],
-      Profile: ['My Profile', 'Manage your student details and account settings.'],
     }[activeTab];
 
     return (
@@ -283,7 +298,7 @@ export default function DashboardScreen() {
     <SafeAreaView style={styles.screen}>
       {notice && <NoticeModal notice={notice} onClose={() => { setNotice(null); notice.onClose?.(); }} />}
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+        {activeTab !== 'Profile' && <View style={styles.header}>
           <Image source={logoImage} style={styles.logo} resizeMode="contain" />
           <View style={styles.headerCopy}>
             <Text style={styles.appName}>FindIt</Text>
@@ -292,7 +307,7 @@ export default function DashboardScreen() {
           <TouchableOpacity style={styles.bellButton} onPress={() => setActiveTab('Hub')}>
             <Text style={styles.bellIcon}>♧</Text>
           </TouchableOpacity>
-        </View>
+        </View>}
         {renderTabContent()}
       </ScrollView>
 
@@ -350,6 +365,90 @@ function SubmittedReportRow({ report }) {
       </View>
     </TouchableOpacity>
   );
+}
+
+function ProfileContent({ user, reports, recognition, loading, logout, onBack }) {
+  const record = recognition?.record || {};
+  const points = Number(record.recognition_points || 0);
+  const conversionRate = Number(recognition?.conversion_rate || 100);
+  const pesoValue = Number(record.peso_value ?? points / conversionRate);
+  const rewardCount = Number(record.reward_count || 0);
+  const reportCount = Number(record.report_count || reports.length || 0);
+  const nextLevel = Math.max(100, Math.ceil((points + 1) / 100) * 100);
+  const levelProgress = Math.min(1, points / nextLevel);
+  const displayName = user?.name || `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Student';
+  const level = Math.max(1, Math.floor(points / 100) + 1);
+
+  return (
+    <View style={styles.profileScreen}>
+      <View style={styles.profileTopBar}>
+        <TouchableOpacity onPress={onBack} style={styles.profileBack}><Text style={styles.profileBackText}>‹</Text></TouchableOpacity>
+        <Text style={styles.profileTopTitle}>My Profile</Text>
+        <Text style={styles.profileSettings}>⚙</Text>
+      </View>
+      <View style={styles.profileIdentityCard}>
+        <View style={styles.profileAvatar}><Text style={styles.profileAvatarText}>{displayName.charAt(0).toUpperCase()}</Text></View>
+        <View style={styles.profileIdentityCopy}>
+          <Text style={styles.profileName}>{displayName}</Text>
+          <Text style={styles.profileEmail}>{user?.email || 'Student account'}</Text>
+          <Text style={styles.profileCourse}>{user?.course || user?.department || 'SNSU student'}</Text>
+        </View>
+      </View>
+
+      <View style={styles.profileLevelCard}>
+        <View style={styles.profileLevelBadge}><Text style={styles.profileLevelIcon}>♛</Text></View>
+        <View style={styles.profileLevelCopy}>
+          <View style={styles.profileLevelHeader}><Text style={styles.profileLevelTitle}>Level {level}</Text><Text style={styles.profileLevelCount}>{points} / {nextLevel} pts</Text></View>
+          <View style={styles.profileLevelTrack}><View style={[styles.profileLevelFill, { width: `${levelProgress * 100}%` }]} /></View>
+        </View>
+      </View>
+
+      <Text style={styles.profileImpactTitle}>My Impact</Text>
+      <View style={styles.profileStatsRow}>
+        <ProfileStat value={reportCount} label="Items Reported" icon="▤" />
+        <ProfileStat value={rewardCount} label="Rewards Converted" icon="♧" />
+      </View>
+
+      <View style={styles.profileImpactCard}>
+        <Text style={styles.profileImpactCardTitle}>Your actions matter!</Text>
+        <Text style={styles.profileImpactCardText}>Every report helps someone reconnect with their lost item.</Text>
+        <Text style={styles.profileImpactCardIcon}>♥</Text>
+      </View>
+
+      <View style={styles.profileActions}>
+        <ProfileAction icon="▤" label="My Reports" onPress={() => {}} />
+        <ProfileAction icon="♧" label="My Rewards" onPress={() => {}} />
+        <ProfileAction icon="⚙" label="Settings" onPress={() => {}} />
+        <ProfileAction icon="?" label="Help & Support" onPress={() => {}} />
+      </View>
+
+      <View style={styles.profileConversionBar}>
+        <View><Text style={styles.profileConversionTitle}>Reward conversion</Text><Text style={styles.profileConversionText}>{conversionRate} points = ₱1.00 · Current value ₱{pesoValue.toFixed(2)}</Text></View>
+        <Text style={styles.profileConversionPoints}>{points} pts</Text>
+      </View>
+
+      <View style={styles.profileSectionHeader}><Text style={styles.profileSectionTitle}>Reward conversion records</Text><Text style={styles.profileSectionHint}>Latest activity</Text></View>
+      {loading ? <Text style={styles.loadingText}>Loading rewards...</Text> : recognition?.transactions?.length ? recognition.transactions.slice(0, 3).map((transaction) => (
+        <View key={transaction.id} style={styles.transactionRow}>
+          <View style={styles.transactionIcon}><Text style={styles.transactionIconText}>{transaction.direction === 'debit' ? '↓' : '↑'}</Text></View>
+          <View style={styles.transactionCopy}><Text style={styles.transactionTitle}>{transaction.description || transaction.notes || transaction.type || 'Recognition update'}</Text><Text style={styles.transactionDate}>{transaction.created_at ? new Date(transaction.created_at).toLocaleDateString() : 'Recent'}</Text></View>
+          <Text style={[styles.transactionPoints, transaction.direction === 'debit' && styles.transactionDebit]}>{transaction.direction === 'debit' ? '-' : '+'}{transaction.points || 0} pts</Text>
+        </View>
+      )) : <Text style={styles.profileEmpty}>Return a found item or complete a verified report to earn recognition points.</Text>}
+
+      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+        <Text style={styles.logoutText}>Log out</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function ProfileStat({ value, label }) {
+  return <View style={styles.profileStat}><Text style={styles.profileStatIcon}>▤</Text><Text style={styles.profileStatValue}>{value}</Text><Text style={styles.profileStatLabel}>{label}</Text></View>;
+}
+
+function ProfileAction({ icon, label, onPress }) {
+  return <TouchableOpacity style={styles.profileAction} onPress={onPress}><Text style={styles.profileActionIcon}>{icon}</Text><Text style={styles.profileActionLabel}>{label}</Text><Text style={styles.profileActionArrow}>›</Text></TouchableOpacity>;
 }
 
 function HubContent({ reports, loading, onBack }) {
@@ -627,6 +726,59 @@ const styles = StyleSheet.create({
   hubEmpty: { alignItems: 'center', paddingHorizontal: 28, paddingVertical: 54 },
   hubEmptyTitle: { color: '#174a31', fontSize: 18, fontWeight: '900' },
   hubEmptyText: { color: '#6f8578', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 8 },
+  profileScreen: { paddingTop: 2, paddingBottom: 20 },
+  profileTopBar: { height: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  profileBack: { width: 34, height: 34, justifyContent: 'center' },
+  profileBackText: { color: '#087044', fontSize: 31, lineHeight: 31 },
+  profileTopTitle: { color: '#174a31', fontSize: 16, fontWeight: '900' },
+  profileSettings: { color: '#087044', fontSize: 21, fontWeight: '900' },
+  profileIdentityCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 14, padding: 13, marginTop: 5 },
+  profileAvatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#087044', alignItems: 'center', justifyContent: 'center' },
+  profileAvatarText: { color: '#ffffff', fontSize: 23, fontWeight: '900' },
+  profileIdentityCopy: { flex: 1, marginLeft: 11 },
+  profileName: { color: '#1d2922', fontSize: 14, fontWeight: '900' },
+  profileEmail: { color: '#7a9183', fontSize: 10, marginTop: 3 },
+  profileCourse: { color: '#527064', fontSize: 10, marginTop: 4 },
+  profileLevelCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e2f3e5', borderRadius: 14, padding: 12, marginTop: 10 },
+  profileLevelBadge: { width: 43, height: 43, borderRadius: 22, backgroundColor: '#f8c62c', alignItems: 'center', justifyContent: 'center' },
+  profileLevelIcon: { color: '#ffffff', fontSize: 23, fontWeight: '900' },
+  profileLevelCopy: { flex: 1, marginLeft: 10 },
+  profileLevelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  profileLevelTitle: { color: '#174a31', fontSize: 14, fontWeight: '900' },
+  profileLevelCount: { color: '#527064', fontSize: 10, fontWeight: '800' },
+  profileLevelTrack: { height: 7, borderRadius: 4, backgroundColor: '#b7d5be', overflow: 'hidden', marginTop: 8 },
+  profileLevelFill: { height: 7, borderRadius: 4, backgroundColor: '#087044' },
+  profileImpactTitle: { color: '#174a31', fontSize: 16, fontWeight: '900', marginTop: 20, marginBottom: 8 },
+  profileStatsRow: { flexDirection: 'row', gap: 8 },
+  profileStat: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 82, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 12 },
+  profileStatIcon: { color: '#087044', fontSize: 20, fontWeight: '900' },
+  profileStatValue: { color: '#174a31', fontSize: 18, fontWeight: '900', marginTop: 2 },
+  profileStatLabel: { color: '#7a9183', fontSize: 9, marginTop: 2 },
+  profileImpactCard: { position: 'relative', overflow: 'hidden', backgroundColor: '#087044', borderRadius: 13, padding: 14, marginTop: 12, minHeight: 76 },
+  profileImpactCardTitle: { color: '#ffffff', fontSize: 13, fontWeight: '900' },
+  profileImpactCardText: { color: '#d9f5db', fontSize: 10, lineHeight: 15, marginTop: 4, maxWidth: 245 },
+  profileImpactCardIcon: { position: 'absolute', right: 22, bottom: 7, color: '#a9dd77', fontSize: 42 },
+  profileActions: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 12, marginTop: 12, overflow: 'hidden' },
+  profileAction: { minHeight: 43, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#edf3ed', paddingHorizontal: 13 },
+  profileActionIcon: { width: 24, color: '#087044', fontSize: 17, fontWeight: '900' },
+  profileActionLabel: { flex: 1, color: '#315044', fontSize: 11, fontWeight: '700' },
+  profileActionArrow: { color: '#7a9183', fontSize: 22 },
+  profileConversionBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff8dd', borderWidth: 1, borderColor: '#d5b84c', borderRadius: 10, padding: 11, marginTop: 12 },
+  profileConversionTitle: { color: '#806615', fontSize: 10, fontWeight: '900' },
+  profileConversionText: { color: '#9a7a17', fontSize: 9, marginTop: 3 },
+  profileConversionPoints: { color: '#806615', fontSize: 12, fontWeight: '900' },
+  profileSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 9 },
+  profileSectionTitle: { color: '#174a31', fontSize: 15, fontWeight: '900' },
+  profileSectionHint: { color: '#087044', fontSize: 9, fontWeight: '800' },
+  transactionRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 10, padding: 10, marginBottom: 8 },
+  transactionIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#e2f3e5', alignItems: 'center', justifyContent: 'center' },
+  transactionIconText: { color: '#087044', fontSize: 19, fontWeight: '900' },
+  transactionCopy: { flex: 1, marginLeft: 9 },
+  transactionTitle: { color: '#1d2922', fontSize: 11, fontWeight: '800' },
+  transactionDate: { color: '#8b9c91', fontSize: 9, marginTop: 3 },
+  transactionPoints: { color: '#087044', fontSize: 11, fontWeight: '900' },
+  transactionDebit: { color: '#b64036' },
+  profileEmpty: { color: '#6f8578', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 10, padding: 14, fontSize: 11, lineHeight: 17 },
   backLink: { alignSelf: 'flex-start', marginBottom: 10 },
   backLinkText: { color: '#087044', fontSize: 14, fontWeight: '800' },
   notice: { backgroundColor: '#fff0ed', borderWidth: 1, borderColor: '#ef8b80', borderRadius: 8, padding: 10, marginTop: 14 },
