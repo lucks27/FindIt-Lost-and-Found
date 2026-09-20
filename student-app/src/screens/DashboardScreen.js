@@ -215,33 +215,28 @@ export default function DashboardScreen() {
         );
       }
       return (
-        <View>
-          <Text style={styles.pageTitle}>My Reports</Text>
-          <Text style={styles.pageCopy}>Create a clear report so the community can help, while your private note stays visible only to administrators.</Text>
+        <View style={styles.reportsScreen}>
+          <Text style={styles.reportsTitle}>My Reports</Text>
+          <Text style={styles.reportsCopy}>Create a clear report so the community can help, while your private note stays visible only to administrators.</Text>
           <View style={styles.reportChoices}>
-            <TouchableOpacity style={styles.reportChoice} onPress={() => setReportMode('lost')}>
-              <Text style={styles.choiceIcon}>−</Text>
+            <TouchableOpacity style={styles.reportChoice} onPress={() => setReportMode('lost')} activeOpacity={0.85}>
+              <View style={styles.choiceTop}><Text style={styles.choiceIcon}>⌁</Text><Text style={styles.choiceArrow}>›</Text></View>
               <Text style={styles.choiceTitle}>Report Lost Item</Text>
               <Text style={styles.choiceCopy}>Tell us what went missing.</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.reportChoice, styles.foundChoice]} onPress={() => setReportMode('found')}>
-              <Text style={styles.choiceIcon}>＋</Text>
+            <TouchableOpacity style={styles.reportChoice} onPress={() => setReportMode('found')} activeOpacity={0.85}>
+              <View style={styles.choiceTop}><Text style={[styles.choiceIcon, styles.foundIcon]}>♡</Text><Text style={styles.choiceArrow}>›</Text></View>
               <Text style={styles.choiceTitle}>Report Found Item</Text>
               <Text style={styles.choiceCopy}>Help return an item safely.</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.sectionTitle}>Submitted reports</Text>
+          <View style={styles.submittedHeading}>
+            <Text style={styles.sectionTitle}>Submitted reports</Text>
+            {myReports.length > 0 && <TouchableOpacity><Text style={styles.viewAll}>See all</Text></TouchableOpacity>}
+          </View>
           {reportLoading && <Text style={styles.loadingText}>Loading reports...</Text>}
           {!reportLoading && myReports.length === 0 && <Text style={styles.emptyCopy}>Your submitted reports will appear here.</Text>}
-          {myReports.map((report) => (
-            <View key={report.id} style={styles.reportRow}>
-              <View style={styles.reportRowCopy}>
-                <Text style={styles.itemTitle}>{report.title}</Text>
-                <Text style={styles.itemMeta}>{report.type === 'found' ? 'Found item' : 'Lost item'}  •  {report.location}</Text>
-              </View>
-              <Text style={styles.reportStatus}>{String(report.status || '').replaceAll('_', ' ')}</Text>
-            </View>
-          ))}
+          {myReports.map((report) => <SubmittedReportRow key={report.id} report={report} />)}
         </View>
       );
     }
@@ -317,6 +312,28 @@ function ItemCard({ item }) {
         <Text style={styles.itemDate}>September 15, 2027</Text>
       </View>
     </View>
+  );
+}
+
+function SubmittedReportRow({ report }) {
+  const icon = report.type === 'found' ? '▣' : report.title?.toLowerCase().includes('phone') ? '▯' : report.title?.toLowerCase().includes('backpack') ? '♧' : '▱';
+  const status = String(report.status || 'pending').replaceAll('_', ' ');
+  const statusKey = status.toLowerCase().replaceAll(' ', '_');
+  const statusStyle = statusKey.includes('approved') || statusKey.includes('verified') || statusKey.includes('published') || statusKey.includes('claimed') || statusKey.includes('matched')
+    ? styles.reportStatusPositive
+    : styles.reportStatusPending;
+
+  return (
+    <TouchableOpacity style={styles.submittedReportRow} activeOpacity={0.85}>
+      <View style={styles.submittedReportIcon}><Text style={styles.submittedReportIconText}>{icon}</Text></View>
+      <View style={styles.reportRowCopy}>
+        <Text style={styles.submittedReportTitle} numberOfLines={1}>{report.title}</Text>
+        <Text style={styles.submittedReportMeta} numberOfLines={1}>{report.type === 'found' ? 'Found item' : 'Lost item'} · {report.location}</Text>
+      </View>
+      <View style={styles.submittedReportEnd}>
+        <Text style={[styles.reportStatusPill, statusStyle]}>{status}</Text>
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -505,22 +522,37 @@ const styles = StyleSheet.create({
   emptyCopy: { color: '#6f8578', fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
   logoutButton: { backgroundColor: '#087044', borderRadius: 18, paddingHorizontal: 22, paddingVertical: 10, marginTop: 22 },
   logoutText: { color: '#ffffff', fontWeight: '800' },
-  bottomNav: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 86, backgroundColor: '#d9ffd2', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 4 },
-  navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 56 },
-  navIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  navIconActive: { backgroundColor: '#0b9c42' },
-  navIconText: { color: '#315044', fontSize: 22, fontWeight: '800' },
+  bottomNav: { position: 'absolute', left: 16, right: 16, bottom: 10, height: 64, borderRadius: 32, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#c7ddc9', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 4, elevation: 5, shadowColor: '#16442d', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
+  navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 56, height: 54 },
+  navIcon: { width: 34, height: 28, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  navIconActive: { backgroundColor: '#e2f4e4' },
+  navIconText: { color: '#668073', fontSize: 18, fontWeight: '800' },
   navIconTextActive: { color: '#ffffff' },
-  navLabel: { color: '#527064', fontSize: 9, fontWeight: '700', marginTop: 3 },
+  navLabel: { color: '#668073', fontSize: 8, fontWeight: '700', marginTop: 1 },
   navLabelActive: { color: '#087044', fontWeight: '900' },
   pageTitle: { color: '#174a31', fontSize: 26, fontWeight: '900', marginTop: 8 },
   pageCopy: { color: '#6f8578', fontSize: 13, lineHeight: 20, marginTop: 8 },
-  reportChoices: { flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 26 },
-  reportChoice: { flex: 1, minHeight: 126, borderRadius: 14, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#b9dfb4', padding: 13 },
-  foundChoice: { backgroundColor: '#e4f8df', borderColor: '#73b879' },
-  choiceIcon: { color: '#087044', fontSize: 28, fontWeight: '900' },
-  choiceTitle: { color: '#174a31', fontSize: 14, fontWeight: '900', marginTop: 7 },
-  choiceCopy: { color: '#718679', fontSize: 11, lineHeight: 16, marginTop: 5 },
+  reportsScreen: { paddingTop: 2 },
+  reportsTitle: { color: '#174a31', fontSize: 25, fontWeight: '900', marginTop: 4 },
+  reportsCopy: { color: '#6f8578', fontSize: 12, lineHeight: 18, marginTop: 7, maxWidth: 300 },
+  reportChoices: { flexDirection: 'row', gap: 10, marginTop: 19, marginBottom: 25 },
+  reportChoice: { flex: 1, minHeight: 123, borderRadius: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', padding: 13 },
+  choiceTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  choiceIcon: { color: '#087044', backgroundColor: '#f8ecdc', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 4, fontSize: 17, fontWeight: '900' },
+  foundIcon: { backgroundColor: '#e2f3e5' },
+  choiceArrow: { color: '#087044', borderWidth: 1, borderColor: '#c7ddc9', borderRadius: 12, width: 20, height: 20, textAlign: 'center', lineHeight: 17, fontSize: 17 },
+  choiceTitle: { color: '#174a31', fontSize: 13, fontWeight: '900', marginTop: 15 },
+  choiceCopy: { color: '#718679', fontSize: 10, lineHeight: 14, marginTop: 4 },
+  submittedHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 },
+  submittedReportRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 11, borderWidth: 1, borderColor: '#d6e6d8', padding: 13, minHeight: 82, marginBottom: 11 },
+  submittedReportIcon: { width: 46, height: 46, borderRadius: 10, backgroundColor: '#e8f5e9', alignItems: 'center', justifyContent: 'center' },
+  submittedReportIconText: { color: '#087044', fontSize: 23, fontWeight: '800' },
+  submittedReportTitle: { color: '#1d2922', fontSize: 14, fontWeight: '900' },
+  submittedReportMeta: { color: '#7a9183', fontSize: 11, marginTop: 6 },
+  submittedReportEnd: { alignItems: 'flex-end', marginLeft: 10 },
+  reportStatusPill: { maxWidth: 112, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 7, fontSize: 9, fontWeight: '900', textTransform: 'capitalize', textAlign: 'center' },
+  reportStatusPending: { color: '#8b6918', backgroundColor: '#f7edcf' },
+  reportStatusPositive: { color: '#087044', backgroundColor: '#c8f0df' },
   loadingText: { color: '#6f8578', marginTop: 14 },
   reportRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 12, padding: 12, marginTop: 10 },
   reportRowCopy: { flex: 1 },
