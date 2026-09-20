@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as api from '../api/api';
 import backgroundImage from '../../assets/building bg.png';
 import logoImage from '../../assets/logo.png';
@@ -30,6 +31,15 @@ const sampleItems = [
   { title: 'Wireless Headphones', category: 'Electronics', place: 'Exit walkway', status: 'Found', icon: 'headset-outline', color: '#ed4d4d' },
   { title: 'Keychain', category: 'Personal items', place: 'Student Center', status: 'Lost', icon: 'key-outline', color: '#0b8f55' },
 ];
+
+const reportCategories = ['Electronics', 'Accessories', 'Clothing', 'Others'];
+
+function formatDateValue(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export default function DashboardScreen() {
   const { user, logout } = useAuth();
@@ -109,6 +119,11 @@ export default function DashboardScreen() {
   }
 
   async function submitReport() {
+    if (form.date > formatDateValue(new Date())) {
+      showNotice('Invalid report date', 'The date cannot be tomorrow or a future date. Choose today or an earlier date.', 'error');
+      return;
+    }
+
     if (!form.title.trim() || !form.description.trim() || !form.privateNote.trim() || !form.location.trim() || !form.image) {
       showNotice('Complete your report', 'Complete the private verification note, item name, public description, location, and photo before publishing.', 'error');
       return;
@@ -433,6 +448,16 @@ function NoticeModal({ notice, onClose }) {
 
 function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage, removeImage, submitReport }) {
   const isFound = mode === 'found';
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const today = new Date();
+  const selectedDate = new Date(`${form.date}T00:00:00`);
+
+  function handleDateChange(event, date) {
+    setDatePickerOpen(false);
+    if (event.type === 'dismissed' || !date) return;
+    updateForm('date', formatDateValue(date > today ? today : date));
+  }
 
   return (
     <View>
@@ -445,7 +470,23 @@ function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage
       <Text style={styles.fieldLabel}>Item name</Text>
       <TextInput style={styles.formInput} placeholder="e.g. Black airplane with cute sign" value={form.title} onChangeText={(value) => updateForm('title', value)} />
       <Text style={styles.fieldLabel}>Category</Text>
-      <TextInput style={styles.formInput} placeholder="Electronics" value={form.category} onChangeText={(value) => updateForm('category', value)} />
+      <TouchableOpacity style={styles.selectInput} onPress={() => setCategoryOpen(true)} activeOpacity={0.85}>
+        <Text style={styles.selectInputText}>{form.category || 'Select a category'}</Text>
+        <Text style={styles.selectChevron}>⌄</Text>
+      </TouchableOpacity>
+      <Modal transparent visible={categoryOpen} animationType="fade" onRequestClose={() => setCategoryOpen(false)}>
+        <TouchableOpacity style={styles.selectBackdrop} activeOpacity={1} onPress={() => setCategoryOpen(false)}>
+          <View style={styles.selectMenu}>
+            <Text style={styles.selectMenuTitle}>Choose a category</Text>
+            {reportCategories.map((category) => (
+              <TouchableOpacity key={category} style={styles.selectOption} onPress={() => { updateForm('category', category); setCategoryOpen(false); }}>
+                <Text style={styles.selectOptionText}>{category}</Text>
+                {form.category === category && <Text style={styles.selectCheck}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
       <Text style={styles.fieldLabel}>Color or identifying appearance</Text>
       <TextInput style={styles.formInput} placeholder="e.g. Navy blue with red chicken" value={form.color} onChangeText={(value) => updateForm('color', value)} />
       <Text style={styles.fieldLabel}>Public description</Text>
@@ -456,8 +497,13 @@ function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage
       <Text style={styles.privateHint}>This note is never shown in the public item listing.</Text>
       <Text style={styles.fieldLabel}>{isFound ? 'Where was it found?' : 'Last known location'}</Text>
       <TextInput style={styles.formInput} placeholder="Main Library" value={form.location} onChangeText={(value) => updateForm('location', value)} />
-      <Text style={styles.fieldLabel}>Date {isFound ? 'found' : 'lost'} · YYYY-MM-DD</Text>
-      <TextInput style={styles.formInput} value={form.date} onChangeText={(value) => updateForm('date', value)} />
+      <Text style={styles.fieldLabel}>Date {isFound ? 'found' : 'lost'}</Text>
+      <TouchableOpacity style={styles.selectInput} onPress={() => setDatePickerOpen(true)} activeOpacity={0.85}>
+        <Text style={styles.selectInputText}>{form.date}</Text>
+        <Text style={styles.calendarIcon}>▣</Text>
+      </TouchableOpacity>
+      <Text style={styles.dateHint}>You can only select today or an earlier date.</Text>
+      {datePickerOpen && <DateTimePicker value={Number.isNaN(selectedDate.getTime()) ? today : selectedDate} mode="date" maximumDate={today} onChange={handleDateChange} />}
       <TouchableOpacity style={styles.uploadBox} onPress={chooseImage}>
         {form.image ? (
           <View style={styles.previewWrap}>
@@ -589,6 +635,17 @@ const styles = StyleSheet.create({
   requiredNoticeText: { color: '#806615', fontSize: 11, lineHeight: 16 },
   fieldLabel: { color: '#315044', fontSize: 11, fontWeight: '800', marginTop: 15, marginBottom: 6 },
   formInput: { minHeight: 42, borderWidth: 1, borderColor: '#b7d5be', borderRadius: 7, backgroundColor: '#ffffff', paddingHorizontal: 12, paddingVertical: 10, color: '#20392b', fontSize: 13 },
+  selectInput: { minHeight: 42, borderWidth: 1, borderColor: '#b7d5be', borderRadius: 7, backgroundColor: '#ffffff', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  selectInputText: { color: '#20392b', fontSize: 13 },
+  selectChevron: { color: '#087044', fontSize: 20, fontWeight: '900', lineHeight: 18 },
+  calendarIcon: { color: '#087044', fontSize: 17, fontWeight: '900' },
+  dateHint: { color: '#74927d', fontSize: 10, marginTop: 5 },
+  selectBackdrop: { flex: 1, backgroundColor: 'rgba(0, 32, 18, 0.35)', justifyContent: 'center', padding: 28 },
+  selectMenu: { backgroundColor: '#ffffff', borderRadius: 14, padding: 16, shadowColor: '#16442d', shadowOpacity: 0.2, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 10 },
+  selectMenuTitle: { color: '#174a31', fontSize: 16, fontWeight: '900', marginBottom: 8 },
+  selectOption: { minHeight: 44, borderTopWidth: 1, borderTopColor: '#e5efe6', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  selectOptionText: { color: '#315044', fontSize: 14, fontWeight: '700' },
+  selectCheck: { color: '#087044', fontSize: 18, fontWeight: '900' },
   multiline: { minHeight: 78, textAlignVertical: 'top' },
   privateInput: { backgroundColor: '#fffdf1', borderColor: '#d5b84c' },
   privateHint: { color: '#9a7a17', fontSize: 10, marginTop: 5 },
