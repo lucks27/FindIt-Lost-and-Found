@@ -60,7 +60,7 @@ export default function DashboardScreen() {
   }
 
   useEffect(() => {
-    if (activeTab === 'Reports' && !reportMode) {
+    if ((activeTab === 'Reports' || activeTab === 'Hub') && !reportMode) {
       loadMyReports();
     }
   }, [activeTab, reportMode]);
@@ -79,6 +79,16 @@ export default function DashboardScreen() {
 
   function updateForm(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function renderHub() {
+    return (
+      <HubContent
+        reports={myReports}
+        loading={reportLoading}
+        onBack={() => setActiveTab('Home')}
+      />
+    );
   }
 
   async function chooseReportImage() {
@@ -236,11 +246,12 @@ export default function DashboardScreen() {
       );
     }
 
+    if (activeTab === 'Hub') return renderHub();
+
     const tab = tabs.find((entry) => entry.key === activeTab);
     const content = {
       Reports: ['My Reports', 'Track the lost and found posts you submitted.'],
       Matches: ['Matches', 'Review possible matches connected to your reports.'],
-      Hub: ['My Hub', 'Notifications, rewards, and important updates will appear here.'],
       Profile: ['My Profile', 'Manage your student details and account settings.'],
     }[activeTab];
 
@@ -305,6 +316,83 @@ function ItemCard({ item }) {
         <Text style={styles.itemMeta}>⌖ {item.place}</Text>
         <Text style={styles.itemDate}>September 15, 2027</Text>
       </View>
+    </View>
+  );
+}
+
+function HubContent({ reports, loading, onBack }) {
+  const [hubTab, setHubTab] = useState('lost');
+  const visibleReports = hubTab === 'lost'
+    ? reports.filter((report) => report.type === 'lost')
+    : reports.filter((report) => report.type === 'found');
+
+  function imageSource(report) {
+    const image = report.images?.find((entry) => entry.is_primary) || report.images?.[0];
+    if (!image?.file_path) return null;
+    if (image.file_path.startsWith('http')) return { uri: image.file_path };
+    return { uri: `${api.API_BASE_URL}/storage/${image.file_path.replace(/^\//, '')}` };
+  }
+
+  function formatDate(report) {
+    const date = report.date_occurred || report.created_at;
+    if (!date) return 'Date not provided';
+    return new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function statusLabel(status) {
+    return String(status || 'pending').replaceAll('_', ' ').toUpperCase();
+  }
+
+  return (
+    <View style={styles.hubScreen}>
+      <TouchableOpacity style={styles.hubBack} onPress={onBack}>
+        <Text style={styles.hubBackText}>‹</Text>
+      </TouchableOpacity>
+      <Text style={styles.hubTitle}>My Hub</Text>
+      <Text style={styles.hubSubtitle}>Track your submitted reports</Text>
+      <View style={styles.hubTabs}>
+        <TouchableOpacity style={[styles.hubTab, hubTab === 'lost' && styles.hubTabActive]} onPress={() => setHubTab('lost')}>
+          <Text style={[styles.hubTabText, hubTab === 'lost' && styles.hubTabTextActive]}>Lost Reports</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.hubTab, hubTab === 'found' && styles.hubTabActive]} onPress={() => setHubTab('found')}>
+          <Text style={[styles.hubTabText, hubTab === 'found' && styles.hubTabTextActive]}>Found Reports</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.hubTab, hubTab === 'claims' && styles.hubTabActive]} onPress={() => setHubTab('claims')}>
+          <Text style={[styles.hubTabText, hubTab === 'claims' && styles.hubTabTextActive]}>Claims</Text>
+        </TouchableOpacity>
+      </View>
+
+      {hubTab === 'claims' ? (
+        <View style={styles.hubEmpty}>
+          <Text style={styles.hubEmptyTitle}>No claims yet</Text>
+          <Text style={styles.hubEmptyText}>Claims connected to your reports will appear here.</Text>
+        </View>
+      ) : loading ? (
+        <Text style={styles.loadingText}>Loading reports...</Text>
+      ) : visibleReports.length === 0 ? (
+        <View style={styles.hubEmpty}>
+          <Text style={styles.hubEmptyTitle}>No {hubTab} reports yet</Text>
+          <Text style={styles.hubEmptyText}>Your submitted {hubTab} item reports will appear here.</Text>
+        </View>
+      ) : (
+        visibleReports.map((report) => {
+          const image = imageSource(report);
+          return (
+            <View key={report.id} style={styles.hubReportCard}>
+              {image ? <Image source={image} style={styles.hubReportImage} /> : <View style={styles.hubReportImagePlaceholder}><Text style={styles.hubReportImageText}>＋</Text></View>}
+              <View style={styles.hubReportCopy}>
+                <Text style={styles.hubReportTitle} numberOfLines={1}>{report.title}</Text>
+                <Text style={styles.hubReportMeta}>{formatDate(report)} · {report.type.toUpperCase()}</Text>
+                <Text style={styles.hubReportLocation} numberOfLines={1}>{report.location}</Text>
+              </View>
+              <View style={styles.hubReportStatus}>
+                <Text style={styles.hubReportStatusText}>{statusLabel(report.status)}</Text>
+                <Text style={styles.hubReportArrow}>›</Text>
+              </View>
+            </View>
+          );
+        })
+      )}
     </View>
   );
 }
@@ -437,6 +525,30 @@ const styles = StyleSheet.create({
   reportRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 12, padding: 12, marginTop: 10 },
   reportRowCopy: { flex: 1 },
   reportStatus: { color: '#087044', fontSize: 10, fontWeight: '800', textTransform: 'capitalize', marginLeft: 8 },
+  hubScreen: { flex: 1, backgroundColor: '#eaf9ed', marginHorizontal: -16, marginTop: -18, paddingHorizontal: 16, paddingBottom: 24 },
+  hubBack: { width: 30, height: 30, justifyContent: 'center', marginTop: 2 },
+  hubBackText: { color: '#1b3326', fontSize: 30, lineHeight: 30 },
+  hubTitle: { color: '#174a31', fontSize: 18, fontWeight: '900', marginLeft: 26, marginTop: -28 },
+  hubSubtitle: { color: '#527064', fontSize: 10, marginLeft: 26, marginTop: 1 },
+  hubTabs: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#b7d5be', marginTop: 18, marginBottom: 16 },
+  hubTab: { flex: 1, alignItems: 'center', paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  hubTabActive: { borderBottomColor: '#087044' },
+  hubTabText: { color: '#607269', fontSize: 11, fontWeight: '700' },
+  hubTabTextActive: { color: '#087044', fontWeight: '900' },
+  hubReportCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 7, padding: 8, marginBottom: 10, minHeight: 72, elevation: 1, shadowColor: '#16442d', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+  hubReportImage: { width: 56, height: 56, borderRadius: 5, backgroundColor: '#dcefe0' },
+  hubReportImagePlaceholder: { width: 56, height: 56, borderRadius: 5, backgroundColor: '#dcefe0', alignItems: 'center', justifyContent: 'center' },
+  hubReportImageText: { color: '#087044', fontSize: 24, fontWeight: '800' },
+  hubReportCopy: { flex: 1, marginLeft: 10, minWidth: 0 },
+  hubReportTitle: { color: '#1d2922', fontSize: 12, fontWeight: '900' },
+  hubReportMeta: { color: '#8b9c91', fontSize: 9, marginTop: 3 },
+  hubReportLocation: { color: '#607269', fontSize: 10, marginTop: 5 },
+  hubReportStatus: { alignItems: 'flex-end', marginLeft: 6 },
+  hubReportStatusText: { color: '#087044', backgroundColor: '#c8f0df', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 4, fontSize: 8, fontWeight: '900', maxWidth: 86, textAlign: 'center' },
+  hubReportArrow: { color: '#527064', fontSize: 24, lineHeight: 24, marginTop: 3 },
+  hubEmpty: { alignItems: 'center', paddingHorizontal: 28, paddingVertical: 54 },
+  hubEmptyTitle: { color: '#174a31', fontSize: 18, fontWeight: '900' },
+  hubEmptyText: { color: '#6f8578', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 8 },
   backLink: { alignSelf: 'flex-start', marginBottom: 10 },
   backLinkText: { color: '#087044', fontSize: 14, fontWeight: '800' },
   notice: { backgroundColor: '#fff0ed', borderWidth: 1, borderColor: '#ef8b80', borderRadius: 8, padding: 10, marginTop: 14 },
