@@ -1,0 +1,5 @@
+<button class="ok-btn">
+  <a href="pdf/confirmation-slip.pdf" download style="color:white; text-decoration:none;">
+    Download File
+  </a>
+</button>

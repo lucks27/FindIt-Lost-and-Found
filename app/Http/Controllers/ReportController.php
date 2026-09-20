@@ -105,7 +105,7 @@ class ReportController extends Controller
             'type' => 'required|in:lost,found',
             'title' => 'required|string|max:255',
             'description' => 'required|string',
-            'private_identifying_details' => 'nullable|string|max:5000',
+            'private_identifying_details' => 'required|string|max:5000',
             'category_id' => 'nullable|exists:item_categories,id',
             'location' => 'required|string|max:255',
             'date_occurred' => 'required|date',

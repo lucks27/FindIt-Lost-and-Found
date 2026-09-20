@@ -51,9 +51,12 @@ export default function DashboardScreen() {
   });
   const firstName = user?.first_name || user?.name?.split(' ')[0] || 'Student';
 
-  function showNotice(title, message, tone = 'success') {
-    setNotice({ title, message, tone });
-    setTimeout(() => setNotice(null), 4200);
+  function showNotice(title, message, tone = 'success', onClose = null) {
+    setNotice({ title, message, tone, onClose });
+    setTimeout(() => {
+      setNotice(null);
+      onClose?.();
+    }, 4200);
   }
 
   useEffect(() => {
@@ -96,8 +99,8 @@ export default function DashboardScreen() {
   }
 
   async function submitReport() {
-    if (!form.title.trim() || !form.description.trim() || !form.location.trim() || !form.image) {
-      showNotice('Complete your report', 'Add an item name, public description, location, and photo.', 'error');
+    if (!form.title.trim() || !form.description.trim() || !form.privateNote.trim() || !form.location.trim() || !form.image) {
+      showNotice('Complete your report', 'Complete the private verification note, item name, public description, location, and photo before publishing.', 'error');
       return;
     }
 
@@ -119,15 +122,18 @@ export default function DashboardScreen() {
       });
 
       await api.createReport(payload);
-      showNotice('Report submitted', reportMode === 'found'
-        ? 'Thank you. Please surrender the item to USC for verification.'
-        : 'Your lost-item report is now waiting for admin approval.');
       setForm({ title: '', category: 'Electronics', color: '', description: '', privateNote: '', location: '', date: new Date().toISOString().slice(0, 10), image: null });
       setReportMode(null);
-      await loadMyReports();
+      showNotice('Report submitted', reportMode === 'found'
+        ? 'Thank you. Please surrender the item to USC for verification.'
+        : 'Your lost-item report is now waiting for admin approval.', 'success', () => setActiveTab('Hub'));
     } catch (error) {
       const validation = error.response?.data?.errors;
-      const message = validation ? Object.values(validation).flat().join('\n') : error.response?.data?.message || 'Please try again.';
+      const responseMessage = error.response?.data?.message;
+      const serverError = error.response?.data?.error || error.response?.data?.exception;
+      const message = validation
+        ? Object.values(validation).flat().join('\n')
+        : responseMessage || serverError || (error.request ? 'The server could not be reached. Check the connection and try again.' : error.message) || 'Please try again.';
       showNotice('Report not submitted', message, 'error');
     } finally {
       setReportLoading(false);
@@ -254,7 +260,7 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      {notice && <NoticeModal notice={notice} onClose={() => setNotice(null)} />}
+      {notice && <NoticeModal notice={notice} onClose={() => { setNotice(null); notice.onClose?.(); }} />}
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Image source={logoImage} style={styles.logo} resizeMode="contain" />
@@ -339,8 +345,9 @@ function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage
       <TextInput style={styles.formInput} placeholder="e.g. Navy blue with red chicken" value={form.color} onChangeText={(value) => updateForm('color', value)} />
       <Text style={styles.fieldLabel}>Public description</Text>
       <TextInput style={[styles.formInput, styles.multiline]} placeholder="Describe what people may safely see in the public post." value={form.description} onChangeText={(value) => updateForm('description', value)} multiline />
-      <Text style={styles.fieldLabel}>Private verification note · admin only</Text>
-      <TextInput style={[styles.formInput, styles.privateInput, styles.multiline]} placeholder="Hidden details such as serial number, stickers, dents, or exact contents." value={form.privateNote} onChangeText={(value) => updateForm('privateNote', value)} multiline />
+      <Text style={styles.fieldLabel}>Private verification note · admin only (required)</Text>
+      <View style={styles.requiredNotice}><Text style={styles.requiredNoticeText}>Please complete this field before publishing your {isFound ? 'found' : 'lost'} item report.</Text></View>
+      <TextInput style={[styles.formInput, styles.privateInput, styles.multiline]} placeholder="Required: serial number, stickers, dents, or exact contents." value={form.privateNote} onChangeText={(value) => updateForm('privateNote', value)} multiline />
       <Text style={styles.privateHint}>This note is never shown in the public item listing.</Text>
       <Text style={styles.fieldLabel}>{isFound ? 'Where was it found?' : 'Last known location'}</Text>
       <TextInput style={styles.formInput} placeholder="Main Library" value={form.location} onChangeText={(value) => updateForm('location', value)} />
@@ -434,6 +441,8 @@ const styles = StyleSheet.create({
   backLinkText: { color: '#087044', fontSize: 14, fontWeight: '800' },
   notice: { backgroundColor: '#fff0ed', borderWidth: 1, borderColor: '#ef8b80', borderRadius: 8, padding: 10, marginTop: 14 },
   noticeText: { color: '#a43d35', fontSize: 11, lineHeight: 16 },
+  requiredNotice: { backgroundColor: '#fff8dd', borderWidth: 1, borderColor: '#d5b84c', borderRadius: 7, padding: 8, marginBottom: 6 },
+  requiredNoticeText: { color: '#806615', fontSize: 11, lineHeight: 16 },
   fieldLabel: { color: '#315044', fontSize: 11, fontWeight: '800', marginTop: 15, marginBottom: 6 },
   formInput: { minHeight: 42, borderWidth: 1, borderColor: '#b7d5be', borderRadius: 7, backgroundColor: '#ffffff', paddingHorizontal: 12, paddingVertical: 10, color: '#20392b', fontSize: 13 },
   multiline: { minHeight: 78, textAlignVertical: 'top' },

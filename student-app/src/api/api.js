@@ -179,7 +179,11 @@ export function fetchReport(id) {
 }
 
 export function createReport(data) {
-  return apiClient.post('/api/reports', data);
+  return apiClient.post('/api/reports', data, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
 }
 
 export function fetchReportMatches(id) {
