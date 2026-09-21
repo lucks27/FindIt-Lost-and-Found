@@ -4,11 +4,9 @@ import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-export let API_BASE_URL = ''
+export let API_BASE_URL = '127.0.0.1' // default, also is use for web
 
-if (Platform.OS === 'web') {
-  API_BASE_URL = '127.0.0.1'
-} else {
+if (Platform.OS !== 'web') {
   API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL
 }
 
