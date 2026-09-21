@@ -17,6 +17,9 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as api from '../api/api';
 import backgroundImage from '../../assets/building bg.png';
 import logoImage from '../../assets/logo.png';
+import impactBannerImage from '../../assets/banner.png.png';
+import itemsReportedIcon from '../../assets/items-reported.png.png';
+import rewardsConvertedIcon from '../../assets/rewards-converted.png.png';
 
 const tabs = [
   { key: 'Home', label: 'Home', icon: '⌂' },
@@ -51,6 +54,7 @@ export default function DashboardScreen() {
   const [recognition, setRecognition] = useState(null);
   const [recognitionLoading, setRecognitionLoading] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
   const [form, setForm] = useState({
     title: '',
     category: 'Electronics',
@@ -272,7 +276,7 @@ export default function DashboardScreen() {
     }
 
     if (activeTab === 'Hub') return renderHub();
-    if (activeTab === 'Profile') return <ProfileContent user={user} reports={myReports} recognition={recognition} loading={recognitionLoading} logout={logout} onBack={() => setActiveTab('Home')} />;
+    if (activeTab === 'Profile') return <ProfileContent user={user} reports={myReports} recognition={recognition} loading={recognitionLoading} onBack={() => setActiveTab('Home')} onLogoutRequest={() => setLogoutConfirmationOpen(true)} />;
 
     const tab = tabs.find((entry) => entry.key === activeTab);
     const content = {
@@ -297,19 +301,24 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       {notice && <NoticeModal notice={notice} onClose={() => { setNotice(null); notice.onClose?.(); }} />}
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {activeTab !== 'Profile' && <View style={styles.header}>
-          <Image source={logoImage} style={styles.logo} resizeMode="contain" />
-          <View style={styles.headerCopy}>
-            <Text style={styles.appName}>FindIt</Text>
-            <Text style={styles.greeting}>Hello, {firstName}</Text>
+      {logoutConfirmationOpen && <LogoutConfirmationModal onCancel={() => setLogoutConfirmationOpen(false)} onConfirm={logout} />}
+      {activeTab === 'Profile' ? (
+        <View style={styles.profileViewport}>{renderTabContent()}</View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <Image source={logoImage} style={styles.logo} resizeMode="contain" />
+            <View style={styles.headerCopy}>
+              <Text style={styles.appName}>FindIt</Text>
+              <Text style={styles.greeting}>Hello, {firstName}</Text>
+            </View>
+            <TouchableOpacity style={styles.bellButton} onPress={() => setActiveTab('Hub')}>
+              <Text style={styles.bellIcon}>♧</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.bellButton} onPress={() => setActiveTab('Hub')}>
-            <Text style={styles.bellIcon}>♧</Text>
-          </TouchableOpacity>
-        </View>}
-        {renderTabContent()}
-      </ScrollView>
+          {renderTabContent()}
+        </ScrollView>
+      )}
 
       <View style={styles.bottomNav}>
         {tabs.map((tab) => {
@@ -367,7 +376,7 @@ function SubmittedReportRow({ report }) {
   );
 }
 
-function ProfileContent({ user, reports, recognition, loading, logout, onBack }) {
+function ProfileContent({ user, reports, recognition, loading, onBack, onLogoutRequest }) {
   const record = recognition?.record || {};
   const points = Number(record.recognition_points || 0);
   const conversionRate = Number(recognition?.conversion_rate || 100);
@@ -405,46 +414,28 @@ function ProfileContent({ user, reports, recognition, loading, logout, onBack })
 
       <Text style={styles.profileImpactTitle}>My Impact</Text>
       <View style={styles.profileStatsRow}>
-        <ProfileStat value={reportCount} label="Items Reported" icon="▤" />
-        <ProfileStat value={rewardCount} label="Rewards Converted" icon="♧" />
+        <ProfileStat value={reportCount} label="Items Reported" icon={itemsReportedIcon} />
+        <ProfileStat value={rewardCount} label="Rewards Converted" icon={rewardsConvertedIcon} />
       </View>
 
       <View style={styles.profileImpactCard}>
-        <Text style={styles.profileImpactCardTitle}>Your actions matter!</Text>
-        <Text style={styles.profileImpactCardText}>Every report helps someone reconnect with their lost item.</Text>
-        <Text style={styles.profileImpactCardIcon}>♥</Text>
+        <Image source={impactBannerImage} style={styles.profileImpactBanner} resizeMode="contain" />
       </View>
 
       <View style={styles.profileActions}>
         <ProfileAction icon="▤" label="My Reports" onPress={() => {}} />
         <ProfileAction icon="♧" label="My Rewards" onPress={() => {}} />
         <ProfileAction icon="⚙" label="Settings" onPress={() => {}} />
+        <ProfileAction icon="↪" label="Log out" onPress={onLogoutRequest} />
         <ProfileAction icon="?" label="Help & Support" onPress={() => {}} />
       </View>
 
-      <View style={styles.profileConversionBar}>
-        <View><Text style={styles.profileConversionTitle}>Reward conversion</Text><Text style={styles.profileConversionText}>{conversionRate} points = ₱1.00 · Current value ₱{pesoValue.toFixed(2)}</Text></View>
-        <Text style={styles.profileConversionPoints}>{points} pts</Text>
-      </View>
-
-      <View style={styles.profileSectionHeader}><Text style={styles.profileSectionTitle}>Reward conversion records</Text><Text style={styles.profileSectionHint}>Latest activity</Text></View>
-      {loading ? <Text style={styles.loadingText}>Loading rewards...</Text> : recognition?.transactions?.length ? recognition.transactions.slice(0, 3).map((transaction) => (
-        <View key={transaction.id} style={styles.transactionRow}>
-          <View style={styles.transactionIcon}><Text style={styles.transactionIconText}>{transaction.direction === 'debit' ? '↓' : '↑'}</Text></View>
-          <View style={styles.transactionCopy}><Text style={styles.transactionTitle}>{transaction.description || transaction.notes || transaction.type || 'Recognition update'}</Text><Text style={styles.transactionDate}>{transaction.created_at ? new Date(transaction.created_at).toLocaleDateString() : 'Recent'}</Text></View>
-          <Text style={[styles.transactionPoints, transaction.direction === 'debit' && styles.transactionDebit]}>{transaction.direction === 'debit' ? '-' : '+'}{transaction.points || 0} pts</Text>
-        </View>
-      )) : <Text style={styles.profileEmpty}>Return a found item or complete a verified report to earn recognition points.</Text>}
-
-      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-        <Text style={styles.logoutText}>Log out</Text>
-      </TouchableOpacity>
     </View>
   );
 }
 
-function ProfileStat({ value, label }) {
-  return <View style={styles.profileStat}><Text style={styles.profileStatIcon}>▤</Text><Text style={styles.profileStatValue}>{value}</Text><Text style={styles.profileStatLabel}>{label}</Text></View>;
+function ProfileStat({ value, label, icon }) {
+  return <View style={styles.profileStat}><Image source={icon} style={styles.profileStatIcon} resizeMode="contain" /><View style={styles.profileStatCopy}><Text style={styles.profileStatValue}>{value}</Text><Text style={styles.profileStatLabel}>{label}</Text></View></View>;
 }
 
 function ProfileAction({ icon, label, onPress }) {
@@ -545,6 +536,27 @@ function NoticeModal({ notice, onClose }) {
   );
 }
 
+function LogoutConfirmationModal({ onCancel, onConfirm }) {
+  return (
+    <Modal transparent visible animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.noticeBackdrop}>
+        <View style={styles.logoutConfirmModal}>
+          <Text style={styles.logoutConfirmTitle}>Log out</Text>
+          <Text style={styles.logoutConfirmMessage}>Are you sure you want to logout?</Text>
+          <View style={styles.logoutConfirmActions}>
+            <TouchableOpacity style={styles.logoutCancelButton} onPress={onCancel} activeOpacity={0.85}>
+              <Text style={styles.logoutCancelText}>No</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.logoutConfirmButton} onPress={onConfirm} activeOpacity={0.85}>
+              <Text style={styles.logoutConfirmText}>Yes</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage, removeImage, submitReport }) {
   const isFound = mode === 'found';
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -624,6 +636,7 @@ function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f1fbef' },
+  profileViewport: { flex: 1, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 82, overflow: 'hidden' },
   content: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 120 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   logo: { width: 48, height: 48 },
@@ -667,6 +680,14 @@ const styles = StyleSheet.create({
   emptyCopy: { color: '#6f8578', fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
   logoutButton: { backgroundColor: '#087044', borderRadius: 18, paddingHorizontal: 22, paddingVertical: 10, marginTop: 22 },
   logoutText: { color: '#ffffff', fontWeight: '800' },
+  logoutConfirmModal: { width: '88%', maxWidth: 340, backgroundColor: '#ffffff', borderRadius: 18, padding: 22, shadowColor: '#003b24', shadowOpacity: 0.25, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 12 },
+  logoutConfirmTitle: { color: '#174a31', fontSize: 18, fontWeight: '900', textAlign: 'center' },
+  logoutConfirmMessage: { color: '#607269', fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 9 },
+  logoutConfirmActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  logoutCancelButton: { flex: 1, alignItems: 'center', borderWidth: 1, borderColor: '#b7d5be', borderRadius: 10, paddingVertical: 11 },
+  logoutCancelText: { color: '#087044', fontSize: 13, fontWeight: '800' },
+  logoutConfirmButton: { flex: 1, alignItems: 'center', backgroundColor: '#087044', borderRadius: 10, paddingVertical: 11 },
+  logoutConfirmText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
   bottomNav: { position: 'absolute', left: 16, right: 16, bottom: 10, height: 64, borderRadius: 32, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#c7ddc9', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 4, elevation: 5, shadowColor: '#16442d', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
   navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 56, height: 54 },
   navIcon: { width: 34, height: 28, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
@@ -732,11 +753,11 @@ const styles = StyleSheet.create({
   profileBackText: { color: '#087044', fontSize: 31, lineHeight: 31 },
   profileTopTitle: { color: '#174a31', fontSize: 16, fontWeight: '900' },
   profileSettings: { color: '#087044', fontSize: 21, fontWeight: '900' },
-  profileIdentityCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 14, padding: 13, marginTop: 5 },
-  profileAvatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#087044', alignItems: 'center', justifyContent: 'center' },
-  profileAvatarText: { color: '#ffffff', fontSize: 23, fontWeight: '900' },
-  profileIdentityCopy: { flex: 1, marginLeft: 11 },
-  profileName: { color: '#1d2922', fontSize: 14, fontWeight: '900' },
+  profileIdentityCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 14, padding: 14, marginTop: 5, minHeight: 88 },
+  profileAvatar: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#087044', alignItems: 'center', justifyContent: 'center' },
+  profileAvatarText: { color: '#ffffff', fontSize: 27, fontWeight: '900' },
+  profileIdentityCopy: { flex: 1, marginLeft: 13 },
+  profileName: { color: '#1d2922', fontSize: 16, fontWeight: '900' },
   profileEmail: { color: '#7a9183', fontSize: 10, marginTop: 3 },
   profileCourse: { color: '#527064', fontSize: 10, marginTop: 4 },
   profileLevelCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e2f3e5', borderRadius: 14, padding: 12, marginTop: 10 },
@@ -748,21 +769,20 @@ const styles = StyleSheet.create({
   profileLevelCount: { color: '#527064', fontSize: 10, fontWeight: '800' },
   profileLevelTrack: { height: 7, borderRadius: 4, backgroundColor: '#b7d5be', overflow: 'hidden', marginTop: 8 },
   profileLevelFill: { height: 7, borderRadius: 4, backgroundColor: '#087044' },
-  profileImpactTitle: { color: '#174a31', fontSize: 16, fontWeight: '900', marginTop: 20, marginBottom: 8 },
+  profileImpactTitle: { color: '#174a31', fontSize: 16, fontWeight: '900', marginTop: 13, marginBottom: 7 },
   profileStatsRow: { flexDirection: 'row', gap: 8 },
-  profileStat: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 82, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 12 },
-  profileStatIcon: { color: '#087044', fontSize: 20, fontWeight: '900' },
-  profileStatValue: { color: '#174a31', fontSize: 18, fontWeight: '900', marginTop: 2 },
-  profileStatLabel: { color: '#7a9183', fontSize: 9, marginTop: 2 },
-  profileImpactCard: { position: 'relative', overflow: 'hidden', backgroundColor: '#087044', borderRadius: 13, padding: 14, marginTop: 12, minHeight: 76 },
-  profileImpactCardTitle: { color: '#ffffff', fontSize: 13, fontWeight: '900' },
-  profileImpactCardText: { color: '#d9f5db', fontSize: 10, lineHeight: 15, marginTop: 4, maxWidth: 245 },
-  profileImpactCardIcon: { position: 'absolute', right: 22, bottom: 7, color: '#a9dd77', fontSize: 42 },
-  profileActions: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 12, marginTop: 12, overflow: 'hidden' },
-  profileAction: { minHeight: 43, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#edf3ed', paddingHorizontal: 13 },
-  profileActionIcon: { width: 24, color: '#087044', fontSize: 17, fontWeight: '900' },
-  profileActionLabel: { flex: 1, color: '#315044', fontSize: 11, fontWeight: '700' },
-  profileActionArrow: { color: '#7a9183', fontSize: 22 },
+  profileStat: { flex: 1, flexDirection: 'row', alignItems: 'center', minHeight: 88, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 12, paddingHorizontal: 10 },
+  profileStatIcon: { width: 50, height: 50, marginRight: 8 },
+  profileStatCopy: { flex: 1, alignItems: 'center' },
+  profileStatValue: { color: '#174a31', fontSize: 21, fontWeight: '900' },
+  profileStatLabel: { color: '#7a9183', fontSize: 9, marginTop: 4, textAlign: 'center' },
+  profileImpactCard: { width: '100%', overflow: 'hidden', marginTop: 4, alignSelf: 'stretch' },
+  profileImpactBanner: { width: '100%', maxWidth: '100%', aspectRatio: 3.2, alignSelf: 'stretch' },
+  profileActions: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 12, marginTop: 4, overflow: 'hidden' },
+  profileAction: { minHeight: 50, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#edf3ed', paddingHorizontal: 15 },
+  profileActionIcon: { width: 30, color: '#087044', fontSize: 20, fontWeight: '900' },
+  profileActionLabel: { flex: 1, color: '#315044', fontSize: 13, fontWeight: '700' },
+  profileActionArrow: { color: '#7a9183', fontSize: 26 },
   profileConversionBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff8dd', borderWidth: 1, borderColor: '#d5b84c', borderRadius: 10, padding: 11, marginTop: 12 },
   profileConversionTitle: { color: '#806615', fontSize: 10, fontWeight: '900' },
   profileConversionText: { color: '#9a7a17', fontSize: 9, marginTop: 3 },
