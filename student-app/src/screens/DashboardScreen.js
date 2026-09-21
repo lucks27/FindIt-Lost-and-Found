@@ -55,6 +55,11 @@ export default function DashboardScreen() {
   const [recognitionLoading, setRecognitionLoading] = useState(false);
   const [notice, setNotice] = useState(null);
   const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
+  const [campusItems, setCampusItems] = useState(sampleItems);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [claimMode, setClaimMode] = useState(false);
+  const [claimDraft, setClaimDraft] = useState({ proofDescription: '', proofPhoto: null });
+  const [claimLoading, setClaimLoading] = useState(false);
   const [form, setForm] = useState({
     title: '',
     category: 'Electronics',
@@ -76,11 +81,55 @@ export default function DashboardScreen() {
   }
 
   useEffect(() => {
+    if (activeTab === 'Home') loadCampusItems();
     if ((activeTab === 'Reports' || activeTab === 'Hub') && !reportMode) {
       loadMyReports();
     }
     if (activeTab === 'Profile') loadRecognition();
   }, [activeTab, reportMode]);
+
+  async function loadCampusItems() {
+    try {
+      const response = await api.fetchReports();
+      const reports = response.data?.data?.data || response.data?.data || [];
+      if (Array.isArray(reports)) setCampusItems(reports);
+    } catch (error) {
+      // Keep the local preview items available when the API is offline.
+    }
+  }
+
+  async function chooseClaimPhoto() {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (!result.canceled) setClaimDraft((current) => ({ ...current, proofPhoto: result.assets[0] }));
+  }
+
+  async function submitClaim() {
+    if (!selectedItem?.id) {
+      showNotice('Claim unavailable', 'This preview item is not connected to a verified campus report yet.', 'error');
+      return;
+    }
+    setClaimLoading(true);
+    try {
+      const data = new FormData();
+      data.append('proof_description', claimDraft.proofDescription);
+      if (claimDraft.proofPhoto) {
+        data.append('proof_photo', {
+          uri: claimDraft.proofPhoto.uri,
+          name: claimDraft.proofPhoto.fileName || 'ownership-proof.jpg',
+          type: claimDraft.proofPhoto.mimeType || 'image/jpeg',
+        });
+      }
+      await api.submitClaim(selectedItem.id, data);
+      setSelectedItem(null);
+      setClaimMode(false);
+      setClaimDraft({ proofDescription: '', proofPhoto: null });
+      showNotice('Claim submitted', 'Your ownership claim was sent to the admin for verification.');
+    } catch (error) {
+      showNotice('Claim not submitted', error.response?.data?.message || 'Please try again.', 'error');
+    } finally {
+      setClaimLoading(false);
+    }
+  }
 
   async function loadMyReports() {
     setReportLoading(true);
@@ -185,6 +234,12 @@ export default function DashboardScreen() {
   }
 
   function renderHome() {
+    if (selectedItem && claimMode) {
+      return <ClaimForm item={selectedItem} draft={claimDraft} loading={claimLoading} onBack={() => setClaimMode(false)} updateDraft={(field, value) => setClaimDraft((current) => ({ ...current, [field]: value }))} choosePhoto={chooseClaimPhoto} submitClaim={submitClaim} />;
+    }
+    if (selectedItem) {
+      return <ItemDetail item={selectedItem} onBack={() => setSelectedItem(null)} onClaim={() => setClaimMode(true)} />;
+    }
     return (
       <>
         <View style={styles.hero}>
@@ -225,7 +280,9 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {sampleItems.map((item) => <ItemCard key={item.title} item={item} />)}
+        {campusItems.length > 0
+          ? campusItems.map((item) => <ItemCard key={item.id || item.title} item={item} onPress={() => setSelectedItem(item)} />)
+          : <Text style={styles.emptyCopy}>No approved campus reports are available yet.</Text>}
       </>
     );
   }
@@ -337,19 +394,81 @@ export default function DashboardScreen() {
   );
 }
 
-function ItemCard({ item }) {
-  return (
+function ItemCard({ item, onPress }) {
+  const imageUri = getReportImageUri(item);
+  const status = getReportStatus(item);
+  const card = (
     <View style={styles.itemCard}>
-      <View style={styles.itemImage}><Text style={styles.itemIcon}>{item.icon === 'laptop-outline' ? '▣' : item.icon === 'headset-outline' ? '◉' : '⌘'}</Text></View>
+      {imageUri ? <Image source={{ uri: imageUri }} style={styles.itemImage} /> : <View style={styles.itemImage}><Text style={styles.itemIcon}>{item.icon === 'laptop-outline' ? '▣' : item.icon === 'headset-outline' ? '◉' : '⌘'}</Text></View>}
       <View style={styles.itemDetails}>
         <View style={styles.itemTitleRow}>
           <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
-          <Text style={[styles.status, { color: item.color }]}>{item.status}</Text>
+          <Text style={[styles.status, status.includes('VERIFIED') || status.includes('APPROVED') ? styles.statusPublic : styles.statusPending]}>{status}</Text>
         </View>
-        <Text style={styles.itemMeta}>{item.category}</Text>
-        <Text style={styles.itemMeta}>⌖ {item.place}</Text>
-        <Text style={styles.itemDate}>September 15, 2027</Text>
+        <Text style={styles.itemMeta}>{item.category || 'Uncategorized'}</Text>
+        <Text style={styles.itemMeta}>⌖ {item.place || item.location || 'Campus'}</Text>
+        <Text style={styles.itemDate}>{item.date_occurred || 'Recently posted'}</Text>
       </View>
+    </View>
+  );
+  return onPress ? <TouchableOpacity onPress={onPress} activeOpacity={0.85}>{card}</TouchableOpacity> : card;
+}
+
+function getReportImageUri(item) {
+  const path = item?.images?.[0]?.file_path || item?.images?.[0]?.url;
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  return `${api.API_BASE_URL}/storage/${path.replace(/^storage\//, '')}`;
+}
+
+function getReportStatus(item) {
+  const type = String(item?.type || '').toLowerCase();
+  const status = String(item?.status || '').toLowerCase();
+  if (type === 'found' && status === 'verified') return 'FOUND-VERIFIED';
+  if (type === 'lost' && status === 'approved') return 'LOST-APPROVED';
+  return status.replaceAll('_', ' ').toUpperCase() || 'PUBLISHED';
+}
+
+function ItemDetail({ item, onBack, onClaim }) {
+  const imageUri = getReportImageUri(item);
+  const canClaim = item.type === 'found' && item.status === 'verified';
+  const status = getReportStatus(item);
+  return (
+    <View style={styles.claimScreen}>
+      <View style={styles.claimHeader}>
+        <TouchableOpacity onPress={onBack} style={styles.claimBack}><Text style={styles.claimBackText}>‹</Text></TouchableOpacity>
+        <View><Text style={styles.claimHeaderTitle}>Item Detail</Text><Text style={styles.claimHeaderSubtitle}>{canClaim ? 'Verified found article in custody' : 'Published campus report'}</Text></View>
+      </View>
+      {imageUri ? <Image source={{ uri: imageUri }} style={styles.detailImage} resizeMode="cover" /> : <View style={styles.detailImagePlaceholder}><Text style={styles.itemIcon}>▣</Text></View>}
+      <View style={styles.detailTitleRow}><Text style={styles.detailTitle}>{item.title}</Text><Text style={[styles.detailStatus, !canClaim && styles.detailStatusLost]}>{status}</Text></View>
+      <View style={styles.detailGrid}>
+        <DetailValue label="Description" value={item.category || 'Electronics'} icon="▤" />
+        <DetailValue label="Color" value={item.color || 'Not specified'} icon="◉" />
+        <DetailValue label="Location Found" value={item.location || item.place || 'Campus'} icon="⌖" />
+        <DetailValue label="Date Found" value={item.date_occurred || 'Recently'} icon="▦" />
+      </View>
+      <View style={styles.detailDescription}><Text style={styles.detailDescriptionLabel}>Description</Text><Text style={styles.detailDescriptionText}>{item.description || 'Found item is currently held by USC for verification.'}</Text></View>
+      {canClaim ? <TouchableOpacity style={styles.claimButton} onPress={onClaim} activeOpacity={0.85}><Text style={styles.claimButtonIcon}>✓</Text><Text style={styles.claimButtonText}>Claim This Item</Text></TouchableOpacity> : <View style={styles.detailInfoNotice}><Text style={styles.detailInfoNoticeText}>Claims are available after a found item is verified by the admin.</Text></View>}
+    </View>
+  );
+}
+
+function DetailValue({ label, value, icon }) {
+  return <View style={styles.detailValue}><View style={styles.detailIcon}><Text style={styles.detailIconText}>{icon}</Text></View><Text style={styles.detailLabel}>{label}</Text><Text style={styles.detailValueText}>{value}</Text></View>;
+}
+
+function ClaimForm({ item, draft, loading, onBack, updateDraft, choosePhoto, submitClaim }) {
+  const imageUri = getReportImageUri(item);
+  return (
+    <View style={styles.claimScreen}>
+      <View style={styles.claimHeader}><TouchableOpacity onPress={onBack} style={styles.claimBack}><Text style={styles.claimBackText}>‹</Text></TouchableOpacity><View><Text style={styles.claimHeaderTitle}>Submit Claim</Text><Text style={styles.claimHeaderSubtitle}>Request and wait for host.</Text></View></View>
+      <View style={styles.claimItemSummary}>{imageUri ? <Image source={{ uri: imageUri }} style={styles.claimItemImage} /> : <View style={styles.claimItemImagePlaceholder}><Text style={styles.itemIcon}>▣</Text></View>}<View style={styles.claimItemCopy}><Text style={styles.claimItemTitle}>{item.title}</Text><Text style={styles.claimItemStatus}>In USC Custody (Verified)</Text></View></View>
+      <Text style={styles.claimSectionTitle}>Describe proof of ownership</Text>
+      <TextInput style={styles.claimProofInput} multiline value={draft.proofDescription} onChangeText={(value) => updateDraft('proofDescription', value)} placeholder="Describe a detail, receipt, serial number, or other proof that confirms this is your item." placeholderTextColor="#8ba9a1" />
+      <Text style={styles.claimSectionTitle}>Upload Proof Photo (Optional)</Text>
+      <TouchableOpacity style={styles.claimUpload} onPress={choosePhoto} activeOpacity={0.85}><Text style={styles.claimUploadIcon}>{draft.proofPhoto ? '✓' : '+'}</Text><Text style={styles.claimUploadText}>{draft.proofPhoto ? 'Proof photo selected' : 'Upload receipt, packaging, or old selfie with item.'}</Text></TouchableOpacity>
+      <Text style={styles.claimDisclaimer}>The University Student Council collects and keeps your documents against the physical article. Your claim changes may be flagged.</Text>
+      <TouchableOpacity style={[styles.claimButton, loading && styles.claimButtonDisabled]} onPress={submitClaim} disabled={loading} activeOpacity={0.85}><Text style={styles.claimButtonIcon}>✓</Text><Text style={styles.claimButtonText}>{loading ? 'Submitting...' : 'Submit Claim Request'}</Text></TouchableOpacity>
     </View>
   );
 }
@@ -671,8 +790,49 @@ const styles = StyleSheet.create({
   itemTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   itemTitle: { color: '#1d2922', fontSize: 14, fontWeight: '900', flex: 1 },
   status: { fontSize: 9, fontWeight: '900', textTransform: 'uppercase', marginLeft: 5 },
+  statusPublic: { color: '#087044' },
+  statusPending: { color: '#9a7a17' },
   itemMeta: { color: '#607269', fontSize: 10, marginTop: 4 },
   itemDate: { color: '#8b9c91', fontSize: 9, marginTop: 3 },
+  claimScreen: { flex: 1, backgroundColor: '#dff8e6', marginHorizontal: -16, marginTop: -18, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 24 },
+  claimHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#c9f2d4', borderRadius: 22, paddingVertical: 14, paddingHorizontal: 10, marginBottom: 14 },
+  claimBack: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
+  claimBackText: { color: '#074a32', fontSize: 38, lineHeight: 38 },
+  claimHeaderTitle: { color: '#073f2e', fontSize: 23, fontWeight: '900' },
+  claimHeaderSubtitle: { color: '#2d7453', fontSize: 12, marginTop: 2 },
+  detailImage: { width: '100%', height: 230, borderRadius: 14, backgroundColor: '#c8e9d1' },
+  detailImagePlaceholder: { width: '100%', height: 230, borderRadius: 14, backgroundColor: '#c8e9d1', alignItems: 'center', justifyContent: 'center' },
+  detailTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#a9d7b8' },
+  detailTitle: { color: '#073f2e', fontSize: 23, fontWeight: '900', flex: 1 },
+  detailStatus: { color: '#d8443b', backgroundColor: '#ffd8d3', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 7, fontSize: 9, fontWeight: '900' },
+  detailStatusLost: { color: '#087044', backgroundColor: '#c8f0df' },
+  detailGrid: { flexDirection: 'row', flexWrap: 'wrap', borderBottomWidth: 1, borderBottomColor: '#a9d7b8', paddingVertical: 12 },
+  detailValue: { width: '50%', minHeight: 76, paddingVertical: 7, paddingHorizontal: 7 },
+  detailIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#c6f0d0', alignItems: 'center', justifyContent: 'center' },
+  detailIconText: { color: '#07563c', fontSize: 18, fontWeight: '900' },
+  detailLabel: { color: '#648879', fontSize: 11, marginTop: 4 },
+  detailValueText: { color: '#073f2e', fontSize: 14, fontWeight: '800', marginTop: 2 },
+  detailDescription: { paddingVertical: 14 },
+  detailDescriptionLabel: { color: '#648879', fontSize: 12 },
+  detailDescriptionText: { color: '#073f2e', fontSize: 13, lineHeight: 19, marginTop: 5 },
+  detailInfoNotice: { backgroundColor: '#c8f0df', borderRadius: 14, padding: 14, marginTop: 'auto' },
+  detailInfoNoticeText: { color: '#176b4b', fontSize: 12, lineHeight: 18, textAlign: 'center', fontWeight: '700' },
+  claimButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#159653', borderRadius: 18, paddingVertical: 15, marginTop: 'auto', minHeight: 54 },
+  claimButtonDisabled: { opacity: 0.65 },
+  claimButtonIcon: { color: '#ffffff', fontSize: 22, fontWeight: '900', marginRight: 14 },
+  claimButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '900' },
+  claimItemSummary: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 15, padding: 10, marginBottom: 22 },
+  claimItemImage: { width: 112, height: 78, borderRadius: 10, backgroundColor: '#c8e9d1' },
+  claimItemImagePlaceholder: { width: 112, height: 78, borderRadius: 10, backgroundColor: '#c8e9d1', alignItems: 'center', justifyContent: 'center' },
+  claimItemCopy: { flex: 1, marginLeft: 14 },
+  claimItemTitle: { color: '#073f2e', fontSize: 20, fontWeight: '900' },
+  claimItemStatus: { color: '#648879', fontSize: 14, fontWeight: '700', marginTop: 6 },
+  claimSectionTitle: { color: '#073f2e', fontSize: 18, fontWeight: '900', marginBottom: 10, marginTop: 12 },
+  claimProofInput: { height: 145, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#bde5ca', borderRadius: 15, padding: 14, color: '#073f2e', fontSize: 13, textAlignVertical: 'top' },
+  claimUpload: { minHeight: 126, borderWidth: 1, borderStyle: 'dashed', borderColor: '#8bd3a5', borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3fff5', padding: 16 },
+  claimUploadIcon: { color: '#159653', fontSize: 34, fontWeight: '800' },
+  claimUploadText: { color: '#187856', fontSize: 12, textAlign: 'center', marginTop: 8 },
+  claimDisclaimer: { color: '#4d866e', fontSize: 11, lineHeight: 17, marginTop: 16, paddingHorizontal: 8 },
   emptyState: { minHeight: 440, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
   emptyIcon: { width: 74, height: 74, borderRadius: 37, backgroundColor: '#dff6d7', alignItems: 'center', justifyContent: 'center' },
   emptyIconText: { color: '#087044', fontSize: 34, fontWeight: '800' },

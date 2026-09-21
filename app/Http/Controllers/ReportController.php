@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DeviceToken;
+use App\Models\ClaimReview;
 use App\Models\Notification;
 use App\Models\PotentialMatch;
 use App\Models\Report;
@@ -13,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
@@ -95,6 +97,67 @@ class ReportController extends Controller
         $report->makeHidden('private_identifying_details');
 
         return response()->json(['status' => 'success', 'data' => $report]);
+    }
+
+    public function submitClaim(Request $request, $id)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'proof_description' => 'required|string|max:3000',
+            'proof_photo' => 'nullable|file|image|max:5120',
+        ]);
+
+        try {
+            return DB::transaction(function () use ($request, $id, $user, $validated) {
+                $report = Report::where('id', $id)->lockForUpdate()->firstOrFail();
+
+                if ($report->type !== 'found' || $report->status !== 'verified') {
+                    return response()->json(['status' => 'error', 'message' => 'Only verified found items can be claimed.'], 422);
+                }
+
+                $existingClaim = ClaimReview::where('report_id', $report->id)
+                    ->where('claimant_student_id', $user->id)
+                    ->whereIn('review_status', ['pending', 'additional_information_required', 'approved'])
+                    ->exists();
+
+                if ($existingClaim) {
+                    return response()->json(['status' => 'error', 'message' => 'You already have an active claim for this item.'], 422);
+                }
+
+                $evidence = ['proof_description' => $validated['proof_description']];
+                if ($request->hasFile('proof_photo')) {
+                    $evidence['proof_photo'] = $request->file('proof_photo')->store('claim-evidence', 'public');
+                }
+
+                $claim = ClaimReview::create([
+                    'report_id' => $report->id,
+                    'claimant_student_id' => $user->id,
+                    'review_status' => 'pending',
+                    'evidence' => $evidence,
+                ]);
+
+                Notification::create([
+                    'type' => 'claim_submitted',
+                    'title' => 'New Claim Submitted',
+                    'message' => "A student submitted an ownership claim for '{$report->title}'.",
+                    'action' => 'claim_submitted',
+                    'status' => 'pending',
+                    'recipient_role' => 'admin',
+                    'subject_type' => ClaimReview::class,
+                    'subject_id' => $claim->id,
+                    'is_read' => false,
+                ]);
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Your claim was submitted and is waiting for verification.',
+                    'data' => $claim->load('report'),
+                ], 201);
+            });
+        } catch (\Throwable $exception) {
+            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+        }
     }
 
     public function store(Request $request)

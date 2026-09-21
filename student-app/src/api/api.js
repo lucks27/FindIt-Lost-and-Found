@@ -182,6 +182,12 @@ export function fetchReport(id) {
   return apiClient.get(`/api/reports/${id}`);
 }
 
+export function submitClaim(reportId, data) {
+  return apiClient.post(`/api/reports/${reportId}/claims`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+}
+
 export function createReport(data) {
   return apiClient.post('/api/reports', data, {
     headers: {
