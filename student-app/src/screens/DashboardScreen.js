@@ -619,28 +619,40 @@ function ItemDetail({ item, onBack, onClaim }) {
   const itemStatus = String(item?.status || '').toLowerCase();
   const canClaim = (itemType === 'found' && itemStatus === 'verified') || (itemType === 'lost' && (itemStatus === 'approved' || itemStatus === 'verified'));
   const status = getReportStatus(item);
+  const isFound = itemType === 'found';
   return (
-    <View style={styles.claimScreen}>
-      <View style={styles.claimHeader}>
-        <TouchableOpacity onPress={onBack} style={styles.claimBack}><Text style={styles.claimBackText}>‹</Text></TouchableOpacity>
-        <View><Text style={styles.claimHeaderTitle}>Item Detail</Text><Text style={styles.claimHeaderSubtitle}>{canClaim ? itemType === 'lost' ? 'Public lost-item report' : 'Verified found article in custody' : 'Published campus report'}</Text></View>
+    <View style={styles.detailScreen}>
+      <View style={styles.detailTopBar}>
+        <TouchableOpacity onPress={onBack} style={styles.detailBackButton}><Text style={styles.detailBackText}>‹</Text></TouchableOpacity>
+        <Text style={styles.detailTopTitle}>Item details</Text>
+        <View style={styles.detailTopDot} />
       </View>
-      {imageUri ? <Image source={{ uri: imageUri }} style={styles.detailImage} resizeMode="cover" /> : <View style={styles.detailImagePlaceholder}><Text style={styles.itemIcon}>▣</Text></View>}
-      <View style={styles.detailTitleRow}><Text style={styles.detailTitle}>{item.title}</Text><Text style={[styles.detailStatus, !canClaim && styles.detailStatusLost]}>{status}</Text></View>
-      <View style={styles.detailGrid}>
-        <DetailValue label="Description" value={item.category || 'Electronics'} icon="▤" />
-        <DetailValue label="Color" value={item.color || 'Not specified'} icon="◉" />
-        <DetailValue label="Location Found" value={item.location || item.place || 'Campus'} icon="⌖" />
-        <DetailValue label="Date Found" value={item.date_occurred || 'Recently'} icon="▦" />
+
+      <View style={styles.detailHero}>
+        {imageUri ? <Image source={{ uri: imageUri }} style={styles.detailImage} resizeMode="cover" /> : <View style={styles.detailImagePlaceholder}><Text style={styles.detailPlaceholderIcon}>▣</Text></View>}
+        <View style={styles.detailHeroShade} />
+        <View style={[styles.detailTypeBadge, isFound && styles.detailTypeBadgeFound]}><Text style={styles.detailTypeBadgeText}>{isFound ? 'FOUND ITEM' : 'LOST ITEM'}</Text></View>
+        <View style={styles.detailHeroCaption}><Text style={styles.detailHeroCaptionText}>{isFound ? 'Help reunite this item with its owner' : 'Help identify this missing item'}</Text></View>
       </View>
-      <View style={styles.detailDescription}><Text style={styles.detailDescriptionLabel}>Description</Text><Text style={styles.detailDescriptionText}>{item.description || 'Found item is currently held by USC for verification.'}</Text></View>
+
+      <View style={styles.detailMainCard}>
+        <View style={styles.detailTitleRow}><Text style={styles.detailTitle}>{item.title}</Text><Text style={[styles.detailStatus, isFound ? styles.detailStatusFound : styles.detailStatusLost]}>{status}</Text></View>
+        <View style={styles.detailGrid}>
+          <DetailValue label="Category" value={item.category || 'Electronics'} icon="▤" />
+          <DetailValue label="Color" value={item.color || 'Not specified'} icon="◉" />
+          <DetailValue label="Location" value={item.location || item.place || 'Campus'} icon="⌖" />
+          <DetailValue label="Date posted" value={item.date_occurred || 'Recently'} icon="▦" />
+        </View>
+        <View style={styles.detailDescription}><Text style={styles.detailDescriptionLabel}>About this item</Text><Text style={styles.detailDescriptionText}>{item.description || (isFound ? 'This found item is currently available through USC verification.' : 'This item was reported missing on campus.')}</Text></View>
+      </View>
+
       {canClaim ? (
-        <TouchableOpacity style={styles.claimButton} onPress={onClaim} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.detailClaimButton} onPress={onClaim} activeOpacity={0.85}>
           <Text style={styles.claimButtonIcon}>✓</Text>
           <Text style={styles.claimButtonText}>Claim This Item</Text>
         </TouchableOpacity>
       ) : (
-        <View style={styles.detailInfoNotice}><Text style={styles.detailInfoNoticeText}>Claims are available for public lost reports and verified found items.</Text></View>
+        <View style={styles.detailInfoNotice}><Text style={styles.detailInfoNoticeTitle}>Claims are not open yet</Text><Text style={styles.detailInfoNoticeText}>Claims are available for public lost reports and verified found items.</Text></View>
       )}
     </View>
   );
@@ -1070,17 +1082,32 @@ const styles = StyleSheet.create({
   notificationEmptyIcon: { color: '#0b8d52', fontSize: 27, fontWeight: '900' },
   notificationEmptyTitle: { color: '#173b2c', fontSize: 16, fontWeight: '900', marginTop: 10 },
   notificationEmptyText: { color: '#668073', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 6 },
-  claimScreen: { flex: 1, backgroundColor: '#dff8e6', marginHorizontal: -16, marginTop: -18, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 24 },
+  detailScreen: { flex: 1, backgroundColor: '#e9f8eb', marginHorizontal: -16, marginTop: -18, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },
+  detailTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  detailBackButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#d1e5d5' },
+  detailBackText: { color: '#074a32', fontSize: 32, lineHeight: 32, marginTop: -3 },
+  detailTopTitle: { color: '#073f2e', fontSize: 18, fontWeight: '900' },
+  detailTopDot: { width: 40, height: 40 },
+  detailHero: { height: 260, borderRadius: 22, overflow: 'hidden', position: 'relative', backgroundColor: '#c8e9d1', shadowColor: '#125b39', shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 4 },
+  detailHeroShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(2, 45, 27, 0.12)' },
+  detailTypeBadge: { position: 'absolute', top: 14, left: 14, borderRadius: 999, backgroundColor: '#dcebdc', paddingHorizontal: 11, paddingVertical: 7 },
+  detailTypeBadgeFound: { backgroundColor: '#ffdcd5' },
+  detailTypeBadgeText: { color: '#174c34', fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
+  detailHeroCaption: { position: 'absolute', left: 14, right: 14, bottom: 14, backgroundColor: 'rgba(3, 49, 29, 0.75)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
+  detailHeroCaptionText: { color: '#ffffff', fontSize: 11, fontWeight: '800' },
+  detailMainCard: { backgroundColor: '#ffffff', borderRadius: 20, marginTop: 12, paddingHorizontal: 14, paddingBottom: 6, borderWidth: 1, borderColor: '#d7e9da', shadowColor: '#145d39', shadowOpacity: 0.08, shadowRadius: 7, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   claimHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#c9f2d4', borderRadius: 22, paddingVertical: 14, paddingHorizontal: 10, marginBottom: 14 },
   claimBack: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
   claimBackText: { color: '#074a32', fontSize: 38, lineHeight: 38 },
   claimHeaderTitle: { color: '#073f2e', fontSize: 23, fontWeight: '900' },
   claimHeaderSubtitle: { color: '#2d7453', fontSize: 12, marginTop: 2 },
-  detailImage: { width: '100%', height: 230, borderRadius: 14, backgroundColor: '#c8e9d1' },
-  detailImagePlaceholder: { width: '100%', height: 230, borderRadius: 14, backgroundColor: '#c8e9d1', alignItems: 'center', justifyContent: 'center' },
+  detailImage: { width: '100%', height: 260, backgroundColor: '#c8e9d1' },
+  detailImagePlaceholder: { width: '100%', height: 260, backgroundColor: '#c8e9d1', alignItems: 'center', justifyContent: 'center' },
+  detailPlaceholderIcon: { color: '#087044', fontSize: 48, fontWeight: '900' },
   detailTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#a9d7b8' },
   detailTitle: { color: '#073f2e', fontSize: 23, fontWeight: '900', flex: 1 },
   detailStatus: { color: '#d8443b', backgroundColor: '#ffd8d3', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 7, fontSize: 9, fontWeight: '900' },
+  detailStatusFound: { color: '#b24d3b', backgroundColor: '#ffe1da' },
   detailStatusLost: { color: '#087044', backgroundColor: '#c8f0df' },
   detailGrid: { flexDirection: 'row', flexWrap: 'wrap', borderBottomWidth: 1, borderBottomColor: '#a9d7b8', paddingVertical: 12 },
   detailValue: { width: '50%', minHeight: 76, paddingVertical: 7, paddingHorizontal: 7 },
@@ -1091,7 +1118,9 @@ const styles = StyleSheet.create({
   detailDescription: { paddingVertical: 14 },
   detailDescriptionLabel: { color: '#648879', fontSize: 12 },
   detailDescriptionText: { color: '#073f2e', fontSize: 13, lineHeight: 19, marginTop: 5 },
-  detailInfoNotice: { backgroundColor: '#c8f0df', borderRadius: 14, padding: 14, marginTop: 'auto' },
+  detailClaimButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#087044', borderRadius: 16, paddingVertical: 16, marginTop: 14, shadowColor: '#075b38', shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
+  detailInfoNotice: { backgroundColor: '#d8f0df', borderRadius: 16, padding: 15, marginTop: 14, borderWidth: 1, borderColor: '#b9ddc3' },
+  detailInfoNoticeTitle: { color: '#176b4b', fontSize: 13, fontWeight: '900', textAlign: 'center', marginBottom: 4 },
   detailInfoNoticeText: { color: '#176b4b', fontSize: 12, lineHeight: 18, textAlign: 'center', fontWeight: '700' },
   claimButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#159653', borderRadius: 18, paddingVertical: 15, marginTop: 'auto', minHeight: 54 },
   claimButtonDisabled: { opacity: 0.65 },
