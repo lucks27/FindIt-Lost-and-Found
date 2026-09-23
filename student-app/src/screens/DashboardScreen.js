@@ -96,7 +96,7 @@ export default function DashboardScreen() {
 
   async function loadCampusItems() {
     try {
-      const response = await api.fetchReports();
+      const response = await api.fetchReports({ per_page: 100 });
       const reports = response.data?.data?.data || response.data?.data || [];
       if (Array.isArray(reports)) setCampusItems(reports);
 
@@ -358,7 +358,7 @@ export default function DashboardScreen() {
         <View style={styles.recentPostsSection}>
           <Text style={styles.recentPostsTitle}>Recent Posts</Text>
 
-          {campusItems.length > 0 ? campusItems.slice(0, 2).map((item) => {
+          {campusItems.length > 0 ? campusItems.map((item) => {
             const imageUri = getReportImageUri(item);
             const status = getReportStatus(item);
             const isFound = String(item.type || '').toLowerCase() === 'found';

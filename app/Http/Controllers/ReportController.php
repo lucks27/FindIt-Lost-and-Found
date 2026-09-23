@@ -68,7 +68,8 @@ class ReportController extends Controller
             });
         }
 
-        $reports = $query->with(['student', 'images', 'visiblePost'])->latest()->paginate(20);
+        $perPage = min(max($request->integer('per_page', 20), 1), 100);
+        $reports = $query->with(['student', 'images', 'visiblePost'])->latest()->paginate($perPage);
 
         $reports->getCollection()->each->makeHidden('private_identifying_details');
 
