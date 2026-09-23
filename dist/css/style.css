@@ -1,0 +1,233 @@
+/* ===== RESET ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+html {
+    width: 100vw;
+    height: 100vh;
+    overflow-x: hidden;
+}
+
+/* ===== BACKGROUND ===== */
+body {
+    width: 100vw;
+    min-height: 100vh;
+    background: url('../assets/ESENESYU.png') center/cover no-repeat fixed;
+    background-color: transparent;
+}
+
+/* ===== OVERLAY ===== */
+.overlay {
+    position: fixed;
+    top: 100px;
+    left: 0;
+    width: 100%;
+    height: calc(100% - 100px);
+    background: rgba(255, 255, 255, 0.49);
+    z-index: -5;
+    pointer-events: none;
+}
+
+/* ===== NAVBAR ===== */
+nav {
+    background: #198c19;
+    height: 70px;
+    width: 100%;
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 99;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.nav-list {
+    list-style: none;
+    display: flex;
+    width: 100%;
+    gap: 40px;
+    align-items: center;
+    margin-left: 15%;
+}
+
+.nav-list a {
+    text-decoration: none;
+    color: #fff;
+    font-weight: 700;
+    font-size: 16px;
+    transition: 0.3s;
+}
+
+.nav-list a:hover {
+    text-decoration: underline;
+}
+
+/* ===== LOGO ===== */
+.logo-overlay {
+    position: fixed;
+    top: 0;
+    left: 30px;
+    z-index: 100;
+}
+
+.logo-overlay img {
+    height: 125px;
+    object-fit: contain;
+}
+
+/* ===== TITLE ===== */
+.title-section {
+    text-align: center;
+    padding: 28px 0 22px;
+}
+
+.title-section h1 {
+    font-family: Georgia, serif;
+    font-size: 28px;
+    color: #1d4f2a;
+    text-transform: uppercase;
+}
+
+.title-section p {
+    font-family: "Brush Script MT", cursive;
+    font-size: 18px;
+    color: #6f8b72;
+}
+
+/* ===== TABLES ===== */
+.booking-table,
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.booking-table th,
+.booking-table td,
+.history-table th,
+.history-table td {
+    padding: 12px;
+    text-align: center;
+}
+
+.booking-table td {
+    border-top: 1px solid #ddd;
+}
+
+/* ===== BUTTONS ===== */
+button {
+    border: none;
+    cursor: pointer;
+    border-radius: 20px;
+    font-weight: bold;
+}
+
+/* Confirm / Cancel */
+.confirm {
+    background: #0d47a1;
+    color: #fff;
+}
+
+.confirm:hover {
+    background: #1565c0;
+}
+
+.cancel {
+    background: #d32f2f;
+    color: #fff;
+}
+
+.cancel:hover {
+    background: #e53935;
+}
+
+/* ===== DASHBOARD ===== */
+.dashboard-class {
+    max-width: 1400px;
+    margin: auto;
+    padding: 20px;
+}
+
+.facilities-section {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+}
+
+.facility-card {
+    text-align: center;
+}
+
+.facility-card img {
+    width: 100%;
+    height: 260px;
+    object-fit: cover;
+}
+
+/* ===== MODAL ===== */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.facility-modal {
+    max-width: 600px;
+    background: #11a100;
+    padding: 30px;
+}
+
+/* ===== LOGIN ===== */
+.login-wrapper {
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    padding-left: 40px;
+    background: url('../assets/background.jpg') center/cover no-repeat;
+}
+
+.login-card {
+    width: 400px;
+    padding: 40px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+}
+
+/* ===== PROFILE ===== */
+.overlay-prof {
+    position: absolute;
+    top: 70px;
+    right: 0;
+    width: 300px;
+    height: calc(100vh - 70px);
+    background: rgba(0, 128, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* ===== NOTIFICATIONS ===== */
+.notifications-container {
+    margin: 10% 3%;
+    padding: 20px;
+    background: #d8f3dc;
+    border-radius: 12px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .facilities-section {
+        grid-template-columns: 1fr;
+    }
+
+    .nav-list {
+        margin-left: 5%;
+        gap: 20px;
+    }
+}

@@ -1,0 +1,1 @@
+import{_ as c,r as s,o as e,c as o,a as r,w as _,b as p,d as m,e as i,f as l}from"./_plugin-vue_export-helper-ChDLoTAl.js";const u={},d={class:"content"};function f(k,w){const t=s("router-view");return e(),o("main",d,[r(t,null,{default:_(({Component:n,route:a})=>[(e(),o("div",{key:a.name},[(e(),p(m(n)))]))]),_:1})])}const v=c(u,[["render",f]]);i(v).use(l).mount("#app");

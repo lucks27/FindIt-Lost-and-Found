@@ -1,0 +1,1 @@
+import{_ as t,r as a,o as n,c as p,a as s,e as r,f as c}from"./_plugin-vue_export-helper-ChDLoTAl.js";const _={name:"AdminApp"},d={id:"admin-app"};function i(u,f,v,A,l,$){const o=a("router-view");return n(),p("div",d,[s(o)])}const m=t(_,[["render",i],["__scopeId","data-v-48215ba6"]]),e=r(m);e.use(c);e.mount("#admin-app");
