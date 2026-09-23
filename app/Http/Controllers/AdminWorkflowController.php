@@ -1346,6 +1346,22 @@ class AdminWorkflowController extends Controller
                     return response()->json(['status' => 'error', 'message' => 'This report cannot be approved for mobile posting.'], 422);
                 }
 
+                $pointRule = PointRule::query()
+                    ->where(function ($query) use ($report) {
+                        if ($report->category_id) {
+                            $query->where('category_id', $report->category_id);
+                        } else {
+                            $query->where('category_name', $report->category)
+                                ->orWhere('item_category', $report->category);
+                        }
+                    })
+                    ->where(function ($query) {
+                        $query->where('active', true)
+                            ->orWhere('is_active', true);
+                    })
+                    ->latest('id')
+                    ->first();
+
                 $surrender->update([
                     'status' => 'approved',
                     'received_by_admin_id' => $admin->id,
@@ -1356,6 +1372,33 @@ class AdminWorkflowController extends Controller
                     'status' => 'pending_verification',
                     'published_at' => Carbon::now(),
                 ]);
+
+                $pointsAwarded = $pointRule ? (int) $pointRule->base_points : 0;
+                $pointTransaction = $pointRule ? PointTransaction::firstOrCreate(
+                    [
+                        'reference_type' => SurrenderRequest::class,
+                        'reference_id' => $surrender->id,
+                        'student_id' => $report->student_id,
+                        'type' => 'found_item_published',
+                    ],
+                    [
+                        'amount' => round($pointsAwarded / self::POINTS_PER_PESO, 2),
+                        'points' => $pointsAwarded,
+                        'direction' => 'credit',
+                        'description' => 'Recognition points awarded when a found item was approved for public posting.',
+                        'created_by_admin_id' => $admin->id,
+                    ]
+                ) : null;
+
+                StudentRecognitionRecord::updateOrCreate(
+                    ['student_id' => $report->student_id],
+                    [
+                        'recognition_points' => (int) PointTransaction::where('student_id', $report->student_id)->sum('points'),
+                        'peso_value' => round((int) PointTransaction::where('student_id', $report->student_id)->sum('points') / self::POINTS_PER_PESO, 2),
+                        'reward_count' => (int) ($report->student?->reward_count ?? 0),
+                        'report_count' => $report->student?->reports()->count() ?? 0,
+                    ]
+                );
 
                 ItemVerification::firstOrCreate(
                     ['report_id' => $report->id],
@@ -1374,13 +1417,18 @@ class AdminWorkflowController extends Controller
 
                 Notification::create([
                     'student_id' => $report->student_id,
-                    'title' => 'Found Item Approved',
-                    'message' => "Your found item '{$report->title}' was approved and posted to the mobile app.",
+                    'title' => 'Found Item Published - Points Received',
+                    'message' => "Your found item '{$report->title}' was approved and posted to the mobile app. You received {$pointsAwarded} recognition points.",
                     'action' => 'item_approved',
                     'recipient_id' => $report->student_id,
                     'recipient_role' => 'student',
                     'subject_type' => SurrenderRequest::class,
                     'subject_id' => $surrender->id,
+                    'data' => [
+                        'points_awarded' => $pointsAwarded,
+                        'point_rule_id' => $pointRule?->id,
+                        'point_transaction_id' => $pointTransaction?->id,
+                    ],
                     'is_read' => false,
                 ]);
 
@@ -1392,7 +1440,7 @@ class AdminWorkflowController extends Controller
 
                 return response()->json([
                     'status' => 'success',
-                    'message' => 'Surrender request approved and posted to mobile.',
+                    'message' => "Surrender request approved, posted to mobile, and {$pointsAwarded} recognition points awarded.",
                     'data' => $surrender->fresh(['report', 'student', 'receivedByAdmin']),
                 ]);
             });
@@ -1501,14 +1549,26 @@ class AdminWorkflowController extends Controller
 
                 $report = $verification->report()->lockForUpdate()->firstOrFail();
 
-                if ($report->type !== 'found' || $report->status !== 'pending_verification') {
+                $claim = $report->type === 'lost'
+                    ? ClaimReview::where('report_id', $report->id)
+                        ->whereIn('review_status', ['pending', 'additional_information_required'])
+                        ->latest()
+                        ->lockForUpdate()
+                        ->first()
+                    : null;
+
+                if ($report->type === 'found' && $report->status !== 'pending_verification') {
                     return response()->json(['status' => 'error', 'message' => 'This found report is not ready for verification approval.'], 422);
+                }
+
+                if ($report->type === 'lost' && ($report->status !== 'approved' || !$claim)) {
+                    return response()->json(['status' => 'error', 'message' => 'This lost report has no pending claim ready for USC confirmation.'], 422);
                 }
 
                 $notes = $request->input('notes');
 
                 $verification->update([
-                    'status' => 'verified',
+                    'status' => $report->type === 'lost' ? 'approved' : 'verified',
                     'verifier_admin_id' => $admin->id,
                     'verified_at' => Carbon::now(),
                     'notes' => $notes ?? $verification->notes,
@@ -1517,14 +1577,24 @@ class AdminWorkflowController extends Controller
                     ]),
                 ]);
 
-                $report->update(['status' => 'verified']);
+                if ($claim) {
+                    $claim->update([
+                        'review_status' => 'approved',
+                        'reviewed_by_admin_id' => $admin->id,
+                        'reviewed_at' => Carbon::now(),
+                    ]);
+                } else {
+                    $report->update(['status' => 'verified']);
+                }
 
                 Notification::create([
-                    'student_id' => $report->student_id,
-                    'title' => 'Item Verified by USC',
-                    'message' => "USC has verified your found item '{$report->title}' and it is now visible in the student feed.",
-                    'action' => 'item_verified',
-                    'recipient_id' => $report->student_id,
+                    'student_id' => $claim?->claimant_student_id ?: $report->student_id,
+                    'title' => $claim ? 'Claim Approved by USC' : 'Item Verified by USC',
+                    'message' => $claim
+                        ? 'Your ownership claim was confirmed by USC. The admin will notify you when the item is ready for collection.'
+                        : "USC has verified your found item '{$report->title}' and it is now visible in the student feed.",
+                    'action' => $claim ? 'claim_confirmed' : 'item_verified',
+                    'recipient_id' => $claim?->claimant_student_id ?: $report->student_id,
                     'recipient_role' => 'student',
                     'subject_type' => ItemVerification::class,
                     'subject_id' => $verification->id,
@@ -1537,7 +1607,11 @@ class AdminWorkflowController extends Controller
                     'verified_at' => $verification->verified_at?->toDateTimeString(),
                 ], $request->ip());
 
-                return response()->json(['status' => 'success', 'message' => 'Item verification approved.', 'data' => $verification->fresh(['report', 'verifierAdmin'])]);
+                return response()->json([
+                    'status' => 'success',
+                    'message' => $claim ? 'Claim confirmed. Send the USC Office pickup instruction to the claimant.' : 'Item verification approved.',
+                    'data' => $verification->fresh(['report', 'verifierAdmin']),
+                ]);
             });
         } catch (\Throwable $exception) {
             return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
@@ -1663,6 +1737,7 @@ class AdminWorkflowController extends Controller
             return DB::transaction(function () use ($request, $id, $admin, $validated) {
                 $verification = ItemVerification::with('report')->findOrFail($id);
                 $claim = ClaimReview::where('report_id', $verification->report_id)
+                    ->whereIn('review_status', ['approved', 'pending', 'additional_information_required'])
                     ->whereNotNull('claimant_student_id')
                     ->latest()
                     ->first();
@@ -1674,8 +1749,8 @@ class AdminWorkflowController extends Controller
 
                 Notification::create([
                     'student_id' => $recipientStudentId,
-                    'title' => 'Pickup Instructions',
-                    'message' => $validated['message'],
+                    'title' => 'Item Ready for Claiming',
+                    'message' => $validated['message'] ?: 'Please visit the USC office to claim your item. Bring valid identification and your ownership proof.',
                     'action' => 'claim_pickup_instructions',
                     'recipient_id' => $recipientStudentId,
                     'recipient_role' => 'student',
@@ -1871,8 +1946,11 @@ class AdminWorkflowController extends Controller
                     ->firstOrFail();
 
                 $report = $claim->report()->lockForUpdate()->firstOrFail();
-                if ($report->type !== 'found' || $report->status !== 'verified') {
-                    return response()->json(['status' => 'error', 'message' => 'Only verified found items can be approved for claim review.'], 422);
+                $isClaimReviewReady = ($report->type === 'found' && $report->status === 'verified')
+                    || ($report->type === 'lost' && $report->status === 'approved');
+
+                if (!$isClaimReviewReady) {
+                    return response()->json(['status' => 'error', 'message' => 'Only public approved lost reports or verified found reports can be approved for claim review.'], 422);
                 }
 
                 $claim->update([
@@ -1881,7 +1959,9 @@ class AdminWorkflowController extends Controller
                     'reviewed_at' => Carbon::now(),
                 ]);
 
-                $report->update(['status' => 'ready_for_release']);
+                if ($report->type === 'found') {
+                    $report->update(['status' => 'ready_for_release']);
+                }
 
                 $matchingLostReports = PotentialMatch::where('found_report_id', $report->id)
                     ->with('lostReport')
@@ -1893,12 +1973,14 @@ class AdminWorkflowController extends Controller
                     }
                 }
 
-                $release = ItemRelease::where('report_id', $report->id)
-                    ->where('claimant_student_id', $claim->claimant_student_id)
-                    ->whereIn('status', ['pending', 'approved'])
-                    ->first();
+                $release = $report->type === 'found'
+                    ? ItemRelease::where('report_id', $report->id)
+                        ->where('claimant_student_id', $claim->claimant_student_id)
+                        ->whereIn('status', ['pending', 'approved'])
+                        ->first()
+                    : null;
 
-                if (!$release) {
+                if ($report->type === 'found' && !$release) {
                     $release = ItemRelease::create([
                         'report_id' => $report->id,
                         'claimant_student_id' => $claim->claimant_student_id,
@@ -1919,7 +2001,9 @@ class AdminWorkflowController extends Controller
                 Notification::create([
                     'student_id' => $claim->claimant_student_id,
                     'title' => 'Claim Approved',
-                    'message' => "USC approved your claim for '{$report->title}'.",
+                    'message' => $report->type === 'lost'
+                        ? "USC verified your ownership claim for '{$report->title}'. Please visit the USC office for claiming."
+                        : "USC approved your claim for '{$report->title}'.",
                     'action' => 'claim_approved',
                     'recipient_id' => $claim->claimant_student_id,
                     'recipient_role' => 'student',
@@ -2091,7 +2175,13 @@ class AdminWorkflowController extends Controller
                 $claim->update(['review_status' => 'completed']);
                 $report->update(['status' => 'completed_return']);
 
-                if ($finder) {
+                $publishedAwardExists = $finder && PointTransaction::where('student_id', $finder->id)
+                        ->where('reference_type', SurrenderRequest::class)
+                        ->whereIn('reference_id', SurrenderRequest::where('report_id', $report->id)->select('id'))
+                        ->where('type', 'found_item_published')
+                        ->exists();
+
+                if ($finder && !$publishedAwardExists) {
                     $pointRule = PointRule::where('item_category', $report->category)
                         ->where('active', true)
                         ->orderByDesc('id')

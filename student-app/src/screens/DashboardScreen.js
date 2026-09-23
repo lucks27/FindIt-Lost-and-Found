@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Image,
   ImageBackground,
@@ -26,6 +26,7 @@ const tabs = [
   { key: 'Reports', label: 'My Reports', icon: '▤' },
   { key: 'Matches', label: 'Matches', icon: '↔' },
   { key: 'Hub', label: 'My Hub', icon: '♧' },
+  { key: 'Notifications', label: 'Alerts', icon: '●' },
   { key: 'Profile', label: 'My Profile', icon: '●' },
 ];
 
@@ -60,6 +61,9 @@ export default function DashboardScreen() {
   const [claimMode, setClaimMode] = useState(false);
   const [claimDraft, setClaimDraft] = useState({ proofDescription: '', proofPhoto: null });
   const [claimLoading, setClaimLoading] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const shownPointNotifications = useRef(new Set());
   const [form, setForm] = useState({
     title: '',
     category: 'Electronics',
@@ -82,10 +86,12 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     if (activeTab === 'Home') loadCampusItems();
+    if (activeTab === 'Home') loadRecognition();
     if ((activeTab === 'Reports' || activeTab === 'Hub') && !reportMode) {
       loadMyReports();
     }
     if (activeTab === 'Profile') loadRecognition();
+    if (activeTab === 'Notifications') loadNotifications();
   }, [activeTab, reportMode]);
 
   async function loadCampusItems() {
@@ -93,6 +99,23 @@ export default function DashboardScreen() {
       const response = await api.fetchReports();
       const reports = response.data?.data?.data || response.data?.data || [];
       if (Array.isArray(reports)) setCampusItems(reports);
+
+      const notificationResponse = await api.fetchNotifications();
+      const pointNotification = (notificationResponse.data?.data || []).find((notification) => (
+        notification.action === 'item_approved'
+        && !notification.is_read
+        && !shownPointNotifications.current.has(notification.id)
+      ));
+      if (pointNotification) {
+        shownPointNotifications.current.add(pointNotification.id);
+        const pointsAwarded = Number(pointNotification.data?.points_awarded || 0);
+        showNotice(
+          'Points received!',
+          `${pointsAwarded} category-based points were added to your wallet. Your found item is now visible in Recent Posts.`,
+          'success',
+          () => api.markNotificationRead(pointNotification.id).catch(() => {})
+        );
+      }
     } catch (error) {
       // Keep the local preview items available when the API is offline.
     }
@@ -123,7 +146,7 @@ export default function DashboardScreen() {
       setSelectedItem(null);
       setClaimMode(false);
       setClaimDraft({ proofDescription: '', proofPhoto: null });
-      showNotice('Claim submitted', 'Your ownership claim was sent to the admin for verification.');
+      showNotice('Claim request submitted', 'Please wait for USC confirmation. You will be notified when you can visit the USC office.');
     } catch (error) {
       showNotice('Claim not submitted', error.response?.data?.message || 'Please try again.', 'error');
     } finally {
@@ -152,6 +175,29 @@ export default function DashboardScreen() {
       showNotice('Unable to load recognition', error.response?.data?.message || 'Please try again.', 'error');
     } finally {
       setRecognitionLoading(false);
+    }
+  }
+
+  async function loadNotifications() {
+    setNotificationsLoading(true);
+    try {
+      const response = await api.fetchNotifications();
+      const items = response.data?.data || [];
+      setNotifications(Array.isArray(items) ? items : []);
+    } catch (error) {
+      showNotice('Unable to load notifications', error.response?.data?.message || 'Please try again.', 'error');
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }
+
+  async function markNotificationRead(notification) {
+    if (notification.is_read) return;
+    try {
+      await api.markNotificationRead(notification.id);
+      setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, is_read: true } : item));
+    } catch (error) {
+      showNotice('Unable to update notification', error.response?.data?.message || 'Please try again.', 'error');
     }
   }
 
@@ -273,14 +319,14 @@ export default function DashboardScreen() {
           </View>
 
           <View style={styles.pointsValueRow}>
-            <Text style={styles.pointsValue}>50 pts</Text>
+            <Text style={styles.pointsValue}>{Number(recognition?.record?.recognition_points || 0)} pts</Text>
           </View>
 
           <View style={styles.pointsProgressTrack}>
             <View style={styles.pointsProgressFill} />
           </View>
 
-          <Text style={styles.pointsHint}>50 pts to reach Level 2</Text>
+          <Text style={styles.pointsHint}>{Math.max(0, 100 - Number(recognition?.record?.recognition_points || 0))} pts to reach Level 2</Text>
         </View>
 
         <View style={styles.statsGrid}>
@@ -315,8 +361,9 @@ export default function DashboardScreen() {
           {campusItems.length > 0 ? campusItems.slice(0, 2).map((item) => {
             const imageUri = getReportImageUri(item);
             const status = getReportStatus(item);
+            const isFound = String(item.type || '').toLowerCase() === 'found';
             const isVerified = status.includes('VERIFIED');
-            const statusText = isVerified ? 'FOUND-VERIFIED' : 'LOST';
+            const statusText = isFound ? 'FOUND-ITEM' : 'LOST';
 
             return (
               <TouchableOpacity key={item.id || item.title} style={styles.recentPostCard} onPress={() => setSelectedItem(item)} activeOpacity={0.9}>
@@ -335,7 +382,7 @@ export default function DashboardScreen() {
                   <Text style={styles.recentPostDate}>{item.date_occurred || 'September 35, 2027'}</Text>
                 </View>
 
-                <Text style={[styles.recentPostBadge, isVerified ? styles.recentPostBadgeVerified : styles.recentPostBadgeLost]}>{statusText}</Text>
+                <Text style={[styles.recentPostBadge, isFound || isVerified ? styles.recentPostBadgeVerified : styles.recentPostBadgeLost]}>{statusText}</Text>
               </TouchableOpacity>
             );
           }) : (
@@ -392,6 +439,7 @@ export default function DashboardScreen() {
     }
 
     if (activeTab === 'Hub') return renderHub();
+    if (activeTab === 'Notifications') return <NotificationContent notifications={notifications} loading={notificationsLoading} onRefresh={loadNotifications} onRead={markNotificationRead} />;
     if (activeTab === 'Profile') return <ProfileContent user={user} reports={myReports} recognition={recognition} loading={recognitionLoading} onBack={() => setActiveTab('Home')} onLogoutRequest={() => setLogoutConfirmationOpen(true)} />;
 
     const tab = tabs.find((entry) => entry.key === activeTab);
@@ -428,8 +476,9 @@ export default function DashboardScreen() {
               <Text style={styles.appName}>FindIt</Text>
               <Text style={styles.greeting}>Hello, {firstName}</Text>
             </View>
-            <TouchableOpacity style={styles.bellButton} onPress={() => setActiveTab('Hub')}>
-              <Text style={styles.bellIcon}>♧</Text>
+            <TouchableOpacity style={styles.bellButton} onPress={() => setActiveTab('Notifications')}>
+              <Text style={styles.bellIcon}>●</Text>
+              {notifications.some((notification) => !notification.is_read) && <View style={styles.bellUnreadDot} />}
             </TouchableOpacity>
           </View>
           {renderTabContent()}
@@ -450,6 +499,47 @@ export default function DashboardScreen() {
         })}
       </View>
     </SafeAreaView>
+  );
+}
+
+function NotificationContent({ notifications, loading, onRefresh, onRead }) {
+  return (
+    <View style={styles.notificationsScreen}>
+      <View style={styles.notificationsHeader}>
+        <View>
+          <Text style={styles.notificationsTitle}>Notifications</Text>
+          <Text style={styles.notificationsSubtitle}>Updates about your reports and claims</Text>
+        </View>
+        <TouchableOpacity style={styles.refreshButton} onPress={onRefresh} disabled={loading}>
+          <Text style={styles.refreshButtonText}>{loading ? '...' : 'Refresh'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {loading ? <Text style={styles.loadingText}>Loading notifications...</Text> : notifications.length === 0 ? (
+        <View style={styles.notificationEmpty}>
+          <Text style={styles.notificationEmptyIcon}>●</Text>
+          <Text style={styles.notificationEmptyTitle}>No notifications yet</Text>
+          <Text style={styles.notificationEmptyText}>Claim, verification, and report updates will appear here.</Text>
+        </View>
+      ) : notifications.map((notification) => (
+        <TouchableOpacity
+          key={notification.id}
+          style={[styles.notificationCard, !notification.is_read && styles.notificationCardUnread]}
+          onPress={() => onRead(notification)}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.notificationIcon, !notification.is_read && styles.notificationIconUnread]}>
+            <Text style={styles.notificationIconText}>{notification.action === 'claim_pickup_instructions' ? '✓' : '●'}</Text>
+          </View>
+          <View style={styles.notificationCopy}>
+            <Text style={styles.notificationTitle}>{notification.title || 'Notification'}</Text>
+            <Text style={styles.notificationMessage}>{notification.message || 'You have a new system update.'}</Text>
+            <Text style={styles.notificationDate}>{notification.created_at ? new Date(notification.created_at).toLocaleString() : 'Just now'}</Text>
+          </View>
+          {!notification.is_read && <View style={styles.notificationUnreadDot} />}
+        </TouchableOpacity>
+      ))}
+    </View>
   );
 }
 
@@ -498,7 +588,7 @@ function ItemDetail({ item, onBack, onClaim }) {
     <View style={styles.claimScreen}>
       <View style={styles.claimHeader}>
         <TouchableOpacity onPress={onBack} style={styles.claimBack}><Text style={styles.claimBackText}>‹</Text></TouchableOpacity>
-        <View><Text style={styles.claimHeaderTitle}>Item Detail</Text><Text style={styles.claimHeaderSubtitle}>{canClaim ? 'Verified found article in custody' : 'Published campus report'}</Text></View>
+        <View><Text style={styles.claimHeaderTitle}>Item Detail</Text><Text style={styles.claimHeaderSubtitle}>{canClaim ? itemType === 'lost' ? 'Public lost-item report' : 'Verified found article in custody' : 'Published campus report'}</Text></View>
       </View>
       {imageUri ? <Image source={{ uri: imageUri }} style={styles.detailImage} resizeMode="cover" /> : <View style={styles.detailImagePlaceholder}><Text style={styles.itemIcon}>▣</Text></View>}
       <View style={styles.detailTitleRow}><Text style={styles.detailTitle}>{item.title}</Text><Text style={[styles.detailStatus, !canClaim && styles.detailStatusLost]}>{status}</Text></View>
@@ -515,7 +605,7 @@ function ItemDetail({ item, onBack, onClaim }) {
           <Text style={styles.claimButtonText}>Claim This Item</Text>
         </TouchableOpacity>
       ) : (
-        <View style={styles.detailInfoNotice}><Text style={styles.detailInfoNoticeText}>Claims are available after a found item is verified by the admin.</Text></View>
+        <View style={styles.detailInfoNotice}><Text style={styles.detailInfoNoticeText}>Claims are available for public lost reports and verified found items.</Text></View>
       )}
     </View>
   );
@@ -527,10 +617,11 @@ function DetailValue({ label, value, icon }) {
 
 function ClaimForm({ item, draft, loading, onBack, updateDraft, choosePhoto, submitClaim }) {
   const imageUri = getReportImageUri(item);
+  const isLostReport = String(item?.type || '').toLowerCase() === 'lost';
   return (
     <View style={styles.claimScreen}>
       <View style={styles.claimHeader}><TouchableOpacity onPress={onBack} style={styles.claimBack}><Text style={styles.claimBackText}>‹</Text></TouchableOpacity><View><Text style={styles.claimHeaderTitle}>Submit Claim</Text><Text style={styles.claimHeaderSubtitle}>Request and wait for host.</Text></View></View>
-      <View style={styles.claimItemSummary}>{imageUri ? <Image source={{ uri: imageUri }} style={styles.claimItemImage} /> : <View style={styles.claimItemImagePlaceholder}><Text style={styles.itemIcon}>▣</Text></View>}<View style={styles.claimItemCopy}><Text style={styles.claimItemTitle}>{item.title}</Text><Text style={styles.claimItemStatus}>In USC Custody (Verified)</Text></View></View>
+      <View style={styles.claimItemSummary}>{imageUri ? <Image source={{ uri: imageUri }} style={styles.claimItemImage} /> : <View style={styles.claimItemImagePlaceholder}><Text style={styles.itemIcon}>▣</Text></View>}<View style={styles.claimItemCopy}><Text style={styles.claimItemTitle}>{item.title}</Text><Text style={styles.claimItemStatus}>{isLostReport ? 'Public lost-item report' : 'In USC Custody (Verified)'}</Text></View></View>
       <Text style={styles.claimSectionTitle}>Describe proof of ownership</Text>
       <TextInput style={styles.claimProofInput} multiline value={draft.proofDescription} onChangeText={(value) => updateDraft('proofDescription', value)} placeholder="Describe a detail, receipt, serial number, or other proof that confirms this is your item." placeholderTextColor="#8ba9a1" />
       <Text style={styles.claimSectionTitle}>Upload Proof Photo (Optional)</Text>
@@ -832,6 +923,7 @@ const styles = StyleSheet.create({
   greeting: { color: '#668073', fontSize: 12, marginTop: 2 },
   bellButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#dff6d7', alignItems: 'center', justifyContent: 'center' },
   bellIcon: { color: '#087044', fontSize: 24, fontWeight: '800' },
+  bellUnreadDot: { position: 'absolute', top: 7, right: 7, width: 9, height: 9, borderRadius: 5, backgroundColor: '#d7433a', borderWidth: 2, borderColor: '#dff6d7' },
   mockupHome: { paddingTop: 4 },
   impactCard: { backgroundColor: '#0b8d52', borderRadius: 20, padding: 18, minHeight: 142, position: 'relative', overflow: 'hidden', shadowColor: '#0b6d3d', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 5 }, elevation: 4 },
   impactBadge: { position: 'absolute', right: 18, top: 18, width: 44, height: 44, borderRadius: 22, backgroundColor: '#d8f0a3', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#f0d755' },
@@ -905,6 +997,26 @@ const styles = StyleSheet.create({
   statusPending: { color: '#9a7a17' },
   itemMeta: { color: '#607269', fontSize: 10, marginTop: 4 },
   itemDate: { color: '#8b9c91', fontSize: 9, marginTop: 3 },
+  notificationsScreen: { paddingTop: 4, paddingBottom: 18 },
+  notificationsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
+  notificationsTitle: { color: '#073f2e', fontSize: 25, fontWeight: '900' },
+  notificationsSubtitle: { color: '#668073', fontSize: 12, marginTop: 4 },
+  refreshButton: { backgroundColor: '#087044', borderRadius: 16, paddingHorizontal: 13, paddingVertical: 8 },
+  refreshButtonText: { color: '#ffffff', fontSize: 11, fontWeight: '900' },
+  notificationCard: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#f5faf5', borderRadius: 14, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#d7e7d9' },
+  notificationCardUnread: { backgroundColor: '#ffffff', borderColor: '#8bc49d' },
+  notificationIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#dceee0', alignItems: 'center', justifyContent: 'center' },
+  notificationIconUnread: { backgroundColor: '#c8f0df' },
+  notificationIconText: { color: '#087044', fontSize: 16, fontWeight: '900' },
+  notificationCopy: { flex: 1, marginLeft: 11, paddingRight: 8 },
+  notificationTitle: { color: '#173b2c', fontSize: 14, fontWeight: '900' },
+  notificationMessage: { color: '#526c5d', fontSize: 12, lineHeight: 18, marginTop: 4 },
+  notificationDate: { color: '#8b9c91', fontSize: 10, marginTop: 7 },
+  notificationUnreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#0b8d52', marginTop: 4 },
+  notificationEmpty: { alignItems: 'center', backgroundColor: '#f5faf5', borderRadius: 16, borderWidth: 1, borderColor: '#d7e7d9', padding: 28, marginTop: 10 },
+  notificationEmptyIcon: { color: '#0b8d52', fontSize: 27, fontWeight: '900' },
+  notificationEmptyTitle: { color: '#173b2c', fontSize: 16, fontWeight: '900', marginTop: 10 },
+  notificationEmptyText: { color: '#668073', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 6 },
   claimScreen: { flex: 1, backgroundColor: '#dff8e6', marginHorizontal: -16, marginTop: -18, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 24 },
   claimHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#c9f2d4', borderRadius: 22, paddingVertical: 14, paddingHorizontal: 10, marginBottom: 14 },
   claimBack: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center', marginRight: 8 },

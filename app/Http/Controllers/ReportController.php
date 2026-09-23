@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DeviceToken;
 use App\Models\ClaimReview;
+use App\Models\ItemVerification;
 use App\Models\Notification;
 use App\Models\PotentialMatch;
 use App\Models\Report;
@@ -44,7 +45,15 @@ class ReportController extends Controller
                         ->where('status', 'approved');
                 })->orWhere(function ($q) {
                     $q->where('type', 'found')
-                        ->where('status', 'verified');
+                        ->whereIn('status', ['pending_verification', 'verified']);
+                });
+            });
+            $query->where(function ($publicQuery) {
+                $publicQuery->whereHas('visiblePost', function ($visiblePostQuery) {
+                    $visiblePostQuery->where('is_visible', true);
+                })->orWhere(function ($legacyQuery) {
+                    $legacyQuery->whereDoesntHave('visiblePost')
+                        ->whereNotNull('published_at');
                 });
             });
         }
@@ -59,7 +68,7 @@ class ReportController extends Controller
             });
         }
 
-        $reports = $query->with(['student', 'images'])->latest()->paginate(20);
+        $reports = $query->with(['student', 'images', 'visiblePost'])->latest()->paginate(20);
 
         $reports->getCollection()->each->makeHidden('private_identifying_details');
 
@@ -112,8 +121,15 @@ class ReportController extends Controller
             return DB::transaction(function () use ($request, $id, $user, $validated) {
                 $report = Report::where('id', $id)->lockForUpdate()->firstOrFail();
 
-                if ($report->type !== 'found' || $report->status !== 'verified') {
-                    return response()->json(['status' => 'error', 'message' => 'Only verified found items can be claimed.'], 422);
+                $isPublicClaimableReport = ($report->type === 'found' && $report->status === 'verified')
+                    || ($report->type === 'lost' && $report->status === 'approved');
+
+                if (!$isPublicClaimableReport) {
+                    return response()->json(['status' => 'error', 'message' => 'Only publicly approved lost items or verified found items can be claimed.'], 422);
+                }
+
+                if ((int) $report->student_id === (int) $user->id) {
+                    return response()->json(['status' => 'error', 'message' => 'You cannot submit a claim on your own report.'], 422);
                 }
 
                 $existingClaim = ClaimReview::where('report_id', $report->id)
@@ -149,9 +165,19 @@ class ReportController extends Controller
                     'is_read' => false,
                 ]);
 
+                if ($report->type === 'lost') {
+                    ItemVerification::firstOrCreate(
+                        ['report_id' => $report->id],
+                        [
+                            'status' => 'pending',
+                            'notes' => 'Pending USC confirmation of ownership claim.',
+                        ]
+                    );
+                }
+
                 return response()->json([
                     'status' => 'success',
-                    'message' => 'Your claim was submitted and is waiting for verification.',
+                    'message' => 'Claim request submitted successfully. Please wait for USC confirmation.',
                     'data' => $claim->load('report'),
                 ], 201);
             });

@@ -79,6 +79,11 @@ class Report extends Model
         return $this->hasMany(ReportImage::class);
     }
 
+    public function visiblePost(): HasOne
+    {
+        return $this->hasOne(VisiblePostedItem::class);
+    }
+
     public function rewards(): HasMany
     {
         return $this->hasMany(Reward::class);
