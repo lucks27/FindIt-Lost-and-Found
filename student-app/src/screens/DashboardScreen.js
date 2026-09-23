@@ -490,7 +490,9 @@ function getReportStatus(item) {
 
 function ItemDetail({ item, onBack, onClaim }) {
   const imageUri = getReportImageUri(item);
-  const canClaim = item.type === 'found' && item.status === 'verified';
+  const itemType = String(item?.type || '').toLowerCase();
+  const itemStatus = String(item?.status || '').toLowerCase();
+  const canClaim = (itemType === 'found' && itemStatus === 'verified') || (itemType === 'lost' && (itemStatus === 'approved' || itemStatus === 'verified'));
   const status = getReportStatus(item);
   return (
     <View style={styles.claimScreen}>
@@ -507,7 +509,14 @@ function ItemDetail({ item, onBack, onClaim }) {
         <DetailValue label="Date Found" value={item.date_occurred || 'Recently'} icon="▦" />
       </View>
       <View style={styles.detailDescription}><Text style={styles.detailDescriptionLabel}>Description</Text><Text style={styles.detailDescriptionText}>{item.description || 'Found item is currently held by USC for verification.'}</Text></View>
-      {canClaim ? <TouchableOpacity style={styles.claimButton} onPress={onClaim} activeOpacity={0.85}><Text style={styles.claimButtonIcon}>✓</Text><Text style={styles.claimButtonText}>Claim This Item</Text></TouchableOpacity> : <View style={styles.detailInfoNotice}><Text style={styles.detailInfoNoticeText}>Claims are available after a found item is verified by the admin.</Text></View>}
+      {canClaim ? (
+        <TouchableOpacity style={styles.claimButton} onPress={onClaim} activeOpacity={0.85}>
+          <Text style={styles.claimButtonIcon}>✓</Text>
+          <Text style={styles.claimButtonText}>Claim This Item</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.detailInfoNotice}><Text style={styles.detailInfoNoticeText}>Claims are available after a found item is verified by the admin.</Text></View>
+      )}
     </View>
   );
 }
