@@ -309,23 +309,38 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        <View style={styles.recentActivitySection}>
-          <View style={styles.recentActivityHeader}>
-            <Text style={styles.recentActivityTitle}>Recent Activity</Text>
-            <Text style={styles.recentActivityViewAll}>View all &gt;</Text>
-          </View>
+        <View style={styles.recentPostsSection}>
+          <Text style={styles.recentPostsTitle}>Recent Posts</Text>
 
-          <View style={styles.activityRow}>
-            <View style={styles.activityIconWrap}>
-              <Text style={styles.activityIcon}>▣</Text>
-            </View>
-            <View style={styles.activityTextWrap}>
-              <Text style={styles.activityText}>You reported a found item</Text>
-              <Text style={styles.activityMeta}>ID: WLF-2026-045</Text>
-              <Text style={styles.activityDate}>Sep 16, 2026</Text>
-            </View>
-            <Text style={styles.activityPoints}>+50 pts</Text>
-          </View>
+          {campusItems.length > 0 ? campusItems.slice(0, 2).map((item) => {
+            const imageUri = getReportImageUri(item);
+            const status = getReportStatus(item);
+            const isVerified = status.includes('VERIFIED');
+            const statusText = isVerified ? 'FOUND-VERIFIED' : 'LOST';
+
+            return (
+              <TouchableOpacity key={item.id || item.title} style={styles.recentPostCard} onPress={() => setSelectedItem(item)} activeOpacity={0.9}>
+                {imageUri ? (
+                  <Image source={{ uri: imageUri }} style={styles.recentPostImage} resizeMode="cover" />
+                ) : (
+                  <View style={styles.recentPostImagePlaceholder}>
+                    <Text style={styles.recentPostImageText}>{item.type === 'found' ? '◉' : '▣'}</Text>
+                  </View>
+                )}
+
+                <View style={styles.recentPostBody}>
+                  <Text style={styles.recentPostName}>{item.title}</Text>
+                  <Text style={styles.recentPostMeta}>◌ {item.category || 'Electronics'}</Text>
+                  <Text style={styles.recentPostMeta}>⌖ {item.place || item.location || 'Campus'}</Text>
+                  <Text style={styles.recentPostDate}>{item.date_occurred || 'September 35, 2027'}</Text>
+                </View>
+
+                <Text style={[styles.recentPostBadge, isVerified ? styles.recentPostBadgeVerified : styles.recentPostBadgeLost]}>{statusText}</Text>
+              </TouchableOpacity>
+            );
+          }) : (
+            <Text style={styles.emptyCopy}>No recent posts available yet.</Text>
+          )}
         </View>
       </View>
     );
@@ -838,18 +853,19 @@ const styles = StyleSheet.create({
   statIcon: { fontSize: 18 },
   statValue: { color: '#1c322d', fontSize: 24, fontWeight: '900', marginTop: 10 },
   statLabel: { color: '#697b72', fontSize: 11, marginTop: 6, textAlign: 'center' },
-  recentActivitySection: { marginTop: 18, paddingTop: 6 },
-  recentActivityHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  recentActivityTitle: { color: '#1b352d', fontSize: 18, fontWeight: '900' },
-  recentActivityViewAll: { color: '#0b8d52', fontSize: 12, fontWeight: '700' },
-  activityRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f7f8f6', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 14, borderWidth: 1, borderColor: '#dfe8df' },
-  activityIconWrap: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#dfeee3', alignItems: 'center', justifyContent: 'center' },
-  activityIcon: { color: '#0c8d52', fontSize: 18, fontWeight: '900' },
-  activityTextWrap: { flex: 1, marginLeft: 10 },
-  activityText: { color: '#1b312d', fontSize: 13, fontWeight: '700' },
-  activityMeta: { color: '#6d8076', fontSize: 10, marginTop: 4 },
-  activityDate: { color: '#7a8f86', fontSize: 10, marginTop: 3 },
-  activityPoints: { color: '#0c8d52', fontSize: 15, fontWeight: '900', marginLeft: 8 },
+  recentPostsSection: { marginTop: 26 },
+  recentPostsTitle: { color: '#1b352d', fontSize: 22, fontWeight: '900', marginBottom: 12 },
+  recentPostCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f9f4', borderRadius: 18, padding: 12, borderWidth: 1, borderColor: '#d7e7d9', shadowColor: '#0d6a40', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2, marginBottom: 14 },
+  recentPostImage: { width: 120, height: 104, borderRadius: 12, backgroundColor: '#d9efe1' },
+  recentPostImagePlaceholder: { width: 120, height: 104, borderRadius: 12, backgroundColor: '#d9efe1', alignItems: 'center', justifyContent: 'center' },
+  recentPostImageText: { color: '#0b8d52', fontSize: 28, fontWeight: '900' },
+  recentPostBody: { flex: 1, marginLeft: 12, paddingRight: 6 },
+  recentPostName: { color: '#1d2d27', fontSize: 17, fontWeight: '900' },
+  recentPostMeta: { color: '#62776b', fontSize: 12, marginTop: 7 },
+  recentPostDate: { color: '#4f5f56', fontSize: 12, marginTop: 7 },
+  recentPostBadge: { position: 'absolute', right: 12, top: 12, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, fontSize: 10, fontWeight: '900', overflow: 'hidden' },
+  recentPostBadgeLost: { backgroundColor: '#e7ece8', color: '#1d332c' },
+  recentPostBadgeVerified: { backgroundColor: '#ffd9d6', color: '#d7433a' },
   hero: { height: 168, overflow: 'hidden', borderRadius: 8 },
   heroImage: { flex: 1, justifyContent: 'flex-end' },
   heroImageStyle: { opacity: 0.9 },
