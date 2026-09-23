@@ -411,22 +411,24 @@
                         <section class="modal-overview">
                             <div class="modal-media">
                                 <div class="modal-image-container">
-                                    <img :src="getReportImage(
-                                        selectedSurrender
-                                            .report,
-                                        currentImageIndex
-                                    )
-                                        " :alt="selectedSurrender
-                                            .report
-                                            ?.title ||
-                                            'SNSU logo'
-                                            " class="modal-image" :class="{
-                                                'fallback-image':
-                                                    !selectedSurrender
-                                                        .report
-                                                        ?.images
-                                                        ?.length
-                                            }" />
+                                    <button type="button" class="modal-image-button" @click="openImagePreview(getReportImages(selectedSurrender.report), currentImageIndex)" aria-label="View full-size item image">
+                                        <img :src="getReportImage(
+                                            selectedSurrender
+                                                .report,
+                                            currentImageIndex
+                                        )
+                                            " :alt="selectedSurrender
+                                                .report
+                                                ?.title ||
+                                                'SNSU logo'
+                                                " class="modal-image" :class="{
+                                                    'fallback-image':
+                                                        !selectedSurrender
+                                                            .report
+                                                            ?.images
+                                                            ?.length
+                                                }" />
+                                    </button>
                                 </div>
 
                                 <div v-if="
@@ -460,6 +462,13 @@ img,
                                                 " />
                                     </button>
                                 </div>
+                            </div>
+
+                            <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
+                                <button type="button" class="image-preview-close" aria-label="Close image preview" @click="closeImagePreview">×</button>
+                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev" aria-label="Previous image" @click="showPreviousImage">‹</button>
+                                <img :src="previewImageUrl" alt="Full-size item preview" class="image-preview-image" />
+                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next" aria-label="Next image" @click="showNextImage">›</button>
                             </div>
 
                             <!-- Summary -->
@@ -999,6 +1008,15 @@ const selectedSurrender =
 
 const currentImageIndex =
     ref(0)
+
+const previewImages =
+    ref([])
+
+const previewImageIndex =
+    ref(0)
+
+const previewImageUrl =
+    computed(() => previewImages.value[previewImageIndex.value] || null)
 
 const sortOrder =
     ref('newest')
@@ -1754,7 +1772,36 @@ function closeDetailModal() {
     currentImageIndex.value =
         0
 
+    previewImages.value = []
+    previewImageIndex.value = 0
+
     resetRequestDetails()
+}
+
+function openImagePreview(imageList, index = 0) {
+    const list = Array.isArray(imageList) ? imageList : [imageList].filter(Boolean)
+
+    if (!list.length) return
+
+    previewImages.value = list
+    previewImageIndex.value = Math.min(index, list.length - 1)
+}
+
+function showPreviousImage() {
+    if (!previewImages.value.length) return
+
+    previewImageIndex.value = (previewImageIndex.value - 1 + previewImages.value.length) % previewImages.value.length
+}
+
+function showNextImage() {
+    if (!previewImages.value.length) return
+
+    previewImageIndex.value = (previewImageIndex.value + 1) % previewImages.value.length
+}
+
+function closeImagePreview() {
+    previewImages.value = []
+    previewImageIndex.value = 0
 }
 
 /* =====================================================
@@ -3577,9 +3624,135 @@ onMounted(() => {
         contain;
 }
 
+.modal-image-button {
+    display:
+        block;
+
+    width:
+        100%;
+
+    padding:
+        0;
+
+    border:
+        0;
+
+    background:
+        transparent;
+
+    cursor:
+        zoom-in;
+}
+
 .modal-image.fallback-image {
     padding:
         24px;
+}
+
+.image-preview-overlay {
+    position:
+        fixed;
+
+    inset:
+        0;
+
+    z-index:
+        1100;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    padding:
+        24px;
+
+    background:
+        rgba(3,
+            12,
+            6,
+            0.82);
+}
+
+.image-preview-close {
+    position:
+        absolute;
+
+    top:
+        18px;
+
+    right:
+        18px;
+
+    display:
+        grid;
+
+    width:
+        40px;
+
+    height:
+        40px;
+
+    place-items:
+        center;
+
+    border:
+        1px solid rgba(255,
+            255,
+            255,
+            0.18);
+
+    border-radius:
+        999px;
+
+    background:
+        rgba(255,
+            255,
+            255,
+            0.08);
+
+    color:
+        #fff;
+
+    font-size:
+        1.4rem;
+
+    line-height:
+        1;
+
+    cursor:
+        pointer;
+}
+
+.image-preview-image {
+    display:
+        block;
+
+    max-width:
+        min(92vw,
+            1100px);
+
+    max-height:
+        90vh;
+
+    border-radius:
+        12px;
+
+    object-fit:
+        contain;
+
+    background:
+        #0a190e;
+
+    box-shadow:
+        0 20px 50px rgba(0,
+            0,
+            0,
+            0.45);
 }
 
 .image-thumbnails {

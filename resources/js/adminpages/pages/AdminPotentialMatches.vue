@@ -126,6 +126,13 @@
         <Transition name="toast-slide">
             <div v-if="toast.message" class="toast" :class="toast.type" role="status">{{ toast.message }}</div>
         </Transition>
+
+        <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
+            <button type="button" class="image-preview-close" aria-label="Close image preview" @click="closeImagePreview">×</button>
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev" aria-label="Previous image" @click="showPreviousImage">‹</button>
+            <img :src="previewImageUrl" alt="Full-size match preview" class="image-preview-image" />
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next" aria-label="Next image" @click="showNextImage">›</button>
+        </div>
     </main>
 </template>
 
@@ -141,6 +148,9 @@ const loading = ref(false)
 const decisionLoading = ref(false)
 const errorMessage = ref('')
 const selectedMatch = ref(null)
+const previewImages = ref([])
+const previewImageIndex = ref(0)
+const previewImageUrl = computed(() => previewImages.value[previewImageIndex.value] || null)
 const page = ref(1)
 const perPage = 12
 const toast = reactive({ message: '', type: 'success' })
@@ -172,7 +182,11 @@ const ReportPreview = defineComponent({
     setup(props) {
         return () => h('div', { class: 'report-preview' }, [
             h('span', { class: 'report-label' }, props.label),
-            getReportImageElement(props.report, props.type),
+            h('button', {
+                type: 'button',
+                class: 'report-image-button',
+                onClick: () => openImagePreview(getReportImages(props.report), 0),
+            }, [getReportImageElement(props.report, props.type)]),
             h('h3', props.report?.title || 'Untitled report'), h('p', getCategory(props.report)),
             h('small', `Location: ${props.report?.location || 'Not provided'}`),
             h('small', `Reported: ${formatDate(props.report?.created_at || props.report?.date_occurred)}`),
@@ -185,7 +199,11 @@ const ReportDetail = defineComponent({
     setup(props) {
         return () => h('article', { class: 'report-detail' }, [
             h('div', { class: 'detail-heading' }, [h('span', { class: `report-dot ${props.type}` }), h('h3', props.title)]),
-            getReportImageElement(props.report, props.type),
+            h('button', {
+                type: 'button',
+                class: 'report-image-button',
+                onClick: () => openImagePreview(getReportImages(props.report), 0),
+            }, [getReportImageElement(props.report, props.type)]),
             h('dl', [
                 detailRow('Title', props.report?.title || 'Untitled report'),
                 detailRow('Category', getCategory(props.report)),
@@ -208,6 +226,12 @@ function formatStatus(value) { return String(value || 'pending').replace(/_/g, '
 function getCategory(report) { return report?.category?.name || report?.category || report?.item_category || 'Uncategorized' }
 function getDescription(report) { return report?.description || report?.ownership_proof || 'No description provided.' }
 function sourceLabel(match) { return match?.source || 'System generated suggestion' }
+function getReportImages(report) {
+    const images = report?.images || []
+    const paths = images.map((item) => item?.file_path || item?.path || item?.url || report?.image).filter(Boolean)
+    if (!paths.length && report?.image) return [report.image]
+    return paths.map((path) => path.startsWith('http') || path.startsWith('/') ? path : `/storage/${path}`)
+}
 function getReportImage(report) { const image = report?.images?.find((item) => item.is_primary) || report?.images?.[0]; const path = image?.file_path || image?.path || report?.image; if (!path) return null; return path.startsWith('http') || path.startsWith('/') ? path : `/storage/${path}` }
 function getReportImageElement(report, type) { const imagePath = getReportImage(report); return imagePath ? h('img', { src: imagePath, alt: report?.title || `${type} report image` }) : h('div', { class: 'image-placeholder' }, 'No image available') }
 function formatDate(value) { return value ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not provided' }
@@ -216,6 +240,10 @@ function showToast(message, type = 'success') { toast.message = message; toast.t
 function openReview(match) { selectedMatch.value = match }
 function closeReview() { if (!decisionLoading.value) selectedMatch.value = null }
 function requestReject(match) { if (window.confirm('Reject this match? This will close this suggestion as a mismatch.')) rejectMatch(match) }
+function openImagePreview(imageList, index = 0) { const list = Array.isArray(imageList) ? imageList : [imageList].filter(Boolean); if (!list.length) return; previewImages.value = list; previewImageIndex.value = Math.min(index, list.length - 1) }
+function showPreviousImage() { if (!previewImages.value.length) return; previewImageIndex.value = (previewImageIndex.value - 1 + previewImages.value.length) % previewImages.value.length }
+function showNextImage() { if (!previewImages.value.length) return; previewImageIndex.value = (previewImageIndex.value + 1) % previewImages.value.length }
+function closeImagePreview() { previewImages.value = []; previewImageIndex.value = 0 }
 
 async function loadMatches() { loading.value = true; errorMessage.value = ''; try { const response = await api.get('/api/admin/matches'); matches.value = Array.isArray(response.data?.data) ? response.data.data : [] } catch (error) { errorMessage.value = error.response?.data?.message || 'Failed to load potential matches.'; matches.value = [] } finally { loading.value = false } }
 async function confirmMatch(match) { decisionLoading.value = true; try { await api.put(`/api/admin/matches/${match.id}/confirm`); match.status = 'confirmed'; showToast('Match confirmed. The student has been notified.'); selectedMatch.value = null; await loadMatches() } catch (error) { showToast(error.response?.data?.message || 'Unable to confirm match.', 'error') } finally { decisionLoading.value = false } }

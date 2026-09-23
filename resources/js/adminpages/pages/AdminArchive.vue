@@ -62,7 +62,7 @@
             </div>
         </section>
 
-        <div v-if="selectedItem" class="modal-overlay" @click.self="selectedItem = null">
+        <div v-if="selectedItem" class="modal-overlay" @click.self="closeItemDetails">
             <section class="archive-modal" role="dialog" aria-modal="true" aria-labelledby="archive-item-title">
                 <header class="modal-header">
                     <div>
@@ -70,14 +70,16 @@
                         <h2 id="archive-item-title">{{ selectedItem.title || 'Untitled item' }}</h2>
                     </div>
                     <button type="button" class="close-button" aria-label="Close details"
-                        @click="selectedItem = null">×</button>
+                        @click="closeItemDetails">×</button>
                 </header>
                 <div class="modal-content">
                     <div class="modal-overview">
                         <div class="modal-image-wrap">
-                            <img v-if="getItemImage(selectedItem)" :src="getItemImage(selectedItem)"
-                                :alt="selectedItem.title || 'Archived item'" />
-                            <div v-else class="image-placeholder">No image available</div>
+                            <button type="button" class="modal-image-button" @click="openImagePreview(getItemImages(selectedItem), 0)" aria-label="View full-size archived item image">
+                                <img v-if="getItemImage(selectedItem)" :src="getItemImage(selectedItem)"
+                                    :alt="selectedItem.title || 'Archived item'" />
+                                <div v-else class="image-placeholder">No image available</div>
+                            </button>
                         </div>
                         <div class="overview-copy"><span class="type-chip" :class="selectedItem.type">{{
                             selectedItem.type || 'Unknown type' }}</span>
@@ -185,6 +187,13 @@
                             === selectedItem.id ? 'Restoring...' : 'Restore to workflow' }}</button></footer>
             </section>
         </div>
+
+        <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
+            <button type="button" class="image-preview-close" aria-label="Close image preview" @click="closeImagePreview">×</button>
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev" aria-label="Previous image" @click="showPreviousImage">‹</button>
+            <img :src="previewImageUrl" alt="Full-size archived item preview" class="image-preview-image" />
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next" aria-label="Next image" @click="showNextImage">›</button>
+        </div>
     </main>
 </template>
 
@@ -197,6 +206,9 @@ const loading = ref(false)
 const restoringId = ref(null)
 const errorMessage = ref('')
 const selectedItem = ref(null)
+const previewImages = ref([])
+const previewImageIndex = ref(0)
+const previewImageUrl = computed(() => previewImages.value[previewImageIndex.value] || null)
 const searchTerm = ref('')
 const filterType = ref('all')
 
@@ -238,12 +250,18 @@ const filteredItems = computed(() => {
 })
 
 function openDetails(item) { selectedItem.value = item }
+function closeItemDetails() { selectedItem.value = null; previewImages.value = []; previewImageIndex.value = 0 }
+function openImagePreview(imageList, index = 0) { const list = Array.isArray(imageList) ? imageList : [imageList].filter(Boolean); if (!list.length) return; previewImages.value = list; previewImageIndex.value = Math.min(index, list.length - 1) }
+function showPreviousImage() { if (!previewImages.value.length) return; previewImageIndex.value = (previewImageIndex.value - 1 + previewImages.value.length) % previewImages.value.length }
+function showNextImage() { if (!previewImages.value.length) return; previewImageIndex.value = (previewImageIndex.value + 1) % previewImages.value.length }
+function closeImagePreview() { previewImages.value = []; previewImageIndex.value = 0 }
 function formatStatus(value) { return String(value || 'Unknown').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()) }
 function formatArchiveType(value) { return formatStatus(value || 'Manual archive') }
 function getArchiveSource(value) { return value === 'mobile_archive' ? 'Mobile post' : formatArchiveType(value) }
 function formatDate(value) { return value ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not provided' }
 function getCategory(item) { return item.item?.category?.name || item.item?.category || item.item?.item_category || 'Uncategorized' }
-function getItemImage(item) { const image = item.item?.images?.find((entry) => entry.is_primary) || item.item?.images?.[0]; const path = image?.file_path || image?.path; if (!path) return null; return path.startsWith('http') || path.startsWith('/') ? path : `/storage/${path}` }
+function getItemImages(item) { const images = item?.item?.images || item?.images || []; const paths = images.map((entry) => entry?.file_path || entry?.path || entry?.url).filter(Boolean); if (!paths.length && item?.item?.image) return [item.item.image]; if (!paths.length && item?.image) return [item.image]; return paths.map((path) => path.startsWith('http') || path.startsWith('/') ? path : `/storage/${path}`) }
+function getItemImage(item) { const image = item.item?.images?.find((entry) => entry.is_primary) || item.item?.images?.[0]; const path = image?.file_path || image?.path || image?.url; if (!path) return null; return path.startsWith('http') || path.startsWith('/') ? path : `/storage/${path}` }
 function getReporter(item) { return item?.student || item?.item?.student || null }
 function getStudentId(student) { return student?.student_id_number || student?.student_id || student?.id || 'Not provided' }
 function getProfilePhoto(student) {
