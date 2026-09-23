@@ -75,7 +75,9 @@
                 <div class="modal-content">
                     <div class="modal-overview">
                         <div class="modal-image-wrap">
-                            <button type="button" class="modal-image-button" @click="openImagePreview(getItemImages(selectedItem), 0)" aria-label="View full-size archived item image">
+                            <button type="button" class="modal-image-button"
+                                @click="openImagePreview(getItemImages(selectedItem), 0)"
+                                aria-label="View full-size archived item image">
                                 <img v-if="getItemImage(selectedItem)" :src="getItemImage(selectedItem)"
                                     :alt="selectedItem.title || 'Archived item'" />
                                 <div v-else class="image-placeholder">No image available</div>
@@ -189,10 +191,13 @@
         </div>
 
         <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
-            <button type="button" class="image-preview-close" aria-label="Close image preview" @click="closeImagePreview">×</button>
-            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev" aria-label="Previous image" @click="showPreviousImage">‹</button>
+            <button type="button" class="image-preview-close" aria-label="Close image preview"
+                @click="closeImagePreview">×</button>
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev"
+                aria-label="Previous image" @click="showPreviousImage">‹</button>
             <img :src="previewImageUrl" alt="Full-size archived item preview" class="image-preview-image" />
-            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next" aria-label="Next image" @click="showNextImage">›</button>
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next" aria-label="Next image"
+                @click="showNextImage">›</button>
         </div>
     </main>
 </template>

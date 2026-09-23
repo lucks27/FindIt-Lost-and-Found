@@ -92,12 +92,13 @@
         <div v-if="selectedItem" class="modal-overlay" @click.self="closeItemModal">
             <section class="modal" role="dialog" aria-modal="true"
                 :aria-labelledby="`preview-title-${selectedItem.id}`">
-                <button class="close" type="button" aria-label="Close item details"
-                    @click="closeItemModal">×</button>
+                <button class="close" type="button" aria-label="Close item details" @click="closeItemModal">×</button>
 
                 <div class="modal-header">
-                    <button class="image-preview-button" type="button" @click="openImagePreview(getItemImages(selectedItem), 0)" aria-label="View full-size image">
-                        <img class="preview" :src="getItemImage(selectedItem)" :alt="selectedItem.title || 'Lost and found item'" />
+                    <button class="image-preview-button" type="button"
+                        @click="openImagePreview(getItemImages(selectedItem), 0)" aria-label="View full-size image">
+                        <img class="preview" :src="getItemImage(selectedItem)"
+                            :alt="selectedItem.title || 'Lost and found item'" />
                     </button>
 
                     <div class="modal-header-copy">
@@ -207,10 +208,13 @@
         </div>
 
         <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
-            <button type="button" class="image-preview-close" aria-label="Close image preview" @click="closeImagePreview">×</button>
-            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev" aria-label="Previous image" @click="showPreviousImage">‹</button>
+            <button type="button" class="image-preview-close" aria-label="Close image preview"
+                @click="closeImagePreview">×</button>
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev"
+                aria-label="Previous image" @click="showPreviousImage">‹</button>
             <img :src="previewImageUrl" alt="Full-size item preview" class="image-preview-image" />
-            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next" aria-label="Next image" @click="showNextImage">›</button>
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next" aria-label="Next image"
+                @click="showNextImage">›</button>
         </div>
     </main>
 </template>
@@ -850,8 +854,13 @@ button:disabled {
     cursor: pointer;
 }
 
-.image-preview-nav.prev { left: 24px; }
-.image-preview-nav.next { right: 24px; }
+.image-preview-nav.prev {
+    left: 24px;
+}
+
+.image-preview-nav.next {
+    right: 24px;
+}
 
 
 .details p:last-child {
@@ -959,7 +968,7 @@ button:disabled {
     margin: 0;
 }
 
-.info-list > div {
+.info-list>div {
     display: grid;
     grid-template-columns: 82px minmax(0, 1fr);
     gap: 8px;
@@ -967,11 +976,11 @@ button:disabled {
     border-top: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-.info-list > div:first-child {
+.info-list>div:first-child {
     border-top: 0;
 }
 
-.info-list > div.wide-info {
+.info-list>div.wide-info {
     grid-column: 1 / -1;
 }
 

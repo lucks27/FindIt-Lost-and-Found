@@ -400,7 +400,9 @@
                         <section class="modal-overview">
                             <div class="modal-media">
                                 <div class="modal-image-container">
-                                    <button type="button" class="modal-image-button" @click="openImagePreview(getReportImages(selectedReport), currentImageIndex)" aria-label="View full-size item image">
+                                    <button type="button" class="modal-image-button"
+                                        @click="openImagePreview(getReportImages(selectedReport), currentImageIndex)"
+                                        aria-label="View full-size item image">
                                         <img :src="getReportImage(
                                             selectedReport,
                                             currentImageIndex
@@ -446,10 +448,13 @@ img,
                             </div>
 
                             <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
-                                <button type="button" class="image-preview-close" aria-label="Close image preview" @click="closeImagePreview">×</button>
-                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev" aria-label="Previous image" @click="showPreviousImage">‹</button>
+                                <button type="button" class="image-preview-close" aria-label="Close image preview"
+                                    @click="closeImagePreview">×</button>
+                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev"
+                                    aria-label="Previous image" @click="showPreviousImage">‹</button>
                                 <img :src="previewImageUrl" alt="Full-size item preview" class="image-preview-image" />
-                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next" aria-label="Next image" @click="showNextImage">›</button>
+                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next"
+                                    aria-label="Next image" @click="showNextImage">›</button>
                             </div>
 
                             <!-- Summary -->
@@ -3240,8 +3245,13 @@ onMounted(() => {
     cursor: pointer;
 }
 
-.image-preview-nav.prev { left: 24px; }
-.image-preview-nav.next { right: 24px; }
+.image-preview-nav.prev {
+    left: 24px;
+}
+
+.image-preview-nav.next {
+    right: 24px;
+}
 
 .image-preview-image {
     display: block;

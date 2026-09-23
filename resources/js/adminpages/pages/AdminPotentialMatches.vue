@@ -128,10 +128,13 @@
         </Transition>
 
         <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
-            <button type="button" class="image-preview-close" aria-label="Close image preview" @click="closeImagePreview">×</button>
-            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev" aria-label="Previous image" @click="showPreviousImage">‹</button>
+            <button type="button" class="image-preview-close" aria-label="Close image preview"
+                @click="closeImagePreview">×</button>
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev"
+                aria-label="Previous image" @click="showPreviousImage">‹</button>
             <img :src="previewImageUrl" alt="Full-size match preview" class="image-preview-image" />
-            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next" aria-label="Next image" @click="showNextImage">›</button>
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next" aria-label="Next image"
+                @click="showNextImage">›</button>
         </div>
     </main>
 </template>
