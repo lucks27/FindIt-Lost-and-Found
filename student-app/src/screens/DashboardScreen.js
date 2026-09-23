@@ -57,6 +57,7 @@ export default function DashboardScreen() {
   const [notice, setNotice] = useState(null);
   const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
   const [campusItems, setCampusItems] = useState(sampleItems);
+  const [postFilter, setPostFilter] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
   const [claimMode, setClaimMode] = useState(false);
   const [claimDraft, setClaimDraft] = useState({ proofDescription: '', proofPhoto: null });
@@ -72,7 +73,7 @@ export default function DashboardScreen() {
     privateNote: '',
     location: '',
     date: new Date().toISOString().slice(0, 10),
-    image: null,
+    images: [],
   });
   const firstName = user?.first_name || user?.name?.split(' ')[0] || 'Student';
 
@@ -96,7 +97,7 @@ export default function DashboardScreen() {
 
   async function loadCampusItems() {
     try {
-      const response = await api.fetchReports();
+      const response = await api.fetchReports({ per_page: 100 });
       const reports = response.data?.data?.data || response.data?.data || [];
       if (Array.isArray(reports)) setCampusItems(reports);
 
@@ -222,13 +223,21 @@ export default function DashboardScreen() {
       return;
     }
 
+    const remainingSlots = 3 - (form.images?.length || 0);
+    if (remainingSlots <= 0) {
+      showNotice('Photo limit reached', 'You can upload up to 3 item photos.', 'error');
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
+      allowsEditing: false,
       quality: 0.8,
+      allowsMultipleSelection: true,
+      selectionLimit: remainingSlots,
     });
-    if (!result.canceled && result.assets?.[0]) {
-      updateForm('image', result.assets[0]);
+    if (!result.canceled && result.assets?.length) {
+      updateForm('images', [...(form.images || []), ...result.assets].slice(0, 3));
     }
   }
 
@@ -238,8 +247,8 @@ export default function DashboardScreen() {
       return;
     }
 
-    if (!form.title.trim() || !form.description.trim() || !form.privateNote.trim() || !form.location.trim() || !form.image) {
-      showNotice('Complete your report', 'Complete the private verification note, item name, public description, location, and photo before publishing.', 'error');
+    if (!form.title.trim() || !form.description.trim() || !form.privateNote.trim() || !form.location.trim() || !form.images?.length) {
+      showNotice('Complete your report', 'Complete the private verification note, item name, public description, location, and at least one photo before publishing.', 'error');
       return;
     }
 
@@ -254,14 +263,16 @@ export default function DashboardScreen() {
       payload.append('date_occurred', form.date);
       payload.append('metadata[category]', form.category);
       payload.append('color', form.color.trim());
-      payload.append('images[]', {
-        uri: form.image.uri,
-        name: form.image.fileName || `report-${Date.now()}.jpg`,
-        type: form.image.mimeType || 'image/jpeg',
-      });
+      form.images.forEach((image, index) => payload.append('images[]', {
+        uri: image.uri,
+        name: image.fileName || `report-${index + 1}-${Date.now()}.jpg`,
+        type: image.mimeType || 'image/jpeg',
+      }));
+
+      payload.append('metadata[photo_count]', String(form.images.length));
 
       await api.createReport(payload);
-      setForm({ title: '', category: 'Electronics', color: '', description: '', privateNote: '', location: '', date: new Date().toISOString().slice(0, 10), image: null });
+      setForm({ title: '', category: 'Electronics', color: '', description: '', privateNote: '', location: '', date: new Date().toISOString().slice(0, 10), images: [] });
       setReportMode(null);
       showNotice('Report submitted', reportMode === 'found'
         ? 'Thank you. Please surrender the item to USC for verification.'
@@ -356,9 +367,33 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.recentPostsSection}>
-          <Text style={styles.recentPostsTitle}>Recent Posts</Text>
+          <View style={styles.recentPostsHeader}>
+            <View>
+              <Text style={styles.recentPostsTitle}>Recent Posts</Text>
+              <Text style={styles.recentPostsSubtitle}>Find an item that needs your help</Text>
+            </View>
+            <Text style={styles.recentPostsCount}>{campusItems.length} posts</Text>
+          </View>
 
-          {campusItems.length > 0 ? campusItems.slice(0, 2).map((item) => {
+          <View style={styles.postFilterBar}>
+            {[
+              { key: 'all', label: 'All posts', icon: '✦' },
+              { key: 'lost', label: 'Lost', icon: '⌁' },
+              { key: 'found', label: 'Found', icon: '♡' },
+            ].map((filter) => (
+              <TouchableOpacity
+                key={filter.key}
+                style={[styles.postFilter, postFilter === filter.key && styles.postFilterActive]}
+                onPress={() => setPostFilter(filter.key)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.postFilterIcon, postFilter === filter.key && styles.postFilterTextActive]}>{filter.icon}</Text>
+                <Text style={[styles.postFilterText, postFilter === filter.key && styles.postFilterTextActive]}>{filter.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {campusItems.filter((item) => postFilter === 'all' || String(item.type || '').toLowerCase() === postFilter).length > 0 ? campusItems.filter((item) => postFilter === 'all' || String(item.type || '').toLowerCase() === postFilter).map((item) => {
             const imageUri = getReportImageUri(item);
             const status = getReportStatus(item);
             const isFound = String(item.type || '').toLowerCase() === 'found';
@@ -376,17 +411,27 @@ export default function DashboardScreen() {
                 )}
 
                 <View style={styles.recentPostBody}>
-                  <Text style={styles.recentPostName}>{item.title}</Text>
-                  <Text style={styles.recentPostMeta}>◌ {item.category || 'Electronics'}</Text>
-                  <Text style={styles.recentPostMeta}>⌖ {item.place || item.location || 'Campus'}</Text>
-                  <Text style={styles.recentPostDate}>{item.date_occurred || 'September 35, 2027'}</Text>
+                  <View style={styles.recentPostTypeRow}>
+                    <Text style={[styles.recentPostType, isFound && styles.recentPostTypeFound]}>{isFound ? 'FOUND ITEM' : 'LOST ITEM'}</Text>
+                    <Text style={styles.recentPostArrow}>›</Text>
+                  </View>
+                  <Text style={styles.recentPostName} numberOfLines={2}>{item.title}</Text>
+                  <View style={styles.recentPostMetaRow}>
+                    <Text style={styles.recentPostMetaChip}>◌ {item.category || 'Electronics'}</Text>
+                    <Text style={styles.recentPostMetaChip}>⌖ {item.place || item.location || 'Campus'}</Text>
+                  </View>
+                  <Text style={styles.recentPostDate}>{item.date_occurred || 'Recently posted'}</Text>
                 </View>
 
                 <Text style={[styles.recentPostBadge, isFound || isVerified ? styles.recentPostBadgeVerified : styles.recentPostBadgeLost]}>{statusText}</Text>
               </TouchableOpacity>
             );
           }) : (
-            <Text style={styles.emptyCopy}>No recent posts available yet.</Text>
+            <View style={styles.noPostsCard}>
+              <Text style={styles.noPostsIcon}>⌁</Text>
+              <Text style={styles.noPostsTitle}>No {postFilter === 'all' ? '' : postFilter} posts yet</Text>
+              <Text style={styles.noPostsText}>Try another filter or check back after the admin publishes a report.</Text>
+            </View>
           )}
         </View>
       </View>
@@ -406,7 +451,7 @@ export default function DashboardScreen() {
             onBack={() => setReportMode(null)}
             updateForm={updateForm}
             chooseImage={chooseReportImage}
-            removeImage={() => updateForm('image', null)}
+            removeImage={(index) => updateForm('images', (form.images || []).filter((_, imageIndex) => imageIndex !== index))}
             submitReport={submitReport}
           />
         );
@@ -466,23 +511,27 @@ export default function DashboardScreen() {
     <SafeAreaView style={styles.screen}>
       {notice && <NoticeModal notice={notice} onClose={() => { setNotice(null); notice.onClose?.(); }} />}
       {logoutConfirmationOpen && <LogoutConfirmationModal onCancel={() => setLogoutConfirmationOpen(false)} onConfirm={logout} />}
+      <View style={styles.fixedHeader}>
+        <Image source={logoImage} style={styles.logo} resizeMode="contain" />
+        <View style={styles.headerCopy}>
+          <Text style={styles.appName}>FindIt</Text>
+          <Text style={styles.greeting}>Hello, {firstName}</Text>
+        </View>
+        <TouchableOpacity style={styles.bellButton} onPress={() => setActiveTab('Notifications')}>
+          <Text style={styles.bellIcon}>●</Text>
+          {notifications.some((notification) => !notification.is_read) && <View style={styles.bellUnreadDot} />}
+        </TouchableOpacity>
+      </View>
       {activeTab === 'Profile' ? (
-        <View style={styles.profileViewport}>{renderTabContent()}</View>
+        <View style={styles.navigationBody}><View style={styles.profileViewport}>{renderTabContent()}</View></View>
+      ) : selectedItem ? (
+        <View style={styles.navigationBody}>{renderTabContent()}</View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
-            <Image source={logoImage} style={styles.logo} resizeMode="contain" />
-            <View style={styles.headerCopy}>
-              <Text style={styles.appName}>FindIt</Text>
-              <Text style={styles.greeting}>Hello, {firstName}</Text>
-            </View>
-            <TouchableOpacity style={styles.bellButton} onPress={() => setActiveTab('Notifications')}>
-              <Text style={styles.bellIcon}>●</Text>
-              {notifications.some((notification) => !notification.is_read) && <View style={styles.bellUnreadDot} />}
-            </TouchableOpacity>
-          </View>
+        <View style={styles.navigationBody}>
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {renderTabContent()}
-        </ScrollView>
+          </ScrollView>
+        </View>
       )}
 
       <View style={styles.bottomNav}>
@@ -567,7 +616,16 @@ function getReportImageUri(item) {
   const path = item?.images?.[0]?.file_path || item?.images?.[0]?.url;
   if (!path) return null;
   if (path.startsWith('http')) return path;
-  return `${api.API_BASE_URL}/storage/${path.replace(/^storage\//, '')}`;
+  return `${api.API_BASE_URL}/storage/${path.replace(/^\/?storage\//, '').replace(/^\//, '')}`;
+}
+
+function getReportGalleryUris(item) {
+  return (Array.isArray(item?.images) ? item.images : []).map((image) => {
+    const path = image?.file_path || image?.url;
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    return `${api.API_BASE_URL}/storage/${path.replace(/^\/?storage\//, '').replace(/^\//, '')}`;
+  }).filter(Boolean);
 }
 
 function getReportStatus(item) {
@@ -579,35 +637,53 @@ function getReportStatus(item) {
 }
 
 function ItemDetail({ item, onBack, onClaim }) {
-  const imageUri = getReportImageUri(item);
+  const galleryUris = getReportGalleryUris(item);
+  const imageUri = galleryUris[0] || getReportImageUri(item);
   const itemType = String(item?.type || '').toLowerCase();
   const itemStatus = String(item?.status || '').toLowerCase();
   const canClaim = (itemType === 'found' && itemStatus === 'verified') || (itemType === 'lost' && (itemStatus === 'approved' || itemStatus === 'verified'));
   const status = getReportStatus(item);
+  const isFound = itemType === 'found';
   return (
-    <View style={styles.claimScreen}>
-      <View style={styles.claimHeader}>
-        <TouchableOpacity onPress={onBack} style={styles.claimBack}><Text style={styles.claimBackText}>‹</Text></TouchableOpacity>
-        <View><Text style={styles.claimHeaderTitle}>Item Detail</Text><Text style={styles.claimHeaderSubtitle}>{canClaim ? itemType === 'lost' ? 'Public lost-item report' : 'Verified found article in custody' : 'Published campus report'}</Text></View>
+    <ScrollView style={styles.detailScreen} contentContainerStyle={styles.detailScrollContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.detailTopBar}>
+        <TouchableOpacity onPress={onBack} style={styles.detailBackButton}><Text style={styles.detailBackText}>‹</Text></TouchableOpacity>
+        <Text style={styles.detailTopTitle}>Item details</Text>
+        <View style={styles.detailTopDot} />
       </View>
-      {imageUri ? <Image source={{ uri: imageUri }} style={styles.detailImage} resizeMode="cover" /> : <View style={styles.detailImagePlaceholder}><Text style={styles.itemIcon}>▣</Text></View>}
-      <View style={styles.detailTitleRow}><Text style={styles.detailTitle}>{item.title}</Text><Text style={[styles.detailStatus, !canClaim && styles.detailStatusLost]}>{status}</Text></View>
-      <View style={styles.detailGrid}>
-        <DetailValue label="Description" value={item.category || 'Electronics'} icon="▤" />
-        <DetailValue label="Color" value={item.color || 'Not specified'} icon="◉" />
-        <DetailValue label="Location Found" value={item.location || item.place || 'Campus'} icon="⌖" />
-        <DetailValue label="Date Found" value={item.date_occurred || 'Recently'} icon="▦" />
+
+      <View style={styles.detailHero}>
+        {galleryUris.length > 0 ? (
+          <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.detailGallery}>
+            {galleryUris.map((uri, index) => <Image key={`${uri}-${index}`} source={{ uri }} style={styles.detailImage} resizeMode="cover" />)}
+          </ScrollView>
+        ) : imageUri ? <Image source={{ uri: imageUri }} style={styles.detailImage} resizeMode="cover" /> : <View style={styles.detailImagePlaceholder}><Text style={styles.detailPlaceholderIcon}>▣</Text></View>}
+        <View style={styles.detailHeroShade} />
+        <View style={[styles.detailTypeBadge, isFound && styles.detailTypeBadgeFound]}><Text style={styles.detailTypeBadgeText}>{isFound ? 'FOUND ITEM' : 'LOST ITEM'}</Text></View>
+        <View style={styles.detailHeroCaption}><Text style={styles.detailHeroCaptionText}>{isFound ? 'Help reunite this item with its owner' : 'Help identify this missing item'}</Text></View>
+        {galleryUris.length > 1 && <View style={styles.detailGalleryHint}><Text style={styles.detailGalleryHintText}>Swipe for more photos · {galleryUris.length}</Text></View>}
       </View>
-      <View style={styles.detailDescription}><Text style={styles.detailDescriptionLabel}>Description</Text><Text style={styles.detailDescriptionText}>{item.description || 'Found item is currently held by USC for verification.'}</Text></View>
+
+      <View style={styles.detailMainCard}>
+        <View style={styles.detailTitleRow}><Text style={styles.detailTitle}>{item.title}</Text><Text style={[styles.detailStatus, isFound ? styles.detailStatusFound : styles.detailStatusLost]}>{status}</Text></View>
+        <View style={styles.detailGrid}>
+          <DetailValue label="Category" value={item.category || 'Electronics'} icon="▤" />
+          <DetailValue label="Color" value={item.color || 'Not specified'} icon="◉" />
+          <DetailValue label="Location" value={item.location || item.place || 'Campus'} icon="⌖" />
+          <DetailValue label="Date posted" value={item.date_occurred || 'Recently'} icon="▦" />
+        </View>
+        <View style={styles.detailDescription}><Text style={styles.detailDescriptionLabel}>About this item</Text><Text style={styles.detailDescriptionText}>{item.description || (isFound ? 'This found item is currently available through USC verification.' : 'This item was reported missing on campus.')}</Text></View>
+      </View>
+
       {canClaim ? (
-        <TouchableOpacity style={styles.claimButton} onPress={onClaim} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.detailClaimButton} onPress={onClaim} activeOpacity={0.85}>
           <Text style={styles.claimButtonIcon}>✓</Text>
           <Text style={styles.claimButtonText}>Claim This Item</Text>
         </TouchableOpacity>
       ) : (
-        <View style={styles.detailInfoNotice}><Text style={styles.detailInfoNoticeText}>Claims are available for public lost reports and verified found items.</Text></View>
+        <View style={styles.detailInfoNotice}><Text style={styles.detailInfoNoticeTitle}>Claims are not open yet</Text><Text style={styles.detailInfoNoticeText}>Claims are available for public lost reports and verified found items.</Text></View>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -841,6 +917,7 @@ function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const today = new Date();
   const selectedDate = new Date(`${form.date}T00:00:00`);
+  const reportImages = Array.isArray(form.images) ? form.images : [];
 
   function handleDateChange(event, date) {
     setDatePickerOpen(false);
@@ -894,17 +971,23 @@ function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage
       <Text style={styles.dateHint}>You can only select today or an earlier date.</Text>
       {datePickerOpen && <DateTimePicker value={Number.isNaN(selectedDate.getTime()) ? today : selectedDate} mode="date" maximumDate={today} onChange={handleDateChange} />}
       <TouchableOpacity style={styles.uploadBox} onPress={chooseImage}>
-        {form.image ? (
-          <View style={styles.previewWrap}>
-            <Image source={{ uri: form.image.uri }} style={styles.previewImage} />
-            <TouchableOpacity style={styles.removeImageButton} onPress={removeImage} hitSlop={8}>
-              <Text style={styles.removeImageText}>×</Text>
-            </TouchableOpacity>
+        {reportImages.length > 0 ? (
+          <View style={styles.reportGalleryPreview}>
+            <Image source={{ uri: reportImages[0].uri }} style={styles.previewImage} />
+            <View style={styles.reportGalleryLabel}><Text style={styles.reportGalleryLabelText}>MAIN IMAGE</Text><Text style={styles.reportGalleryCount}>{reportImages.length}/3 photos</Text></View>
           </View>
         ) : (
-          <Text style={styles.uploadText}>＋  Add item photo{ '\n' }<Text style={styles.uploadHint}>A clear photo is required for verification</Text></Text>
+          <Text style={styles.uploadText}>＋  Add item photos{ '\n' }<Text style={styles.uploadHint}>Main photo plus 2 additional angles</Text></Text>
         )}
       </TouchableOpacity>
+      {reportImages.length > 0 && <View style={styles.reportThumbRow}>
+        {reportImages.map((image, index) => (
+          <View key={`${image.uri}-${index}`} style={styles.reportThumbWrap}>
+            <Image source={{ uri: image.uri }} style={styles.reportThumb} />
+            <TouchableOpacity style={styles.removeImageButton} onPress={() => removeImage(index)} hitSlop={8}><Text style={styles.removeImageText}>×</Text></TouchableOpacity>
+          </View>
+        ))}
+      </View>}
       <TouchableOpacity style={[styles.submitButton, isFound && styles.submitFound]} onPress={submitReport} disabled={reportLoading}>
         <Text style={styles.submitText}>{reportLoading ? 'Submitting...' : isFound ? 'Submit Found Report' : 'Publish Lost Report'}</Text>
       </TouchableOpacity>
@@ -914,9 +997,10 @@ function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f1fbef' },
+  fixedHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1fbef', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#d8eadb', zIndex: 10, elevation: 3, shadowColor: '#16442d', shadowOpacity: 0.08, shadowRadius: 5, shadowOffset: { width: 0, height: 2 } },
+  navigationBody: { flex: 1 },
   profileViewport: { flex: 1, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 82, overflow: 'hidden' },
   content: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 120 },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   logo: { width: 48, height: 48 },
   headerCopy: { flex: 1, marginLeft: 8 },
   appName: { color: '#087044', fontSize: 18, fontWeight: '900' },
@@ -954,19 +1038,37 @@ const styles = StyleSheet.create({
   statIcon: { fontSize: 18 },
   statValue: { color: '#1c322d', fontSize: 24, fontWeight: '900', marginTop: 10 },
   statLabel: { color: '#697b72', fontSize: 11, marginTop: 6, textAlign: 'center' },
-  recentPostsSection: { marginTop: 26 },
-  recentPostsTitle: { color: '#1b352d', fontSize: 22, fontWeight: '900', marginBottom: 12 },
-  recentPostCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f9f4', borderRadius: 18, padding: 12, borderWidth: 1, borderColor: '#d7e7d9', shadowColor: '#0d6a40', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2, marginBottom: 14 },
-  recentPostImage: { width: 120, height: 104, borderRadius: 12, backgroundColor: '#d9efe1' },
-  recentPostImagePlaceholder: { width: 120, height: 104, borderRadius: 12, backgroundColor: '#d9efe1', alignItems: 'center', justifyContent: 'center' },
-  recentPostImageText: { color: '#0b8d52', fontSize: 28, fontWeight: '900' },
-  recentPostBody: { flex: 1, marginLeft: 12, paddingRight: 6 },
-  recentPostName: { color: '#1d2d27', fontSize: 17, fontWeight: '900' },
-  recentPostMeta: { color: '#62776b', fontSize: 12, marginTop: 7 },
-  recentPostDate: { color: '#4f5f56', fontSize: 12, marginTop: 7 },
-  recentPostBadge: { position: 'absolute', right: 12, top: 12, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, fontSize: 10, fontWeight: '900', overflow: 'hidden' },
+  recentPostsSection: { marginTop: 28 },
+  recentPostsHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 13 },
+  recentPostsTitle: { color: '#1b352d', fontSize: 22, fontWeight: '900' },
+  recentPostsSubtitle: { color: '#71857a', fontSize: 11, marginTop: 4 },
+  recentPostsCount: { color: '#087044', fontSize: 10, fontWeight: '900', backgroundColor: '#d6f1dc', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6 },
+  postFilterBar: { flexDirection: 'row', backgroundColor: '#e1f1e1', borderRadius: 16, padding: 4, marginBottom: 14 },
+  postFilter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, paddingVertical: 9, paddingHorizontal: 4 },
+  postFilterActive: { backgroundColor: '#087044', shadowColor: '#075b38', shadowOpacity: 0.16, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  postFilterIcon: { color: '#537063', fontSize: 13, fontWeight: '900', marginRight: 4 },
+  postFilterText: { color: '#537063', fontSize: 11, fontWeight: '800' },
+  postFilterTextActive: { color: '#ffffff' },
+  recentPostCard: { backgroundColor: '#f8fcf8', borderRadius: 20, padding: 10, borderWidth: 1, borderColor: '#d4e7d7', shadowColor: '#0d6a40', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3, marginBottom: 15, overflow: 'hidden' },
+  recentPostImage: { width: '100%', height: 158, borderRadius: 14, backgroundColor: '#d9efe1' },
+  recentPostImagePlaceholder: { width: '100%', height: 158, borderRadius: 14, backgroundColor: '#cdebd5', alignItems: 'center', justifyContent: 'center' },
+  recentPostImageText: { color: '#0b8d52', fontSize: 38, fontWeight: '900' },
+  recentPostBody: { paddingHorizontal: 4, paddingTop: 12, paddingBottom: 4 },
+  recentPostTypeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  recentPostType: { color: '#27754d', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  recentPostTypeFound: { color: '#c55a43' },
+  recentPostArrow: { color: '#087044', fontSize: 24, lineHeight: 20, fontWeight: '500' },
+  recentPostName: { color: '#1d2d27', fontSize: 18, lineHeight: 23, fontWeight: '900', marginTop: 5, paddingRight: 56 },
+  recentPostMetaRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10 },
+  recentPostMetaChip: { color: '#60776a', fontSize: 10, backgroundColor: '#e8f3e9', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5, marginRight: 6, marginBottom: 4 },
+  recentPostDate: { color: '#82968a', fontSize: 10, marginTop: 5 },
+  recentPostBadge: { position: 'absolute', right: 20, top: 20, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, fontSize: 10, fontWeight: '900', overflow: 'hidden' },
   recentPostBadgeLost: { backgroundColor: '#e7ece8', color: '#1d332c' },
   recentPostBadgeVerified: { backgroundColor: '#ffd9d6', color: '#d7433a' },
+  noPostsCard: { alignItems: 'center', backgroundColor: '#f8fcf8', borderRadius: 18, borderWidth: 1, borderColor: '#d4e7d7', paddingHorizontal: 24, paddingVertical: 30 },
+  noPostsIcon: { color: '#0b8d52', fontSize: 30, fontWeight: '900' },
+  noPostsTitle: { color: '#1b352d', fontSize: 15, fontWeight: '900', marginTop: 8 },
+  noPostsText: { color: '#71857a', fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 5 },
   hero: { height: 168, overflow: 'hidden', borderRadius: 8 },
   heroImage: { flex: 1, justifyContent: 'flex-end' },
   heroImageStyle: { opacity: 0.9 },
@@ -1017,17 +1119,36 @@ const styles = StyleSheet.create({
   notificationEmptyIcon: { color: '#0b8d52', fontSize: 27, fontWeight: '900' },
   notificationEmptyTitle: { color: '#173b2c', fontSize: 16, fontWeight: '900', marginTop: 10 },
   notificationEmptyText: { color: '#668073', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 6 },
-  claimScreen: { flex: 1, backgroundColor: '#dff8e6', marginHorizontal: -16, marginTop: -18, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 24 },
+  detailScreen: { flex: 1, backgroundColor: '#e9f8eb', marginHorizontal: -16, marginTop: -18, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },
+  detailScrollContent: { paddingBottom: 24 },
+  detailTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  detailBackButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#d1e5d5' },
+  detailBackText: { color: '#074a32', fontSize: 32, lineHeight: 32, marginTop: -3 },
+  detailTopTitle: { color: '#073f2e', fontSize: 18, fontWeight: '900' },
+  detailTopDot: { width: 40, height: 40 },
+  detailHero: { height: 260, borderRadius: 22, overflow: 'hidden', position: 'relative', backgroundColor: '#c8e9d1', shadowColor: '#125b39', shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 4 },
+  detailGallery: { flex: 1 },
+  detailHeroShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(2, 45, 27, 0.12)' },
+  detailTypeBadge: { position: 'absolute', top: 14, left: 14, borderRadius: 999, backgroundColor: '#dcebdc', paddingHorizontal: 11, paddingVertical: 7 },
+  detailTypeBadgeFound: { backgroundColor: '#ffdcd5' },
+  detailTypeBadgeText: { color: '#174c34', fontSize: 10, fontWeight: '900', letterSpacing: 0.6 },
+  detailHeroCaption: { position: 'absolute', left: 14, right: 14, bottom: 14, backgroundColor: 'rgba(3, 49, 29, 0.75)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
+  detailHeroCaptionText: { color: '#ffffff', fontSize: 11, fontWeight: '800' },
+  detailGalleryHint: { position: 'absolute', right: 14, bottom: 54, backgroundColor: 'rgba(3, 49, 29, 0.72)', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 6 },
+  detailGalleryHintText: { color: '#ffffff', fontSize: 9, fontWeight: '800' },
+  detailMainCard: { backgroundColor: '#ffffff', borderRadius: 20, marginTop: 12, paddingHorizontal: 14, paddingBottom: 6, borderWidth: 1, borderColor: '#d7e9da', shadowColor: '#145d39', shadowOpacity: 0.08, shadowRadius: 7, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   claimHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#c9f2d4', borderRadius: 22, paddingVertical: 14, paddingHorizontal: 10, marginBottom: 14 },
   claimBack: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
   claimBackText: { color: '#074a32', fontSize: 38, lineHeight: 38 },
   claimHeaderTitle: { color: '#073f2e', fontSize: 23, fontWeight: '900' },
   claimHeaderSubtitle: { color: '#2d7453', fontSize: 12, marginTop: 2 },
-  detailImage: { width: '100%', height: 230, borderRadius: 14, backgroundColor: '#c8e9d1' },
-  detailImagePlaceholder: { width: '100%', height: 230, borderRadius: 14, backgroundColor: '#c8e9d1', alignItems: 'center', justifyContent: 'center' },
+  detailImage: { width: '100%', height: 260, backgroundColor: '#c8e9d1' },
+  detailImagePlaceholder: { width: '100%', height: 260, backgroundColor: '#c8e9d1', alignItems: 'center', justifyContent: 'center' },
+  detailPlaceholderIcon: { color: '#087044', fontSize: 48, fontWeight: '900' },
   detailTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#a9d7b8' },
   detailTitle: { color: '#073f2e', fontSize: 23, fontWeight: '900', flex: 1 },
   detailStatus: { color: '#d8443b', backgroundColor: '#ffd8d3', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 7, fontSize: 9, fontWeight: '900' },
+  detailStatusFound: { color: '#b24d3b', backgroundColor: '#ffe1da' },
   detailStatusLost: { color: '#087044', backgroundColor: '#c8f0df' },
   detailGrid: { flexDirection: 'row', flexWrap: 'wrap', borderBottomWidth: 1, borderBottomColor: '#a9d7b8', paddingVertical: 12 },
   detailValue: { width: '50%', minHeight: 76, paddingVertical: 7, paddingHorizontal: 7 },
@@ -1038,8 +1159,17 @@ const styles = StyleSheet.create({
   detailDescription: { paddingVertical: 14 },
   detailDescriptionLabel: { color: '#648879', fontSize: 12 },
   detailDescriptionText: { color: '#073f2e', fontSize: 13, lineHeight: 19, marginTop: 5 },
-  detailInfoNotice: { backgroundColor: '#c8f0df', borderRadius: 14, padding: 14, marginTop: 'auto' },
+  detailClaimButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#087044', borderRadius: 16, paddingVertical: 16, marginTop: 14, shadowColor: '#075b38', shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
+  detailInfoNotice: { backgroundColor: '#d8f0df', borderRadius: 16, padding: 15, marginTop: 14, borderWidth: 1, borderColor: '#b9ddc3' },
+  detailInfoNoticeTitle: { color: '#176b4b', fontSize: 13, fontWeight: '900', textAlign: 'center', marginBottom: 4 },
   detailInfoNoticeText: { color: '#176b4b', fontSize: 12, lineHeight: 18, textAlign: 'center', fontWeight: '700' },
+  reportGalleryPreview: { width: '100%', position: 'relative' },
+  reportGalleryLabel: { position: 'absolute', left: 10, right: 10, bottom: 10, flexDirection: 'row', justifyContent: 'space-between', backgroundColor: 'rgba(3, 49, 29, 0.78)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6 },
+  reportGalleryLabelText: { color: '#ffffff', fontSize: 9, fontWeight: '900' },
+  reportGalleryCount: { color: '#d9f4df', fontSize: 9, fontWeight: '800' },
+  reportThumbRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10 },
+  reportThumbWrap: { width: 64, height: 52, borderRadius: 8, overflow: 'hidden', marginRight: 8, marginBottom: 6, position: 'relative', borderWidth: 1, borderColor: '#b7d5be' },
+  reportThumb: { width: '100%', height: '100%' },
   claimButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#159653', borderRadius: 18, paddingVertical: 15, marginTop: 'auto', minHeight: 54 },
   claimButtonDisabled: { opacity: 0.65 },
   claimButtonIcon: { color: '#ffffff', fontSize: 22, fontWeight: '900', marginRight: 14 },
