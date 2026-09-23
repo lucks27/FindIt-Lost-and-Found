@@ -240,50 +240,94 @@ export default function DashboardScreen() {
     if (selectedItem) {
       return <ItemDetail item={selectedItem} onBack={() => setSelectedItem(null)} onClaim={() => setClaimMode(true)} />;
     }
+
     return (
-      <>
-        <View style={styles.hero}>
-          <ImageBackground source={backgroundImage} style={styles.heroImage} imageStyle={styles.heroImageStyle}>
-            <View style={styles.heroShade} />
-            <View style={styles.heroCopy}>
-              <Text style={styles.heroKicker}>FIND WHAT MATTERS</Text>
-              <Text style={styles.heroTitle}>Lost or found something?</Text>
-              <Text style={styles.heroSubtitle}>Search campus posts and help return items to their owners.</Text>
+      <View style={styles.mockupHome}>
+        <View style={styles.impactCard}>
+          <View style={styles.impactBadge}>
+            <Text style={styles.impactBadgeText}>★</Text>
+          </View>
+          <Text style={styles.impactTitle}>Small actions.{"\n"}Big impact.</Text>
+          <Text style={styles.impactSubtitle}>Report, return, earn!</Text>
+        </View>
+
+        <View style={styles.profileRowCard}>
+          <View style={styles.userAvatarBadge}>
+            <Text style={styles.userAvatarText}>B</Text>
+          </View>
+          <View style={styles.userMeta}>
+            <Text style={styles.userName}>Bryll Benny Rose Basil</Text>
+            <Text style={styles.userDepartment}>BS Information Technology (BS.IT)</Text>
+          </View>
+          <View style={styles.levelPill}>
+            <Text style={styles.levelPillText}>LEVEL 1</Text>
+          </View>
+        </View>
+
+        <View style={styles.pointsCard}>
+          <View style={styles.pointsHeaderRow}>
+            <Text style={styles.pointsLabel}>Your Points</Text>
+            <View style={styles.giftBadge}>
+              <Text style={styles.giftBadgeText}>🎁</Text>
             </View>
-          </ImageBackground>
+          </View>
+
+          <View style={styles.pointsValueRow}>
+            <Text style={styles.pointsValue}>50 pts</Text>
+          </View>
+
+          <View style={styles.pointsProgressTrack}>
+            <View style={styles.pointsProgressFill} />
+          </View>
+
+          <Text style={styles.pointsHint}>50 pts to reach Level 2</Text>
         </View>
 
-        <View style={styles.searchPanel}>
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search by name or venue..."
-            placeholderTextColor="#c9f0c0"
-            style={styles.searchInput}
-          />
-          <View style={styles.categoryRow}>
-            {['All', 'Electronics', 'Accessories', 'Clothing', 'Others'].map((category, index) => (
-              <TouchableOpacity key={category} style={[styles.category, index === 0 && styles.categoryActive]}>
-                <Text style={[styles.categoryText, index === 0 && styles.categoryTextActive]}>{category}</Text>
-              </TouchableOpacity>
-            ))}
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <View style={styles.statIconWrap}>
+              <Text style={styles.statIcon}>▣</Text>
+            </View>
+            <Text style={styles.statValue}>3</Text>
+            <Text style={styles.statLabel}>Reports</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={styles.statIconWrap}>
+              <Text style={styles.statIcon}>🎁</Text>
+            </View>
+            <Text style={styles.statValue}>1</Text>
+            <Text style={styles.statLabel}>Reward</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={styles.statIconWrap}>
+              <Text style={styles.statIcon}>★</Text>
+            </View>
+            <Text style={styles.statValue}>50</Text>
+            <Text style={styles.statLabel}>Total Points</Text>
           </View>
         </View>
 
-        <View style={styles.sectionHeading}>
-          <View>
-            <Text style={styles.sectionTitle}>Recent campus posts</Text>
-            <Text style={styles.sectionSubtitle}>Browse the latest lost and found items</Text>
+        <View style={styles.recentActivitySection}>
+          <View style={styles.recentActivityHeader}>
+            <Text style={styles.recentActivityTitle}>Recent Activity</Text>
+            <Text style={styles.recentActivityViewAll}>View all &gt;</Text>
           </View>
-          <TouchableOpacity onPress={() => setActiveTab('Matches')}>
-            <Text style={styles.viewAll}>View all</Text>
-          </TouchableOpacity>
-        </View>
 
-        {campusItems.length > 0
-          ? campusItems.map((item) => <ItemCard key={item.id || item.title} item={item} onPress={() => setSelectedItem(item)} />)
-          : <Text style={styles.emptyCopy}>No approved campus reports are available yet.</Text>}
-      </>
+          <View style={styles.activityRow}>
+            <View style={styles.activityIconWrap}>
+              <Text style={styles.activityIcon}>▣</Text>
+            </View>
+            <View style={styles.activityTextWrap}>
+              <Text style={styles.activityText}>You reported a found item</Text>
+              <Text style={styles.activityMeta}>ID: WLF-2026-045</Text>
+              <Text style={styles.activityDate}>Sep 16, 2026</Text>
+            </View>
+            <Text style={styles.activityPoints}>+50 pts</Text>
+          </View>
+        </View>
+      </View>
     );
   }
 
@@ -764,6 +808,48 @@ const styles = StyleSheet.create({
   greeting: { color: '#668073', fontSize: 12, marginTop: 2 },
   bellButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#dff6d7', alignItems: 'center', justifyContent: 'center' },
   bellIcon: { color: '#087044', fontSize: 24, fontWeight: '800' },
+  mockupHome: { paddingTop: 4 },
+  impactCard: { backgroundColor: '#0b8d52', borderRadius: 20, padding: 18, minHeight: 142, position: 'relative', overflow: 'hidden', shadowColor: '#0b6d3d', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 5 }, elevation: 4 },
+  impactBadge: { position: 'absolute', right: 18, top: 18, width: 44, height: 44, borderRadius: 22, backgroundColor: '#d8f0a3', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#f0d755' },
+  impactBadgeText: { color: '#0b8d52', fontSize: 22, fontWeight: '900' },
+  impactTitle: { color: '#f7fbf9', fontSize: 26, fontWeight: '900', lineHeight: 32, maxWidth: 220, marginTop: 12 },
+  impactSubtitle: { color: '#eefaf2', fontSize: 16, fontWeight: '500', marginTop: 8 },
+  profileRowCard: { backgroundColor: '#f6f7f4', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12, marginTop: 14, flexDirection: 'row', alignItems: 'center' },
+  userAvatarBadge: { width: 52, height: 52, borderRadius: 14, backgroundColor: '#d7ddd5', alignItems: 'center', justifyContent: 'center' },
+  userAvatarText: { color: '#1b352a', fontSize: 28, fontWeight: '900' },
+  userMeta: { flex: 1, marginLeft: 12 },
+  userName: { color: '#1f2f2a', fontSize: 15, fontWeight: '900' },
+  userDepartment: { color: '#697b72', fontSize: 10, marginTop: 4 },
+  levelPill: { backgroundColor: '#ebedeb', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },
+  levelPillText: { color: '#253830', fontSize: 10, fontWeight: '900' },
+  pointsCard: { backgroundColor: '#1b9a5f', borderRadius: 18, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 14, marginTop: 22, borderWidth: 1, borderColor: '#1a8854', shadowColor: '#0d6a40', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  pointsHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pointsLabel: { color: '#f5fbf8', fontSize: 17, fontWeight: '900' },
+  giftBadge: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f8d765', alignItems: 'center', justifyContent: 'center' },
+  giftBadgeText: { fontSize: 18 },
+  pointsValueRow: { marginTop: 12 },
+  pointsValue: { color: '#f5fbf8', fontSize: 28, fontWeight: '900' },
+  pointsProgressTrack: { height: 12, borderRadius: 999, backgroundColor: '#dfe9e0', overflow: 'hidden', marginTop: 12 },
+  pointsProgressFill: { width: '50%', height: '100%', borderRadius: 999, backgroundColor: '#f5d861' },
+  pointsHint: { color: '#e6f8ef', fontSize: 12, marginTop: 10 },
+  statsGrid: { flexDirection: 'row', marginTop: 22, justifyContent: 'space-between' },
+  statCard: { flex: 1, backgroundColor: '#f6f7f4', borderRadius: 16, paddingVertical: 16, paddingHorizontal: 14, marginHorizontal: 4, alignItems: 'center', borderWidth: 1, borderColor: '#dbebe0' },
+  statIconWrap: { width: 34, height: 34, borderRadius: 12, backgroundColor: '#e3f1e6', alignItems: 'center', justifyContent: 'center' },
+  statIcon: { fontSize: 18 },
+  statValue: { color: '#1c322d', fontSize: 24, fontWeight: '900', marginTop: 10 },
+  statLabel: { color: '#697b72', fontSize: 11, marginTop: 6, textAlign: 'center' },
+  recentActivitySection: { marginTop: 18, paddingTop: 6 },
+  recentActivityHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  recentActivityTitle: { color: '#1b352d', fontSize: 18, fontWeight: '900' },
+  recentActivityViewAll: { color: '#0b8d52', fontSize: 12, fontWeight: '700' },
+  activityRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f7f8f6', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 14, borderWidth: 1, borderColor: '#dfe8df' },
+  activityIconWrap: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#dfeee3', alignItems: 'center', justifyContent: 'center' },
+  activityIcon: { color: '#0c8d52', fontSize: 18, fontWeight: '900' },
+  activityTextWrap: { flex: 1, marginLeft: 10 },
+  activityText: { color: '#1b312d', fontSize: 13, fontWeight: '700' },
+  activityMeta: { color: '#6d8076', fontSize: 10, marginTop: 4 },
+  activityDate: { color: '#7a8f86', fontSize: 10, marginTop: 3 },
+  activityPoints: { color: '#0c8d52', fontSize: 15, fontWeight: '900', marginLeft: 8 },
   hero: { height: 168, overflow: 'hidden', borderRadius: 8 },
   heroImage: { flex: 1, justifyContent: 'flex-end' },
   heroImageStyle: { opacity: 0.9 },
