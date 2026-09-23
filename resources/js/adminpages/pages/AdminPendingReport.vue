@@ -757,36 +757,6 @@ img,
                             </p>
                         </section>
 
-                        <!-- ADDITIONAL DETAILS -->
-                        <section v-if="
-                            selectedReport
-                                .additional_details
-                        " class="
-                                detail-panel
-                                detail-panel-wide
-                            ">
-                            <div class="detail-panel-heading">
-                                <span class="detail-icon">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="9" />
-
-                                        <path d="M12 11v5M12 8h.01" />
-                                    </svg>
-                                </span>
-
-                                <h3>
-                                    Additional Details
-                                </h3>
-                            </div>
-
-                            <p class="detail-text">
-                                {{
-                                    selectedReport
-                                        .additional_details
-                                }}
-                            </p>
-                        </section>
-
                         <!-- PRIVATE DETAILS -->
                         <section v-if="
                             selectedReport
@@ -826,96 +796,6 @@ img,
                                         .private_identifying_details
                                 }}
                             </p>
-                        </section>
-
-                        <!-- REPORT TIMELINE -->
-                        <section class="
-                                detail-panel
-                                detail-panel-wide
-                            ">
-                            <div class="detail-panel-heading">
-                                <span class="detail-icon">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="9" />
-
-                                        <path d="M12 7v5l3 2" />
-                                    </svg>
-                                </span>
-
-                                <h3>
-                                    Report Timeline
-                                </h3>
-                            </div>
-
-                            <dl class="timeline-summary">
-                                <div>
-                                    <dt>
-                                        Status
-                                    </dt>
-
-                                    <dd>
-                                        <span class="status-badge" :class="normalizeStatus(
-                                            selectedReport
-                                                .status
-                                        )
-                                            ">
-                                            {{
-                                                formatStatus(
-                                                    selectedReport
-                                                        .status
-                                                )
-                                            }}
-                                        </span>
-                                    </dd>
-                                </div>
-
-                                <div>
-                                    <dt>
-                                        Submitted
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            formatDateTime(
-                                                selectedReport
-                                                    .created_at
-                                            )
-                                        }}
-                                    </dd>
-                                </div>
-
-                                <div>
-                                    <dt>
-                                        Date
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            formatDate(
-                                                selectedReport
-                                                    .date_occurred
-                                            )
-                                        }}
-                                    </dd>
-                                </div>
-
-                                <div v-if="
-                                    selectedReport.updated_at
-                                ">
-                                    <dt>
-                                        Updated
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            formatDateTime(
-                                                selectedReport
-                                                    .updated_at
-                                            )
-                                        }}
-                                    </dd>
-                                </div>
-                            </dl>
                         </section>
 
                         <!-- =================================================
@@ -1229,17 +1109,6 @@ const requestDetailOptions = [
 
         description:
             'Request clarification of the item category or color.'
-    },
-
-    {
-        value:
-            'student_information',
-
-        label:
-            'Student Information',
-
-        description:
-            'Request missing student or contact information.'
     },
 
     {
@@ -2803,7 +2672,7 @@ onMounted(() => {
 }
 
 .card-meta dt {
-    color: #7f8875;
+    color: #ffffff;
 
     font-size: 0.61rem;
 }
@@ -2813,7 +2682,7 @@ onMounted(() => {
 
     overflow: hidden;
 
-    color: #c9cebb;
+    color: #ffffff;
 
     font-size: 0.64rem;
 
@@ -3338,7 +3207,7 @@ onMounted(() => {
 
     margin-bottom: 3px;
 
-    color: #a8b59f;
+    color: #ffffff;
 
     font-size: 0.61rem;
 }
@@ -3483,7 +3352,7 @@ onMounted(() => {
 
 .info-list dt,
 .timeline-summary dt {
-    color: #a8b59f;
+    color: #ffffff;
 
     font-size: 0.61rem;
 }
@@ -3492,7 +3361,7 @@ onMounted(() => {
 .timeline-summary dd {
     margin: 0;
 
-    color: #e1e7d8;
+    color: #ffffff;
 
     font-size: 0.64rem;
 
@@ -3504,7 +3373,7 @@ onMounted(() => {
 .detail-text {
     margin: 0;
 
-    color: #e1e7d8;
+    color: #ffffff;
 
     font-size: 0.66rem;
 
@@ -3521,6 +3390,15 @@ onMounted(() => {
 
     background:
         rgba(220, 38, 38, 0.15);
+}
+
+.private-section h3 {
+    color: #d27d77;
+}
+
+.private-section small,
+.private-section .detail-text {
+    color: #ffffff;
 }
 
 .private-icon {
@@ -3572,7 +3450,7 @@ onMounted(() => {
 .request-details-header p {
     margin: 0;
 
-    color: #b9c3b0;
+    color: #ffffff;
 
     font-size: 0.62rem;
 
@@ -3598,7 +3476,7 @@ onMounted(() => {
 
     background: transparent;
 
-    color: #d1d8c8;
+    color: #ffffff;
 
     font: inherit;
 

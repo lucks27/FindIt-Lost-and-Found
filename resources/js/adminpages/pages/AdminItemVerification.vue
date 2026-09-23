@@ -524,10 +524,11 @@ image,
                                     </span>
 
                                     <strong>
-                                        #{{
-                                            selectedVerification
-                                                .claimant_student_id ||
-                                            '—'
+                                        {{
+                                            getClaimantField(
+                                                selectedVerification,
+                                                'student_id_number'
+                                            )
                                         }}
                                     </strong>
                                 </div>
@@ -590,20 +591,6 @@ image,
                                                 getClaimantName(
                                                     selectedVerification
                                                 )
-                                            }}
-                                        </dd>
-                                    </div>
-
-                                    <div>
-                                        <dt>
-                                            Claimant ID
-                                        </dt>
-
-                                        <dd>
-                                            {{
-                                                selectedVerification
-                                                    .claimant_student_id ||
-                                                '—'
                                             }}
                                         </dd>
                                     </div>
@@ -800,6 +787,20 @@ image,
                                             }}
                                         </dd>
                                     </div>
+
+                                    <div>
+                                        <dt>
+                                            Description
+                                        </dt>
+
+                                        <dd>
+                                            {{
+                                                selectedVerification
+                                                    .report?.description ||
+                                                'No report description provided.'
+                                            }}
+                                        </dd>
+                                    </div>
                                 </dl>
                             </section>
                         </div>
@@ -847,191 +848,24 @@ image,
                                     </p>
                                 </div>
 
-                                <div class="evidence-block">
+                                <div class="evidence-block private-evidence">
                                     <span>
-                                        Additional Proof
+                                        Private Identifying Details
                                     </span>
 
                                     <p>
                                         {{
                                             selectedVerification
+                                                .report?.private_identifying_details ||
+                                            selectedVerification
                                                 .additional_proof ||
-                                            'No additional proof provided.'
+                                            'No private identifying details provided.'
                                         }}
                                     </p>
-                                </div>
-                            </div>
-                        </section>
 
-                        <section class="description-panel">
-                            <span>
-                                Found Item Description
-                            </span>
-
-                            <p>
-                                {{
-                                    selectedVerification
-                                        .report?.description ||
-                                    'No report description provided.'
-                                }}
-                            </p>
-                        </section>
-
-                        <section class="workflow-panel">
-                            <div class="detail-panel-header">
-                                <span class="detail-icon">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="9" />
-
-                                        <path d="M12 7v5l3 2" />
-                                    </svg>
-                                </span>
-
-                                <h3>
-                                    Claim Review Activity
-                                </h3>
-                            </div>
-
-                            <div class="workflow-grid">
-                                <div class="workflow-item">
-                                    <span>
-                                        Verification ID
-                                    </span>
-
-                                    <strong>
-                                        #{{ selectedVerification.id }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Status
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatStatus(
-                                                selectedVerification.status
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Review Notes
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            getReviewNotes(
-                                                selectedVerification
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Details Requested
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatDateTime(
-                                                selectedVerification
-                                                    .details_requested_at
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Requested By
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            getDetailsRequestAdmin(
-                                                selectedVerification
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Reviewed By
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            getReviewedByAdmin(
-                                                selectedVerification
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Reviewed At
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatDateTime(
-                                                selectedVerification
-                                                    .reviewed_at
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Created
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatDateTime(
-                                                selectedVerification
-                                                    .created_at
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Last Updated
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatDateTime(
-                                                selectedVerification
-                                                    .updated_at
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Archived At
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatDateTime(
-                                                selectedVerification
-                                                    .deleted_at
-                                            )
-                                        }}
-                                    </strong>
+                                    <small>
+                                        Visible only to admins and the item owner.
+                                    </small>
                                 </div>
                             </div>
                         </section>
@@ -1709,6 +1543,7 @@ function getClaimant(
         item?.claimant_student ||
         item?.claimant ||
         item?.student ||
+        item?.report?.student ||
         null
     )
 }
@@ -1720,16 +1555,22 @@ function getClaimantName(
         getClaimant(
             item
         )
+    const reportStudent =
+        item?.report?.student
 
     return (
         claimant?.name ||
         claimant?.full_name ||
         item?.claimant_name ||
         item?.claimant_student_name ||
+        reportStudent?.name ||
+        reportStudent?.full_name ||
         (
             item?.claimant_student_id
                 ? `Student #${item.claimant_student_id}`
-                : 'Unknown claimant'
+                : item?.report?.student_id
+                    ? `Student #${item.report.student_id}`
+                    : 'Unknown claimant'
         )
     )
 }
@@ -1742,9 +1583,12 @@ function getClaimantField(
         getClaimant(
             item
         )
+    const reportStudent =
+        item?.report?.student
 
     const value =
-        claimant?.[field]
+        claimant?.[field] ??
+        reportStudent?.[field]
 
     return (
         value !== undefined &&
@@ -5186,18 +5030,13 @@ onMounted(
 
 .pickup-message-card {
     border:
-        1px solid rgba(215,
-            184,
-            92,
-            0.58);
+        1px solid #d4af37;
 
     background:
-        linear-gradient(135deg,
-            #f6efd3,
-            #ece2bb);
+        #1f6b3a;
 
     color:
-        #173d28;
+        #ffffff;
 }
 
 .pickup-message-icon,
@@ -5226,15 +5065,12 @@ onMounted(
             0.12);
 
     color:
-        #1d5837;
+        #00dd4d;
 }
 
 .transaction-complete-icon {
     background:
-        rgba(34,
-            197,
-            94,
-            0.16);
+        rgba(39, 220, 106, 0.16);
 
     color:
         #b7f3c9;
@@ -5272,7 +5108,8 @@ onMounted(
         3px;
 
     color:
-        #80661e;
+        #facc15;
+    /* Yellow */
 
     font-size:
         0.57rem;
@@ -5301,7 +5138,7 @@ onMounted(
 
 .pickup-message-card h3 {
     color:
-        #173d28;
+        #ffffff;
 }
 
 .pickup-message-card p {
@@ -5309,7 +5146,7 @@ onMounted(
         4px 0 0;
 
     color:
-        #5c6654;
+        #ffffff;
 
     font-size:
         0.61rem;
@@ -5927,6 +5764,19 @@ onMounted(
 
     font-weight:
         800;
+}
+
+.private-evidence span,
+.private-evidence p,
+.private-evidence small {
+    color: #fca5a5;
+}
+
+.private-evidence small {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.54rem;
+    font-weight: 700;
 }
 
 .evidence-block p,

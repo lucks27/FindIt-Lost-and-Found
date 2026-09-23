@@ -221,20 +221,6 @@
 
                             <div>
                                 <dt>
-                                    Deadline
-                                </dt>
-
-                                <dd>
-                                    {{
-                                        formatDate(
-                                            item.deadline_at
-                                        )
-                                    }}
-                                </dd>
-                            </div>
-
-                            <div>
-                                <dt>
                                     Time Found
                                 </dt>
 
@@ -524,20 +510,6 @@ img,
                                     </strong>
                                 </div>
 
-                                <div class="summary-field">
-                                    <span>
-                                        Deadline
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatDateTime(
-                                                selectedSurrender
-                                                    .deadline_at
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
                             </div>
                         </section>
 
@@ -782,38 +754,6 @@ img,
                             </section>
                         </div>
 
-                        <!-- Additional details -->
-                        <section v-if="
-                            selectedSurrender
-                                .report
-                                ?.additional_details
-                        " class="
-                                detail-panel
-                                detail-panel-wide
-                            ">
-                            <div class="detail-panel-heading">
-                                <span class="detail-icon">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="9" />
-
-                                        <path d="M12 11v5M12 8h.01" />
-                                    </svg>
-                                </span>
-
-                                <h3>
-                                    Additional Details
-                                </h3>
-                            </div>
-
-                            <p class="detail-text">
-                                {{
-                                    selectedSurrender
-                                        .report
-                                        .additional_details
-                                }}
-                            </p>
-                        </section>
-
                         <!-- Private details -->
                         <section v-if="
                             selectedSurrender
@@ -854,96 +794,6 @@ img,
                                         .private_identifying_details
                                 }}
                             </p>
-                        </section>
-
-                        <!-- Timeline -->
-                        <section class="
-                                detail-panel
-                                detail-panel-wide
-                            ">
-                            <div class="detail-panel-heading">
-                                <span class="detail-icon">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="9" />
-
-                                        <path d="M12 7v5l3 2" />
-                                    </svg>
-                                </span>
-
-                                <h3>
-                                    Surrender Timeline
-                                </h3>
-                            </div>
-
-                            <dl class="timeline-summary">
-                                <div>
-                                    <dt>
-                                        Status
-                                    </dt>
-
-                                    <dd>
-                                        <span class="status-badge" :class="statusOf(
-                                            selectedSurrender
-                                        )
-                                            ">
-                                            {{
-                                                selectedSurrender
-                                                    .status ||
-                                                'pending'
-                                            }}
-                                        </span>
-                                    </dd>
-                                </div>
-
-                                <div>
-                                    <dt>
-                                        Deadline
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            formatDateTime(
-                                                selectedSurrender
-                                                    .deadline_at
-                                            )
-                                        }}
-                                    </dd>
-                                </div>
-
-                                <div v-if="
-                                    selectedSurrender
-                                        .received_at
-                                ">
-                                    <dt>
-                                        Received
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            formatDateTime(
-                                                selectedSurrender
-                                                    .received_at
-                                            )
-                                        }}
-                                    </dd>
-                                </div>
-
-                                <div v-if="
-                                    selectedSurrender
-                                        .notes
-                                ">
-                                    <dt>
-                                        Notes
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            selectedSurrender
-                                                .notes
-                                        }}
-                                    </dd>
-                                </div>
-                            </dl>
                         </section>
 
                         <!-- REQUEST DETAILS FORM -->
@@ -1240,17 +1090,6 @@ const requestDetailOptions = [
 
         description:
             'Request unique marks, contents, serial number, or identifiers.'
-    },
-
-    {
-        value:
-            'student_information',
-
-        label:
-            'Student Information',
-
-        description:
-            'Request missing student or contact information.'
     },
 
     {
@@ -3086,7 +2925,7 @@ onMounted(() => {
 
 .card-meta dt {
     color:
-        #7f8875;
+        #ffffff;
 
     font-size:
         0.61rem;
@@ -3100,7 +2939,7 @@ onMounted(() => {
         hidden;
 
     color:
-        #c9cebb;
+        #ffffff;
 
     font-size:
         0.64rem;
@@ -3626,7 +3465,7 @@ onMounted(() => {
             0.035);
 
     color:
-        #c7cdb8;
+        #ffffff;
 
     cursor:
         pointer;
@@ -3844,7 +3683,7 @@ onMounted(() => {
         3px;
 
     color:
-        #818a76;
+        #ffffff;
 
     font-size:
         0.61rem;
@@ -4050,7 +3889,7 @@ onMounted(() => {
 .info-list dt,
 .timeline-summary dt {
     color:
-        #7f8875;
+        #ffffff;
 
     font-size:
         0.61rem;
@@ -4062,7 +3901,7 @@ onMounted(() => {
         0;
 
     color:
-        #cbd1bd;
+        #ffffff;
 
     font-size:
         0.64rem;
@@ -4079,7 +3918,7 @@ onMounted(() => {
         0;
 
     color:
-        #c6ccb8;
+        #ffffff;
 
     font-size:
         0.66rem;
@@ -4103,6 +3942,16 @@ onMounted(() => {
             38,
             38,
             0.15);
+}
+
+.private-section h3 {
+    color: #d27d77;
+}
+
+.private-section small,
+.private-section .detail-text {
+    color:
+        #ffffff;
 }
 
 .private-icon {
@@ -4179,7 +4028,7 @@ onMounted(() => {
         0;
 
     color:
-        #9fa894;
+        #ffffff;
 
     font-size:
         0.62rem;
@@ -4572,20 +4421,11 @@ onMounted(() => {
 }
 
 .request-send-btn {
-    border-color:
-        rgba(196,
-            157,
-            59,
-            0.45);
+    border-color: #f59e0b;
 
-    background:
-        rgba(196,
-            157,
-            59,
-            0.16);
+    background: #fbbf24;
 
-    color:
-        #e5c66a;
+    color: #f0f0f0;
 }
 
 .request-send-btn:hover:not( :disabled) {
