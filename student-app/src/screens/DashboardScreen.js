@@ -57,6 +57,7 @@ export default function DashboardScreen() {
   const [notice, setNotice] = useState(null);
   const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
   const [campusItems, setCampusItems] = useState(sampleItems);
+  const [postFilter, setPostFilter] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
   const [claimMode, setClaimMode] = useState(false);
   const [claimDraft, setClaimDraft] = useState({ proofDescription: '', proofPhoto: null });
@@ -356,9 +357,33 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.recentPostsSection}>
-          <Text style={styles.recentPostsTitle}>Recent Posts</Text>
+          <View style={styles.recentPostsHeader}>
+            <View>
+              <Text style={styles.recentPostsTitle}>Recent Posts</Text>
+              <Text style={styles.recentPostsSubtitle}>Find an item that needs your help</Text>
+            </View>
+            <Text style={styles.recentPostsCount}>{campusItems.length} posts</Text>
+          </View>
 
-          {campusItems.length > 0 ? campusItems.map((item) => {
+          <View style={styles.postFilterBar}>
+            {[
+              { key: 'all', label: 'All posts', icon: '✦' },
+              { key: 'lost', label: 'Lost', icon: '⌁' },
+              { key: 'found', label: 'Found', icon: '♡' },
+            ].map((filter) => (
+              <TouchableOpacity
+                key={filter.key}
+                style={[styles.postFilter, postFilter === filter.key && styles.postFilterActive]}
+                onPress={() => setPostFilter(filter.key)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.postFilterIcon, postFilter === filter.key && styles.postFilterTextActive]}>{filter.icon}</Text>
+                <Text style={[styles.postFilterText, postFilter === filter.key && styles.postFilterTextActive]}>{filter.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {campusItems.filter((item) => postFilter === 'all' || String(item.type || '').toLowerCase() === postFilter).length > 0 ? campusItems.filter((item) => postFilter === 'all' || String(item.type || '').toLowerCase() === postFilter).map((item) => {
             const imageUri = getReportImageUri(item);
             const status = getReportStatus(item);
             const isFound = String(item.type || '').toLowerCase() === 'found';
@@ -376,17 +401,27 @@ export default function DashboardScreen() {
                 )}
 
                 <View style={styles.recentPostBody}>
-                  <Text style={styles.recentPostName}>{item.title}</Text>
-                  <Text style={styles.recentPostMeta}>◌ {item.category || 'Electronics'}</Text>
-                  <Text style={styles.recentPostMeta}>⌖ {item.place || item.location || 'Campus'}</Text>
-                  <Text style={styles.recentPostDate}>{item.date_occurred || 'September 35, 2027'}</Text>
+                  <View style={styles.recentPostTypeRow}>
+                    <Text style={[styles.recentPostType, isFound && styles.recentPostTypeFound]}>{isFound ? 'FOUND ITEM' : 'LOST ITEM'}</Text>
+                    <Text style={styles.recentPostArrow}>›</Text>
+                  </View>
+                  <Text style={styles.recentPostName} numberOfLines={2}>{item.title}</Text>
+                  <View style={styles.recentPostMetaRow}>
+                    <Text style={styles.recentPostMetaChip}>◌ {item.category || 'Electronics'}</Text>
+                    <Text style={styles.recentPostMetaChip}>⌖ {item.place || item.location || 'Campus'}</Text>
+                  </View>
+                  <Text style={styles.recentPostDate}>{item.date_occurred || 'Recently posted'}</Text>
                 </View>
 
                 <Text style={[styles.recentPostBadge, isFound || isVerified ? styles.recentPostBadgeVerified : styles.recentPostBadgeLost]}>{statusText}</Text>
               </TouchableOpacity>
             );
           }) : (
-            <Text style={styles.emptyCopy}>No recent posts available yet.</Text>
+            <View style={styles.noPostsCard}>
+              <Text style={styles.noPostsIcon}>⌁</Text>
+              <Text style={styles.noPostsTitle}>No {postFilter === 'all' ? '' : postFilter} posts yet</Text>
+              <Text style={styles.noPostsText}>Try another filter or check back after the admin publishes a report.</Text>
+            </View>
           )}
         </View>
       </View>
@@ -954,19 +989,37 @@ const styles = StyleSheet.create({
   statIcon: { fontSize: 18 },
   statValue: { color: '#1c322d', fontSize: 24, fontWeight: '900', marginTop: 10 },
   statLabel: { color: '#697b72', fontSize: 11, marginTop: 6, textAlign: 'center' },
-  recentPostsSection: { marginTop: 26 },
-  recentPostsTitle: { color: '#1b352d', fontSize: 22, fontWeight: '900', marginBottom: 12 },
-  recentPostCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f9f4', borderRadius: 18, padding: 12, borderWidth: 1, borderColor: '#d7e7d9', shadowColor: '#0d6a40', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2, marginBottom: 14 },
-  recentPostImage: { width: 120, height: 104, borderRadius: 12, backgroundColor: '#d9efe1' },
-  recentPostImagePlaceholder: { width: 120, height: 104, borderRadius: 12, backgroundColor: '#d9efe1', alignItems: 'center', justifyContent: 'center' },
-  recentPostImageText: { color: '#0b8d52', fontSize: 28, fontWeight: '900' },
-  recentPostBody: { flex: 1, marginLeft: 12, paddingRight: 6 },
-  recentPostName: { color: '#1d2d27', fontSize: 17, fontWeight: '900' },
-  recentPostMeta: { color: '#62776b', fontSize: 12, marginTop: 7 },
-  recentPostDate: { color: '#4f5f56', fontSize: 12, marginTop: 7 },
-  recentPostBadge: { position: 'absolute', right: 12, top: 12, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, fontSize: 10, fontWeight: '900', overflow: 'hidden' },
+  recentPostsSection: { marginTop: 28 },
+  recentPostsHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 13 },
+  recentPostsTitle: { color: '#1b352d', fontSize: 22, fontWeight: '900' },
+  recentPostsSubtitle: { color: '#71857a', fontSize: 11, marginTop: 4 },
+  recentPostsCount: { color: '#087044', fontSize: 10, fontWeight: '900', backgroundColor: '#d6f1dc', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6 },
+  postFilterBar: { flexDirection: 'row', backgroundColor: '#e1f1e1', borderRadius: 16, padding: 4, marginBottom: 14 },
+  postFilter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, paddingVertical: 9, paddingHorizontal: 4 },
+  postFilterActive: { backgroundColor: '#087044', shadowColor: '#075b38', shadowOpacity: 0.16, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  postFilterIcon: { color: '#537063', fontSize: 13, fontWeight: '900', marginRight: 4 },
+  postFilterText: { color: '#537063', fontSize: 11, fontWeight: '800' },
+  postFilterTextActive: { color: '#ffffff' },
+  recentPostCard: { backgroundColor: '#f8fcf8', borderRadius: 20, padding: 10, borderWidth: 1, borderColor: '#d4e7d7', shadowColor: '#0d6a40', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3, marginBottom: 15, overflow: 'hidden' },
+  recentPostImage: { width: '100%', height: 158, borderRadius: 14, backgroundColor: '#d9efe1' },
+  recentPostImagePlaceholder: { width: '100%', height: 158, borderRadius: 14, backgroundColor: '#cdebd5', alignItems: 'center', justifyContent: 'center' },
+  recentPostImageText: { color: '#0b8d52', fontSize: 38, fontWeight: '900' },
+  recentPostBody: { paddingHorizontal: 4, paddingTop: 12, paddingBottom: 4 },
+  recentPostTypeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  recentPostType: { color: '#27754d', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  recentPostTypeFound: { color: '#c55a43' },
+  recentPostArrow: { color: '#087044', fontSize: 24, lineHeight: 20, fontWeight: '500' },
+  recentPostName: { color: '#1d2d27', fontSize: 18, lineHeight: 23, fontWeight: '900', marginTop: 5, paddingRight: 56 },
+  recentPostMetaRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10 },
+  recentPostMetaChip: { color: '#60776a', fontSize: 10, backgroundColor: '#e8f3e9', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5, marginRight: 6, marginBottom: 4 },
+  recentPostDate: { color: '#82968a', fontSize: 10, marginTop: 5 },
+  recentPostBadge: { position: 'absolute', right: 20, top: 20, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, fontSize: 10, fontWeight: '900', overflow: 'hidden' },
   recentPostBadgeLost: { backgroundColor: '#e7ece8', color: '#1d332c' },
   recentPostBadgeVerified: { backgroundColor: '#ffd9d6', color: '#d7433a' },
+  noPostsCard: { alignItems: 'center', backgroundColor: '#f8fcf8', borderRadius: 18, borderWidth: 1, borderColor: '#d4e7d7', paddingHorizontal: 24, paddingVertical: 30 },
+  noPostsIcon: { color: '#0b8d52', fontSize: 30, fontWeight: '900' },
+  noPostsTitle: { color: '#1b352d', fontSize: 15, fontWeight: '900', marginTop: 8 },
+  noPostsText: { color: '#71857a', fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 5 },
   hero: { height: 168, overflow: 'hidden', borderRadius: 8 },
   heroImage: { flex: 1, justifyContent: 'flex-end' },
   heroImageStyle: { opacity: 0.9 },
