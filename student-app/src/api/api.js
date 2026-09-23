@@ -2,13 +2,17 @@
 import { fromByteArray } from 'base64-js';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const expoHost = Constants.expoConfig?.hostUri?.split(':')[0]
-  || Constants.manifest?.debuggerHost?.split(':')[0];
-const defaultApiHost = expoHost || '192.168.1.95';
+export let API_BASE_URL;
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL
-  || `http://${defaultApiHost}:8000`;
+if (Platform.OS !== 'web') {
+  API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+} else {
+  API_BASE_URL = 'http://127.0.0.1:8000';
+}
+
 const TOKEN_KEY = 'student-app-auth-token';
 
 const apiClient = axios.create({
@@ -27,21 +31,46 @@ const setAuthorizationHeader = (token) => {
 };
 
 export async function setSavedToken(token) {
-  setAuthorizationHeader(token);
-  if (token) {
-    await SecureStore.setItemAsync(TOKEN_KEY, token);
-  } else {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+  try {
+    setAuthorizationHeader(token);
+
+    if (Platform.OS === 'web') {
+      if (token) {
+        await AsyncStorage.setItem(TOKEN_KEY, token);
+      } else {
+        await AsyncStorage.removeItem(TOKEN_KEY);
+      }
+
+      return;
+    }
+
+    if (token) {
+      await SecureStore.setItemAsync(TOKEN_KEY, token);
+    } else {
+      await SecureStore.deleteItemAsync(TOKEN_KEY);
+    }
+  } catch (error) {
+    console.error('Failed to save authentication token:', error);
   }
 }
 
-export function getSavedToken() {
-  return SecureStore.getItemAsync(TOKEN_KEY);
+export async function getSavedToken() {
+  try {
+    if (Platform.OS === 'web') {
+      return await AsyncStorage.getItem(TOKEN_KEY);
+    }
+
+    return await SecureStore.getItemAsync(TOKEN_KEY);
+  } catch (error) {
+    console.error('Failed to get saved authentication token:', error);
+    return null;
+  }
 }
 
 export async function initializeApiClient() {
   try {
     const savedToken = await getSavedToken();
+
     if (savedToken) {
       setAuthorizationHeader(savedToken);
       return true;
@@ -49,6 +78,7 @@ export async function initializeApiClient() {
   } catch (error) {
     console.error('Error initializing API client:', error);
   }
+
   return false;
 }
 
