@@ -206,7 +206,7 @@ function isPending(value) { return !['confirmed', 'rejected'].includes(String(va
 function statusClass(value) { return String(value || 'pending').toLowerCase() }
 function formatStatus(value) { return String(value || 'pending').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()) }
 function getCategory(report) { return report?.category?.name || report?.category || report?.item_category || 'Uncategorized' }
-function getDescription(report) { return report?.description || report?.additional_details || 'No description provided.' }
+function getDescription(report) { return report?.description || report?.ownership_proof || 'No description provided.' }
 function sourceLabel(match) { return match?.source || 'System generated suggestion' }
 function getReportImage(report) { const image = report?.images?.find((item) => item.is_primary) || report?.images?.[0]; const path = image?.file_path || image?.path || report?.image; if (!path) return null; return path.startsWith('http') || path.startsWith('/') ? path : `/storage/${path}` }
 function getReportImageElement(report, type) { const imagePath = getReportImage(report); return imagePath ? h('img', { src: imagePath, alt: report?.title || `${type} report image` }) : h('div', { class: 'image-placeholder' }, 'No image available') }

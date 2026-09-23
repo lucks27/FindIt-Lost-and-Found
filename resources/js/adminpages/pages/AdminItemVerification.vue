@@ -183,6 +183,7 @@
 
                             <p>
                                 {{
+                                    item.report?.ownership_proof ||
                                     item.ownership_proof ||
                                     'No ownership proof provided.'
                                 }}
@@ -842,6 +843,8 @@ image,
                                     <p>
                                         {{
                                             selectedVerification
+                                                .report?.ownership_proof ||
+                                            selectedVerification
                                                 .ownership_proof ||
                                             'No ownership proof provided.'
                                         }}
@@ -858,7 +861,7 @@ image,
                                             selectedVerification
                                                 .report?.private_identifying_details ||
                                             selectedVerification
-                                                .additional_proof ||
+                                                .report?.ownership_proof ||
                                             'No private identifying details provided.'
                                         }}
                                     </p>

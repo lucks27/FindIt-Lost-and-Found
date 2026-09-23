@@ -113,8 +113,8 @@
                                 <dd>{{ selectedItem.item?.location || 'Not provided' }}</dd>
                             </div>
                             <div class="wide">
-                                <dt>Additional details</dt>
-                                <dd>{{ selectedItem.item?.additional_details || 'None provided' }}</dd>
+                                <dt>Ownership Proof</dt>
+                                <dd>{{ selectedItem.item?.ownership_proof || 'None provided' }}</dd>
                             </div>
                             <div class="wide">
                                 <dt>Private details</dt>

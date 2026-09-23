@@ -106,7 +106,7 @@
                     <p><b>Description:</b> {{ getDescription(selectedItem) }}</p>
                     <p><b>Posted:</b> {{ formatDate(selectedItem.published_at || selectedItem.created_at) }}</p>
                     <p><b>Location:</b> {{ selectedItem.location || 'N/A' }}</p>
-                    <p><b>Additional Details:</b> {{ selectedItem.additional_details || 'None' }}</p>
+                    <p><b>Ownership Proof:</b> {{ selectedItem.ownership_proof || 'None' }}</p>
                     <p><b>Status:</b> {{ selectedItem.status }}</p>
                     <p><b>Visibility:</b> {{ selectedItem.is_visible ? 'Public' : 'Private' }}</p>
                 </div>
