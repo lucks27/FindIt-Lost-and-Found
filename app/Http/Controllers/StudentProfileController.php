@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\Student;
 use App\Models\Notification;
+use App\Models\PointRule;
+use App\Models\PointTransaction;
+use App\Models\StudentRecognitionRecord;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class StudentProfileController extends Controller
@@ -69,6 +72,32 @@ class StudentProfileController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $this->getStudent(),
+        ]);
+    }
+
+    public function apiRecognition()
+    {
+        $student = $this->getStudent();
+        $record = StudentRecognitionRecord::firstOrCreate(
+            ['student_id' => $student->id],
+            ['recognition_points' => 0, 'peso_value' => 0, 'reward_count' => 0, 'report_count' => 0]
+        );
+
+        $transactions = PointTransaction::where('student_id', $student->id)
+            ->latest()
+            ->limit(20)
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'record' => $record,
+                'transactions' => $transactions,
+                'point_rules' => PointRule::where(function ($query) {
+                    $query->where('active', true)->orWhere('is_active', true);
+                })->get(),
+                'conversion_rate' => 100,
+            ],
         ]);
     }
 

@@ -50,6 +50,7 @@ class Report extends Model
 
     protected $casts = [
         'date_occurred' => 'date',
+        'metadata' => 'array',
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
         'published_at' => 'datetime',

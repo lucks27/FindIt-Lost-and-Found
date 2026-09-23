@@ -119,6 +119,10 @@ export async function fetchProfile() {
   }
 }
 
+export function fetchRecognition() {
+  return apiClient.get('/api/student/recognition');
+}
+
 export function updateProfile(data) {
   return apiClient.put('/api/student/profile', data);
 }
@@ -208,8 +212,18 @@ export function fetchReport(id) {
   return apiClient.get(`/api/reports/${id}`);
 }
 
+export function submitClaim(reportId, data) {
+  return apiClient.post(`/api/reports/${reportId}/claims`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+}
+
 export function createReport(data) {
-  return apiClient.post('/api/reports', data);
+  return apiClient.post('/api/reports', data, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
 }
 
 export function fetchReportMatches(id) {

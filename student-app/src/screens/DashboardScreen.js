@@ -13,9 +13,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as api from '../api/api';
 import backgroundImage from '../../assets/building bg.png';
 import logoImage from '../../assets/logo.png';
+import impactBannerImage from '../../assets/banner.png.png';
+import itemsReportedIcon from '../../assets/items-reported.png.png';
+import rewardsConvertedIcon from '../../assets/rewards-converted.png.png';
 
 const tabs = [
   { key: 'Home', label: 'Home', icon: '⌂' },
@@ -31,6 +35,15 @@ const sampleItems = [
   { title: 'Keychain', category: 'Personal items', place: 'Student Center', status: 'Lost', icon: 'key-outline', color: '#0b8f55' },
 ];
 
+const reportCategories = ['Electronics', 'Accessories', 'Clothing', 'Others'];
+
+function formatDateValue(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function DashboardScreen() {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('Home');
@@ -38,7 +51,15 @@ export default function DashboardScreen() {
   const [reportMode, setReportMode] = useState(null);
   const [myReports, setMyReports] = useState([]);
   const [reportLoading, setReportLoading] = useState(false);
+  const [recognition, setRecognition] = useState(null);
+  const [recognitionLoading, setRecognitionLoading] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
+  const [campusItems, setCampusItems] = useState(sampleItems);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [claimMode, setClaimMode] = useState(false);
+  const [claimDraft, setClaimDraft] = useState({ proofDescription: '', proofPhoto: null });
+  const [claimLoading, setClaimLoading] = useState(false);
   const [form, setForm] = useState({
     title: '',
     category: 'Electronics',
@@ -51,16 +72,64 @@ export default function DashboardScreen() {
   });
   const firstName = user?.first_name || user?.name?.split(' ')[0] || 'Student';
 
-  function showNotice(title, message, tone = 'success') {
-    setNotice({ title, message, tone });
-    setTimeout(() => setNotice(null), 4200);
+  function showNotice(title, message, tone = 'success', onClose = null) {
+    setNotice({ title, message, tone, onClose });
+    setTimeout(() => {
+      setNotice(null);
+      onClose?.();
+    }, 4200);
   }
 
   useEffect(() => {
-    if (activeTab === 'Reports' && !reportMode) {
+    if (activeTab === 'Home') loadCampusItems();
+    if ((activeTab === 'Reports' || activeTab === 'Hub') && !reportMode) {
       loadMyReports();
     }
+    if (activeTab === 'Profile') loadRecognition();
   }, [activeTab, reportMode]);
+
+  async function loadCampusItems() {
+    try {
+      const response = await api.fetchReports();
+      const reports = response.data?.data?.data || response.data?.data || [];
+      if (Array.isArray(reports)) setCampusItems(reports);
+    } catch (error) {
+      // Keep the local preview items available when the API is offline.
+    }
+  }
+
+  async function chooseClaimPhoto() {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (!result.canceled) setClaimDraft((current) => ({ ...current, proofPhoto: result.assets[0] }));
+  }
+
+  async function submitClaim() {
+    if (!selectedItem?.id) {
+      showNotice('Claim unavailable', 'This preview item is not connected to a verified campus report yet.', 'error');
+      return;
+    }
+    setClaimLoading(true);
+    try {
+      const data = new FormData();
+      data.append('proof_description', claimDraft.proofDescription);
+      if (claimDraft.proofPhoto) {
+        data.append('proof_photo', {
+          uri: claimDraft.proofPhoto.uri,
+          name: claimDraft.proofPhoto.fileName || 'ownership-proof.jpg',
+          type: claimDraft.proofPhoto.mimeType || 'image/jpeg',
+        });
+      }
+      await api.submitClaim(selectedItem.id, data);
+      setSelectedItem(null);
+      setClaimMode(false);
+      setClaimDraft({ proofDescription: '', proofPhoto: null });
+      showNotice('Claim submitted', 'Your ownership claim was sent to the admin for verification.');
+    } catch (error) {
+      showNotice('Claim not submitted', error.response?.data?.message || 'Please try again.', 'error');
+    } finally {
+      setClaimLoading(false);
+    }
+  }
 
   async function loadMyReports() {
     setReportLoading(true);
@@ -74,8 +143,30 @@ export default function DashboardScreen() {
     }
   }
 
+  async function loadRecognition() {
+    setRecognitionLoading(true);
+    try {
+      const response = await api.fetchRecognition();
+      setRecognition(response.data?.data || null);
+    } catch (error) {
+      showNotice('Unable to load recognition', error.response?.data?.message || 'Please try again.', 'error');
+    } finally {
+      setRecognitionLoading(false);
+    }
+  }
+
   function updateForm(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function renderHub() {
+    return (
+      <HubContent
+        reports={myReports}
+        loading={reportLoading}
+        onBack={() => setActiveTab('Home')}
+      />
+    );
   }
 
   async function chooseReportImage() {
@@ -96,8 +187,13 @@ export default function DashboardScreen() {
   }
 
   async function submitReport() {
-    if (!form.title.trim() || !form.description.trim() || !form.location.trim() || !form.image) {
-      showNotice('Complete your report', 'Add an item name, public description, location, and photo.', 'error');
+    if (form.date > formatDateValue(new Date())) {
+      showNotice('Invalid report date', 'The date cannot be tomorrow or a future date. Choose today or an earlier date.', 'error');
+      return;
+    }
+
+    if (!form.title.trim() || !form.description.trim() || !form.privateNote.trim() || !form.location.trim() || !form.image) {
+      showNotice('Complete your report', 'Complete the private verification note, item name, public description, location, and photo before publishing.', 'error');
       return;
     }
 
@@ -119,15 +215,18 @@ export default function DashboardScreen() {
       });
 
       await api.createReport(payload);
-      showNotice('Report submitted', reportMode === 'found'
-        ? 'Thank you. Please surrender the item to USC for verification.'
-        : 'Your lost-item report is now waiting for admin approval.');
       setForm({ title: '', category: 'Electronics', color: '', description: '', privateNote: '', location: '', date: new Date().toISOString().slice(0, 10), image: null });
       setReportMode(null);
-      await loadMyReports();
+      showNotice('Report submitted', reportMode === 'found'
+        ? 'Thank you. Please surrender the item to USC for verification.'
+        : 'Your lost-item report is now waiting for admin approval.', 'success', () => setActiveTab('Hub'));
     } catch (error) {
       const validation = error.response?.data?.errors;
-      const message = validation ? Object.values(validation).flat().join('\n') : error.response?.data?.message || 'Please try again.';
+      const responseMessage = error.response?.data?.message;
+      const serverError = error.response?.data?.error || error.response?.data?.exception;
+      const message = validation
+        ? Object.values(validation).flat().join('\n')
+        : responseMessage || serverError || (error.request ? 'The server could not be reached. Check the connection and try again.' : error.message) || 'Please try again.';
       showNotice('Report not submitted', message, 'error');
     } finally {
       setReportLoading(false);
@@ -135,48 +234,115 @@ export default function DashboardScreen() {
   }
 
   function renderHome() {
+    if (selectedItem && claimMode) {
+      return <ClaimForm item={selectedItem} draft={claimDraft} loading={claimLoading} onBack={() => setClaimMode(false)} updateDraft={(field, value) => setClaimDraft((current) => ({ ...current, [field]: value }))} choosePhoto={chooseClaimPhoto} submitClaim={submitClaim} />;
+    }
+    if (selectedItem) {
+      return <ItemDetail item={selectedItem} onBack={() => setSelectedItem(null)} onClaim={() => setClaimMode(true)} />;
+    }
+
     return (
-      <>
-        <View style={styles.hero}>
-          <ImageBackground source={backgroundImage} style={styles.heroImage} imageStyle={styles.heroImageStyle}>
-            <View style={styles.heroShade} />
-            <View style={styles.heroCopy}>
-              <Text style={styles.heroKicker}>FIND WHAT MATTERS</Text>
-              <Text style={styles.heroTitle}>Lost or found something?</Text>
-              <Text style={styles.heroSubtitle}>Search campus posts and help return items to their owners.</Text>
+      <View style={styles.mockupHome}>
+        <View style={styles.impactCard}>
+          <View style={styles.impactBadge}>
+            <Text style={styles.impactBadgeText}>★</Text>
+          </View>
+          <Text style={styles.impactTitle}>Small actions.{"\n"}Big impact.</Text>
+          <Text style={styles.impactSubtitle}>Report, return, earn!</Text>
+        </View>
+
+        <View style={styles.profileRowCard}>
+          <View style={styles.userAvatarBadge}>
+            <Text style={styles.userAvatarText}>B</Text>
+          </View>
+          <View style={styles.userMeta}>
+            <Text style={styles.userName}>Bryll Benny Rose Basil</Text>
+            <Text style={styles.userDepartment}>BS Information Technology (BS.IT)</Text>
+          </View>
+          <View style={styles.levelPill}>
+            <Text style={styles.levelPillText}>LEVEL 1</Text>
+          </View>
+        </View>
+
+        <View style={styles.pointsCard}>
+          <View style={styles.pointsHeaderRow}>
+            <Text style={styles.pointsLabel}>Your Points</Text>
+            <View style={styles.giftBadge}>
+              <Text style={styles.giftBadgeText}>🎁</Text>
             </View>
-          </ImageBackground>
+          </View>
+
+          <View style={styles.pointsValueRow}>
+            <Text style={styles.pointsValue}>50 pts</Text>
+          </View>
+
+          <View style={styles.pointsProgressTrack}>
+            <View style={styles.pointsProgressFill} />
+          </View>
+
+          <Text style={styles.pointsHint}>50 pts to reach Level 2</Text>
         </View>
 
-        <View style={styles.searchPanel}>
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search by name or venue..."
-            placeholderTextColor="#c9f0c0"
-            style={styles.searchInput}
-          />
-          <View style={styles.categoryRow}>
-            {['All', 'Electronics', 'Accessories', 'Clothing', 'Others'].map((category, index) => (
-              <TouchableOpacity key={category} style={[styles.category, index === 0 && styles.categoryActive]}>
-                <Text style={[styles.categoryText, index === 0 && styles.categoryTextActive]}>{category}</Text>
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <View style={styles.statIconWrap}>
+              <Text style={styles.statIcon}>▣</Text>
+            </View>
+            <Text style={styles.statValue}>3</Text>
+            <Text style={styles.statLabel}>Reports</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={styles.statIconWrap}>
+              <Text style={styles.statIcon}>🎁</Text>
+            </View>
+            <Text style={styles.statValue}>1</Text>
+            <Text style={styles.statLabel}>Reward</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={styles.statIconWrap}>
+              <Text style={styles.statIcon}>★</Text>
+            </View>
+            <Text style={styles.statValue}>50</Text>
+            <Text style={styles.statLabel}>Total Points</Text>
+          </View>
+        </View>
+
+        <View style={styles.recentPostsSection}>
+          <Text style={styles.recentPostsTitle}>Recent Posts</Text>
+
+          {campusItems.length > 0 ? campusItems.slice(0, 2).map((item) => {
+            const imageUri = getReportImageUri(item);
+            const status = getReportStatus(item);
+            const isVerified = status.includes('VERIFIED');
+            const statusText = isVerified ? 'FOUND-VERIFIED' : 'LOST';
+
+            return (
+              <TouchableOpacity key={item.id || item.title} style={styles.recentPostCard} onPress={() => setSelectedItem(item)} activeOpacity={0.9}>
+                {imageUri ? (
+                  <Image source={{ uri: imageUri }} style={styles.recentPostImage} resizeMode="cover" />
+                ) : (
+                  <View style={styles.recentPostImagePlaceholder}>
+                    <Text style={styles.recentPostImageText}>{item.type === 'found' ? '◉' : '▣'}</Text>
+                  </View>
+                )}
+
+                <View style={styles.recentPostBody}>
+                  <Text style={styles.recentPostName}>{item.title}</Text>
+                  <Text style={styles.recentPostMeta}>◌ {item.category || 'Electronics'}</Text>
+                  <Text style={styles.recentPostMeta}>⌖ {item.place || item.location || 'Campus'}</Text>
+                  <Text style={styles.recentPostDate}>{item.date_occurred || 'September 35, 2027'}</Text>
+                </View>
+
+                <Text style={[styles.recentPostBadge, isVerified ? styles.recentPostBadgeVerified : styles.recentPostBadgeLost]}>{statusText}</Text>
               </TouchableOpacity>
-            ))}
-          </View>
+            );
+          }) : (
+            <Text style={styles.emptyCopy}>No recent posts available yet.</Text>
+          )}
         </View>
-
-        <View style={styles.sectionHeading}>
-          <View>
-            <Text style={styles.sectionTitle}>Recent campus posts</Text>
-            <Text style={styles.sectionSubtitle}>Browse the latest lost and found items</Text>
-          </View>
-          <TouchableOpacity onPress={() => setActiveTab('Matches')}>
-            <Text style={styles.viewAll}>View all</Text>
-          </TouchableOpacity>
-        </View>
-
-        {sampleItems.map((item) => <ItemCard key={item.title} item={item} />)}
-      </>
+      </View>
     );
   }
 
@@ -199,43 +365,39 @@ export default function DashboardScreen() {
         );
       }
       return (
-        <View>
-          <Text style={styles.pageTitle}>My Reports</Text>
-          <Text style={styles.pageCopy}>Create a clear report so the community can help, while your private note stays visible only to administrators.</Text>
+        <View style={styles.reportsScreen}>
+          <Text style={styles.reportsTitle}>My Reports</Text>
+          <Text style={styles.reportsCopy}>Create a clear report so the community can help, while your private note stays visible only to administrators.</Text>
           <View style={styles.reportChoices}>
-            <TouchableOpacity style={styles.reportChoice} onPress={() => setReportMode('lost')}>
-              <Text style={styles.choiceIcon}>−</Text>
+            <TouchableOpacity style={styles.reportChoice} onPress={() => setReportMode('lost')} activeOpacity={0.85}>
+              <View style={styles.choiceTop}><Text style={styles.choiceIcon}>⌁</Text><Text style={styles.choiceArrow}>›</Text></View>
               <Text style={styles.choiceTitle}>Report Lost Item</Text>
               <Text style={styles.choiceCopy}>Tell us what went missing.</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.reportChoice, styles.foundChoice]} onPress={() => setReportMode('found')}>
-              <Text style={styles.choiceIcon}>＋</Text>
+            <TouchableOpacity style={styles.reportChoice} onPress={() => setReportMode('found')} activeOpacity={0.85}>
+              <View style={styles.choiceTop}><Text style={[styles.choiceIcon, styles.foundIcon]}>♡</Text><Text style={styles.choiceArrow}>›</Text></View>
               <Text style={styles.choiceTitle}>Report Found Item</Text>
               <Text style={styles.choiceCopy}>Help return an item safely.</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.sectionTitle}>Submitted reports</Text>
+          <View style={styles.submittedHeading}>
+            <Text style={styles.sectionTitle}>Submitted reports</Text>
+            {myReports.length > 0 && <TouchableOpacity><Text style={styles.viewAll}>See all</Text></TouchableOpacity>}
+          </View>
           {reportLoading && <Text style={styles.loadingText}>Loading reports...</Text>}
           {!reportLoading && myReports.length === 0 && <Text style={styles.emptyCopy}>Your submitted reports will appear here.</Text>}
-          {myReports.map((report) => (
-            <View key={report.id} style={styles.reportRow}>
-              <View style={styles.reportRowCopy}>
-                <Text style={styles.itemTitle}>{report.title}</Text>
-                <Text style={styles.itemMeta}>{report.type === 'found' ? 'Found item' : 'Lost item'}  •  {report.location}</Text>
-              </View>
-              <Text style={styles.reportStatus}>{String(report.status || '').replaceAll('_', ' ')}</Text>
-            </View>
-          ))}
+          {myReports.map((report) => <SubmittedReportRow key={report.id} report={report} />)}
         </View>
       );
     }
+
+    if (activeTab === 'Hub') return renderHub();
+    if (activeTab === 'Profile') return <ProfileContent user={user} reports={myReports} recognition={recognition} loading={recognitionLoading} onBack={() => setActiveTab('Home')} onLogoutRequest={() => setLogoutConfirmationOpen(true)} />;
 
     const tab = tabs.find((entry) => entry.key === activeTab);
     const content = {
       Reports: ['My Reports', 'Track the lost and found posts you submitted.'],
       Matches: ['Matches', 'Review possible matches connected to your reports.'],
-      Hub: ['My Hub', 'Notifications, rewards, and important updates will appear here.'],
-      Profile: ['My Profile', 'Manage your student details and account settings.'],
     }[activeTab];
 
     return (
@@ -254,20 +416,25 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      {notice && <NoticeModal notice={notice} onClose={() => setNotice(null)} />}
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Image source={logoImage} style={styles.logo} resizeMode="contain" />
-          <View style={styles.headerCopy}>
-            <Text style={styles.appName}>FindIt</Text>
-            <Text style={styles.greeting}>Hello, {firstName}</Text>
+      {notice && <NoticeModal notice={notice} onClose={() => { setNotice(null); notice.onClose?.(); }} />}
+      {logoutConfirmationOpen && <LogoutConfirmationModal onCancel={() => setLogoutConfirmationOpen(false)} onConfirm={logout} />}
+      {activeTab === 'Profile' ? (
+        <View style={styles.profileViewport}>{renderTabContent()}</View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <Image source={logoImage} style={styles.logo} resizeMode="contain" />
+            <View style={styles.headerCopy}>
+              <Text style={styles.appName}>FindIt</Text>
+              <Text style={styles.greeting}>Hello, {firstName}</Text>
+            </View>
+            <TouchableOpacity style={styles.bellButton} onPress={() => setActiveTab('Hub')}>
+              <Text style={styles.bellIcon}>♧</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.bellButton} onPress={() => setActiveTab('Hub')}>
-            <Text style={styles.bellIcon}>♧</Text>
-          </TouchableOpacity>
-        </View>
-        {renderTabContent()}
-      </ScrollView>
+          {renderTabContent()}
+        </ScrollView>
+      )}
 
       <View style={styles.bottomNav}>
         {tabs.map((tab) => {
@@ -286,19 +453,255 @@ export default function DashboardScreen() {
   );
 }
 
-function ItemCard({ item }) {
-  return (
+function ItemCard({ item, onPress }) {
+  const imageUri = getReportImageUri(item);
+  const status = getReportStatus(item);
+  const card = (
     <View style={styles.itemCard}>
-      <View style={styles.itemImage}><Text style={styles.itemIcon}>{item.icon === 'laptop-outline' ? '▣' : item.icon === 'headset-outline' ? '◉' : '⌘'}</Text></View>
+      {imageUri ? <Image source={{ uri: imageUri }} style={styles.itemImage} /> : <View style={styles.itemImage}><Text style={styles.itemIcon}>{item.icon === 'laptop-outline' ? '▣' : item.icon === 'headset-outline' ? '◉' : '⌘'}</Text></View>}
       <View style={styles.itemDetails}>
         <View style={styles.itemTitleRow}>
           <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
-          <Text style={[styles.status, { color: item.color }]}>{item.status}</Text>
+          <Text style={[styles.status, status.includes('VERIFIED') || status.includes('APPROVED') ? styles.statusPublic : styles.statusPending]}>{status}</Text>
         </View>
-        <Text style={styles.itemMeta}>{item.category}</Text>
-        <Text style={styles.itemMeta}>⌖ {item.place}</Text>
-        <Text style={styles.itemDate}>September 15, 2027</Text>
+        <Text style={styles.itemMeta}>{item.category || 'Uncategorized'}</Text>
+        <Text style={styles.itemMeta}>⌖ {item.place || item.location || 'Campus'}</Text>
+        <Text style={styles.itemDate}>{item.date_occurred || 'Recently posted'}</Text>
       </View>
+    </View>
+  );
+  return onPress ? <TouchableOpacity onPress={onPress} activeOpacity={0.85}>{card}</TouchableOpacity> : card;
+}
+
+function getReportImageUri(item) {
+  const path = item?.images?.[0]?.file_path || item?.images?.[0]?.url;
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  return `${api.API_BASE_URL}/storage/${path.replace(/^storage\//, '')}`;
+}
+
+function getReportStatus(item) {
+  const type = String(item?.type || '').toLowerCase();
+  const status = String(item?.status || '').toLowerCase();
+  if (type === 'found' && status === 'verified') return 'FOUND-VERIFIED';
+  if (type === 'lost' && status === 'approved') return 'LOST-APPROVED';
+  return status.replaceAll('_', ' ').toUpperCase() || 'PUBLISHED';
+}
+
+function ItemDetail({ item, onBack, onClaim }) {
+  const imageUri = getReportImageUri(item);
+  const itemType = String(item?.type || '').toLowerCase();
+  const itemStatus = String(item?.status || '').toLowerCase();
+  const canClaim = (itemType === 'found' && itemStatus === 'verified') || (itemType === 'lost' && (itemStatus === 'approved' || itemStatus === 'verified'));
+  const status = getReportStatus(item);
+  return (
+    <View style={styles.claimScreen}>
+      <View style={styles.claimHeader}>
+        <TouchableOpacity onPress={onBack} style={styles.claimBack}><Text style={styles.claimBackText}>‹</Text></TouchableOpacity>
+        <View><Text style={styles.claimHeaderTitle}>Item Detail</Text><Text style={styles.claimHeaderSubtitle}>{canClaim ? 'Verified found article in custody' : 'Published campus report'}</Text></View>
+      </View>
+      {imageUri ? <Image source={{ uri: imageUri }} style={styles.detailImage} resizeMode="cover" /> : <View style={styles.detailImagePlaceholder}><Text style={styles.itemIcon}>▣</Text></View>}
+      <View style={styles.detailTitleRow}><Text style={styles.detailTitle}>{item.title}</Text><Text style={[styles.detailStatus, !canClaim && styles.detailStatusLost]}>{status}</Text></View>
+      <View style={styles.detailGrid}>
+        <DetailValue label="Description" value={item.category || 'Electronics'} icon="▤" />
+        <DetailValue label="Color" value={item.color || 'Not specified'} icon="◉" />
+        <DetailValue label="Location Found" value={item.location || item.place || 'Campus'} icon="⌖" />
+        <DetailValue label="Date Found" value={item.date_occurred || 'Recently'} icon="▦" />
+      </View>
+      <View style={styles.detailDescription}><Text style={styles.detailDescriptionLabel}>Description</Text><Text style={styles.detailDescriptionText}>{item.description || 'Found item is currently held by USC for verification.'}</Text></View>
+      {canClaim ? (
+        <TouchableOpacity style={styles.claimButton} onPress={onClaim} activeOpacity={0.85}>
+          <Text style={styles.claimButtonIcon}>✓</Text>
+          <Text style={styles.claimButtonText}>Claim This Item</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.detailInfoNotice}><Text style={styles.detailInfoNoticeText}>Claims are available after a found item is verified by the admin.</Text></View>
+      )}
+    </View>
+  );
+}
+
+function DetailValue({ label, value, icon }) {
+  return <View style={styles.detailValue}><View style={styles.detailIcon}><Text style={styles.detailIconText}>{icon}</Text></View><Text style={styles.detailLabel}>{label}</Text><Text style={styles.detailValueText}>{value}</Text></View>;
+}
+
+function ClaimForm({ item, draft, loading, onBack, updateDraft, choosePhoto, submitClaim }) {
+  const imageUri = getReportImageUri(item);
+  return (
+    <View style={styles.claimScreen}>
+      <View style={styles.claimHeader}><TouchableOpacity onPress={onBack} style={styles.claimBack}><Text style={styles.claimBackText}>‹</Text></TouchableOpacity><View><Text style={styles.claimHeaderTitle}>Submit Claim</Text><Text style={styles.claimHeaderSubtitle}>Request and wait for host.</Text></View></View>
+      <View style={styles.claimItemSummary}>{imageUri ? <Image source={{ uri: imageUri }} style={styles.claimItemImage} /> : <View style={styles.claimItemImagePlaceholder}><Text style={styles.itemIcon}>▣</Text></View>}<View style={styles.claimItemCopy}><Text style={styles.claimItemTitle}>{item.title}</Text><Text style={styles.claimItemStatus}>In USC Custody (Verified)</Text></View></View>
+      <Text style={styles.claimSectionTitle}>Describe proof of ownership</Text>
+      <TextInput style={styles.claimProofInput} multiline value={draft.proofDescription} onChangeText={(value) => updateDraft('proofDescription', value)} placeholder="Describe a detail, receipt, serial number, or other proof that confirms this is your item." placeholderTextColor="#8ba9a1" />
+      <Text style={styles.claimSectionTitle}>Upload Proof Photo (Optional)</Text>
+      <TouchableOpacity style={styles.claimUpload} onPress={choosePhoto} activeOpacity={0.85}><Text style={styles.claimUploadIcon}>{draft.proofPhoto ? '✓' : '+'}</Text><Text style={styles.claimUploadText}>{draft.proofPhoto ? 'Proof photo selected' : 'Upload receipt, packaging, or old selfie with item.'}</Text></TouchableOpacity>
+      <Text style={styles.claimDisclaimer}>The University Student Council collects and keeps your documents against the physical article. Your claim changes may be flagged.</Text>
+      <TouchableOpacity style={[styles.claimButton, loading && styles.claimButtonDisabled]} onPress={submitClaim} disabled={loading} activeOpacity={0.85}><Text style={styles.claimButtonIcon}>✓</Text><Text style={styles.claimButtonText}>{loading ? 'Submitting...' : 'Submit Claim Request'}</Text></TouchableOpacity>
+    </View>
+  );
+}
+
+function SubmittedReportRow({ report }) {
+  const icon = report.type === 'found' ? '▣' : report.title?.toLowerCase().includes('phone') ? '▯' : report.title?.toLowerCase().includes('backpack') ? '♧' : '▱';
+  const status = String(report.status || 'pending').replaceAll('_', ' ');
+  const statusKey = status.toLowerCase().replaceAll(' ', '_');
+  const statusStyle = statusKey.includes('approved') || statusKey.includes('verified') || statusKey.includes('published') || statusKey.includes('claimed') || statusKey.includes('matched')
+    ? styles.reportStatusPositive
+    : styles.reportStatusPending;
+
+  return (
+    <TouchableOpacity style={styles.submittedReportRow} activeOpacity={0.85}>
+      <View style={styles.submittedReportIcon}><Text style={styles.submittedReportIconText}>{icon}</Text></View>
+      <View style={styles.reportRowCopy}>
+        <Text style={styles.submittedReportTitle} numberOfLines={1}>{report.title}</Text>
+        <Text style={styles.submittedReportMeta} numberOfLines={1}>{report.type === 'found' ? 'Found item' : 'Lost item'} · {report.location}</Text>
+      </View>
+      <View style={styles.submittedReportEnd}>
+        <Text style={[styles.reportStatusPill, statusStyle]}>{status}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function ProfileContent({ user, reports, recognition, loading, onBack, onLogoutRequest }) {
+  const record = recognition?.record || {};
+  const points = Number(record.recognition_points || 0);
+  const conversionRate = Number(recognition?.conversion_rate || 100);
+  const pesoValue = Number(record.peso_value ?? points / conversionRate);
+  const rewardCount = Number(record.reward_count || 0);
+  const reportCount = Number(record.report_count || reports.length || 0);
+  const nextLevel = Math.max(100, Math.ceil((points + 1) / 100) * 100);
+  const levelProgress = Math.min(1, points / nextLevel);
+  const displayName = user?.name || `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Student';
+  const level = Math.max(1, Math.floor(points / 100) + 1);
+
+  return (
+    <View style={styles.profileScreen}>
+      <View style={styles.profileTopBar}>
+        <TouchableOpacity onPress={onBack} style={styles.profileBack}><Text style={styles.profileBackText}>‹</Text></TouchableOpacity>
+        <Text style={styles.profileTopTitle}>My Profile</Text>
+        <Text style={styles.profileSettings}>⚙</Text>
+      </View>
+      <View style={styles.profileIdentityCard}>
+        <View style={styles.profileAvatar}><Text style={styles.profileAvatarText}>{displayName.charAt(0).toUpperCase()}</Text></View>
+        <View style={styles.profileIdentityCopy}>
+          <Text style={styles.profileName}>{displayName}</Text>
+          <Text style={styles.profileEmail}>{user?.email || 'Student account'}</Text>
+          <Text style={styles.profileCourse}>{user?.course || user?.department || 'SNSU student'}</Text>
+        </View>
+      </View>
+
+      <View style={styles.profileLevelCard}>
+        <View style={styles.profileLevelBadge}><Text style={styles.profileLevelIcon}>♛</Text></View>
+        <View style={styles.profileLevelCopy}>
+          <View style={styles.profileLevelHeader}><Text style={styles.profileLevelTitle}>Level {level}</Text><Text style={styles.profileLevelCount}>{points} / {nextLevel} pts</Text></View>
+          <View style={styles.profileLevelTrack}><View style={[styles.profileLevelFill, { width: `${levelProgress * 100}%` }]} /></View>
+        </View>
+      </View>
+
+      <Text style={styles.profileImpactTitle}>My Impact</Text>
+      <View style={styles.profileStatsRow}>
+        <ProfileStat value={reportCount} label="Items Reported" icon={itemsReportedIcon} />
+        <ProfileStat value={rewardCount} label="Rewards Converted" icon={rewardsConvertedIcon} />
+      </View>
+
+      <View style={styles.profileImpactCard}>
+        <Image source={impactBannerImage} style={styles.profileImpactBanner} resizeMode="contain" />
+      </View>
+
+      <View style={styles.profileActions}>
+        <ProfileAction icon="▤" label="My Reports" onPress={() => {}} />
+        <ProfileAction icon="♧" label="My Rewards" onPress={() => {}} />
+        <ProfileAction icon="⚙" label="Settings" onPress={() => {}} />
+        <ProfileAction icon="↪" label="Log out" onPress={onLogoutRequest} />
+        <ProfileAction icon="?" label="Help & Support" onPress={() => {}} />
+      </View>
+
+    </View>
+  );
+}
+
+function ProfileStat({ value, label, icon }) {
+  return <View style={styles.profileStat}><Image source={icon} style={styles.profileStatIcon} resizeMode="contain" /><View style={styles.profileStatCopy}><Text style={styles.profileStatValue}>{value}</Text><Text style={styles.profileStatLabel}>{label}</Text></View></View>;
+}
+
+function ProfileAction({ icon, label, onPress }) {
+  return <TouchableOpacity style={styles.profileAction} onPress={onPress}><Text style={styles.profileActionIcon}>{icon}</Text><Text style={styles.profileActionLabel}>{label}</Text><Text style={styles.profileActionArrow}>›</Text></TouchableOpacity>;
+}
+
+function HubContent({ reports, loading, onBack }) {
+  const [hubTab, setHubTab] = useState('lost');
+  const visibleReports = hubTab === 'lost'
+    ? reports.filter((report) => report.type === 'lost')
+    : reports.filter((report) => report.type === 'found');
+
+  function imageSource(report) {
+    const image = report.images?.find((entry) => entry.is_primary) || report.images?.[0];
+    if (!image?.file_path) return null;
+    if (image.file_path.startsWith('http')) return { uri: image.file_path };
+    return { uri: `${api.API_BASE_URL}/storage/${image.file_path.replace(/^\//, '')}` };
+  }
+
+  function formatDate(report) {
+    const date = report.date_occurred || report.created_at;
+    if (!date) return 'Date not provided';
+    return new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function statusLabel(status) {
+    return String(status || 'pending').replaceAll('_', ' ').toUpperCase();
+  }
+
+  return (
+    <View style={styles.hubScreen}>
+      <TouchableOpacity style={styles.hubBack} onPress={onBack}>
+        <Text style={styles.hubBackText}>‹</Text>
+      </TouchableOpacity>
+      <Text style={styles.hubTitle}>My Hub</Text>
+      <Text style={styles.hubSubtitle}>Track your submitted reports</Text>
+      <View style={styles.hubTabs}>
+        <TouchableOpacity style={[styles.hubTab, hubTab === 'lost' && styles.hubTabActive]} onPress={() => setHubTab('lost')}>
+          <Text style={[styles.hubTabText, hubTab === 'lost' && styles.hubTabTextActive]}>Lost Reports</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.hubTab, hubTab === 'found' && styles.hubTabActive]} onPress={() => setHubTab('found')}>
+          <Text style={[styles.hubTabText, hubTab === 'found' && styles.hubTabTextActive]}>Found Reports</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.hubTab, hubTab === 'claims' && styles.hubTabActive]} onPress={() => setHubTab('claims')}>
+          <Text style={[styles.hubTabText, hubTab === 'claims' && styles.hubTabTextActive]}>Claims</Text>
+        </TouchableOpacity>
+      </View>
+
+      {hubTab === 'claims' ? (
+        <View style={styles.hubEmpty}>
+          <Text style={styles.hubEmptyTitle}>No claims yet</Text>
+          <Text style={styles.hubEmptyText}>Claims connected to your reports will appear here.</Text>
+        </View>
+      ) : loading ? (
+        <Text style={styles.loadingText}>Loading reports...</Text>
+      ) : visibleReports.length === 0 ? (
+        <View style={styles.hubEmpty}>
+          <Text style={styles.hubEmptyTitle}>No {hubTab} reports yet</Text>
+          <Text style={styles.hubEmptyText}>Your submitted {hubTab} item reports will appear here.</Text>
+        </View>
+      ) : (
+        visibleReports.map((report) => {
+          const image = imageSource(report);
+          return (
+            <View key={report.id} style={styles.hubReportCard}>
+              {image ? <Image source={image} style={styles.hubReportImage} /> : <View style={styles.hubReportImagePlaceholder}><Text style={styles.hubReportImageText}>＋</Text></View>}
+              <View style={styles.hubReportCopy}>
+                <Text style={styles.hubReportTitle} numberOfLines={1}>{report.title}</Text>
+                <Text style={styles.hubReportMeta}>{formatDate(report)} · {report.type.toUpperCase()}</Text>
+                <Text style={styles.hubReportLocation} numberOfLines={1}>{report.location}</Text>
+              </View>
+              <View style={styles.hubReportStatus}>
+                <Text style={styles.hubReportStatusText}>{statusLabel(report.status)}</Text>
+                <Text style={styles.hubReportArrow}>›</Text>
+              </View>
+            </View>
+          );
+        })
+      )}
     </View>
   );
 }
@@ -320,8 +723,39 @@ function NoticeModal({ notice, onClose }) {
   );
 }
 
+function LogoutConfirmationModal({ onCancel, onConfirm }) {
+  return (
+    <Modal transparent visible animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.noticeBackdrop}>
+        <View style={styles.logoutConfirmModal}>
+          <Text style={styles.logoutConfirmTitle}>Log out</Text>
+          <Text style={styles.logoutConfirmMessage}>Are you sure you want to logout?</Text>
+          <View style={styles.logoutConfirmActions}>
+            <TouchableOpacity style={styles.logoutCancelButton} onPress={onCancel} activeOpacity={0.85}>
+              <Text style={styles.logoutCancelText}>No</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.logoutConfirmButton} onPress={onConfirm} activeOpacity={0.85}>
+              <Text style={styles.logoutConfirmText}>Yes</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage, removeImage, submitReport }) {
   const isFound = mode === 'found';
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const today = new Date();
+  const selectedDate = new Date(`${form.date}T00:00:00`);
+
+  function handleDateChange(event, date) {
+    setDatePickerOpen(false);
+    if (event.type === 'dismissed' || !date) return;
+    updateForm('date', formatDateValue(date > today ? today : date));
+  }
 
   return (
     <View>
@@ -334,18 +768,40 @@ function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage
       <Text style={styles.fieldLabel}>Item name</Text>
       <TextInput style={styles.formInput} placeholder="e.g. Black airplane with cute sign" value={form.title} onChangeText={(value) => updateForm('title', value)} />
       <Text style={styles.fieldLabel}>Category</Text>
-      <TextInput style={styles.formInput} placeholder="Electronics" value={form.category} onChangeText={(value) => updateForm('category', value)} />
+      <TouchableOpacity style={styles.selectInput} onPress={() => setCategoryOpen(true)} activeOpacity={0.85}>
+        <Text style={styles.selectInputText}>{form.category || 'Select a category'}</Text>
+        <Text style={styles.selectChevron}>⌄</Text>
+      </TouchableOpacity>
+      <Modal transparent visible={categoryOpen} animationType="fade" onRequestClose={() => setCategoryOpen(false)}>
+        <TouchableOpacity style={styles.selectBackdrop} activeOpacity={1} onPress={() => setCategoryOpen(false)}>
+          <View style={styles.selectMenu}>
+            <Text style={styles.selectMenuTitle}>Choose a category</Text>
+            {reportCategories.map((category) => (
+              <TouchableOpacity key={category} style={styles.selectOption} onPress={() => { updateForm('category', category); setCategoryOpen(false); }}>
+                <Text style={styles.selectOptionText}>{category}</Text>
+                {form.category === category && <Text style={styles.selectCheck}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
       <Text style={styles.fieldLabel}>Color or identifying appearance</Text>
       <TextInput style={styles.formInput} placeholder="e.g. Navy blue with red chicken" value={form.color} onChangeText={(value) => updateForm('color', value)} />
       <Text style={styles.fieldLabel}>Public description</Text>
       <TextInput style={[styles.formInput, styles.multiline]} placeholder="Describe what people may safely see in the public post." value={form.description} onChangeText={(value) => updateForm('description', value)} multiline />
-      <Text style={styles.fieldLabel}>Private verification note · admin only</Text>
-      <TextInput style={[styles.formInput, styles.privateInput, styles.multiline]} placeholder="Hidden details such as serial number, stickers, dents, or exact contents." value={form.privateNote} onChangeText={(value) => updateForm('privateNote', value)} multiline />
+      <Text style={styles.fieldLabel}>Private verification note · admin only (required)</Text>
+      <View style={styles.requiredNotice}><Text style={styles.requiredNoticeText}>Please complete this field before publishing your {isFound ? 'found' : 'lost'} item report.</Text></View>
+      <TextInput style={[styles.formInput, styles.privateInput, styles.multiline]} placeholder="Required: serial number, stickers, dents, or exact contents." value={form.privateNote} onChangeText={(value) => updateForm('privateNote', value)} multiline />
       <Text style={styles.privateHint}>This note is never shown in the public item listing.</Text>
       <Text style={styles.fieldLabel}>{isFound ? 'Where was it found?' : 'Last known location'}</Text>
       <TextInput style={styles.formInput} placeholder="Main Library" value={form.location} onChangeText={(value) => updateForm('location', value)} />
-      <Text style={styles.fieldLabel}>Date {isFound ? 'found' : 'lost'} · YYYY-MM-DD</Text>
-      <TextInput style={styles.formInput} value={form.date} onChangeText={(value) => updateForm('date', value)} />
+      <Text style={styles.fieldLabel}>Date {isFound ? 'found' : 'lost'}</Text>
+      <TouchableOpacity style={styles.selectInput} onPress={() => setDatePickerOpen(true)} activeOpacity={0.85}>
+        <Text style={styles.selectInputText}>{form.date}</Text>
+        <Text style={styles.calendarIcon}>▣</Text>
+      </TouchableOpacity>
+      <Text style={styles.dateHint}>You can only select today or an earlier date.</Text>
+      {datePickerOpen && <DateTimePicker value={Number.isNaN(selectedDate.getTime()) ? today : selectedDate} mode="date" maximumDate={today} onChange={handleDateChange} />}
       <TouchableOpacity style={styles.uploadBox} onPress={chooseImage}>
         {form.image ? (
           <View style={styles.previewWrap}>
@@ -367,6 +823,7 @@ function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f1fbef' },
+  profileViewport: { flex: 1, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 82, overflow: 'hidden' },
   content: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 120 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   logo: { width: 48, height: 48 },
@@ -375,6 +832,49 @@ const styles = StyleSheet.create({
   greeting: { color: '#668073', fontSize: 12, marginTop: 2 },
   bellButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#dff6d7', alignItems: 'center', justifyContent: 'center' },
   bellIcon: { color: '#087044', fontSize: 24, fontWeight: '800' },
+  mockupHome: { paddingTop: 4 },
+  impactCard: { backgroundColor: '#0b8d52', borderRadius: 20, padding: 18, minHeight: 142, position: 'relative', overflow: 'hidden', shadowColor: '#0b6d3d', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 5 }, elevation: 4 },
+  impactBadge: { position: 'absolute', right: 18, top: 18, width: 44, height: 44, borderRadius: 22, backgroundColor: '#d8f0a3', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#f0d755' },
+  impactBadgeText: { color: '#0b8d52', fontSize: 22, fontWeight: '900' },
+  impactTitle: { color: '#f7fbf9', fontSize: 26, fontWeight: '900', lineHeight: 32, maxWidth: 220, marginTop: 12 },
+  impactSubtitle: { color: '#eefaf2', fontSize: 16, fontWeight: '500', marginTop: 8 },
+  profileRowCard: { backgroundColor: '#f6f7f4', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12, marginTop: 14, flexDirection: 'row', alignItems: 'center' },
+  userAvatarBadge: { width: 52, height: 52, borderRadius: 14, backgroundColor: '#d7ddd5', alignItems: 'center', justifyContent: 'center' },
+  userAvatarText: { color: '#1b352a', fontSize: 28, fontWeight: '900' },
+  userMeta: { flex: 1, marginLeft: 12 },
+  userName: { color: '#1f2f2a', fontSize: 15, fontWeight: '900' },
+  userDepartment: { color: '#697b72', fontSize: 10, marginTop: 4 },
+  levelPill: { backgroundColor: '#ebedeb', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 },
+  levelPillText: { color: '#253830', fontSize: 10, fontWeight: '900' },
+  pointsCard: { backgroundColor: '#1b9a5f', borderRadius: 18, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 14, marginTop: 22, borderWidth: 1, borderColor: '#1a8854', shadowColor: '#0d6a40', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  pointsHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pointsLabel: { color: '#f5fbf8', fontSize: 17, fontWeight: '900' },
+  giftBadge: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f8d765', alignItems: 'center', justifyContent: 'center' },
+  giftBadgeText: { fontSize: 18 },
+  pointsValueRow: { marginTop: 12 },
+  pointsValue: { color: '#f5fbf8', fontSize: 28, fontWeight: '900' },
+  pointsProgressTrack: { height: 12, borderRadius: 999, backgroundColor: '#dfe9e0', overflow: 'hidden', marginTop: 12 },
+  pointsProgressFill: { width: '50%', height: '100%', borderRadius: 999, backgroundColor: '#f5d861' },
+  pointsHint: { color: '#e6f8ef', fontSize: 12, marginTop: 10 },
+  statsGrid: { flexDirection: 'row', marginTop: 22, justifyContent: 'space-between' },
+  statCard: { flex: 1, backgroundColor: '#f6f7f4', borderRadius: 16, paddingVertical: 16, paddingHorizontal: 14, marginHorizontal: 4, alignItems: 'center', borderWidth: 1, borderColor: '#dbebe0' },
+  statIconWrap: { width: 34, height: 34, borderRadius: 12, backgroundColor: '#e3f1e6', alignItems: 'center', justifyContent: 'center' },
+  statIcon: { fontSize: 18 },
+  statValue: { color: '#1c322d', fontSize: 24, fontWeight: '900', marginTop: 10 },
+  statLabel: { color: '#697b72', fontSize: 11, marginTop: 6, textAlign: 'center' },
+  recentPostsSection: { marginTop: 26 },
+  recentPostsTitle: { color: '#1b352d', fontSize: 22, fontWeight: '900', marginBottom: 12 },
+  recentPostCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f9f4', borderRadius: 18, padding: 12, borderWidth: 1, borderColor: '#d7e7d9', shadowColor: '#0d6a40', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2, marginBottom: 14 },
+  recentPostImage: { width: 120, height: 104, borderRadius: 12, backgroundColor: '#d9efe1' },
+  recentPostImagePlaceholder: { width: 120, height: 104, borderRadius: 12, backgroundColor: '#d9efe1', alignItems: 'center', justifyContent: 'center' },
+  recentPostImageText: { color: '#0b8d52', fontSize: 28, fontWeight: '900' },
+  recentPostBody: { flex: 1, marginLeft: 12, paddingRight: 6 },
+  recentPostName: { color: '#1d2d27', fontSize: 17, fontWeight: '900' },
+  recentPostMeta: { color: '#62776b', fontSize: 12, marginTop: 7 },
+  recentPostDate: { color: '#4f5f56', fontSize: 12, marginTop: 7 },
+  recentPostBadge: { position: 'absolute', right: 12, top: 12, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, fontSize: 10, fontWeight: '900', overflow: 'hidden' },
+  recentPostBadgeLost: { backgroundColor: '#e7ece8', color: '#1d332c' },
+  recentPostBadgeVerified: { backgroundColor: '#ffd9d6', color: '#d7433a' },
   hero: { height: 168, overflow: 'hidden', borderRadius: 8 },
   heroImage: { flex: 1, justifyContent: 'flex-end' },
   heroImageStyle: { opacity: 0.9 },
@@ -401,8 +901,49 @@ const styles = StyleSheet.create({
   itemTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   itemTitle: { color: '#1d2922', fontSize: 14, fontWeight: '900', flex: 1 },
   status: { fontSize: 9, fontWeight: '900', textTransform: 'uppercase', marginLeft: 5 },
+  statusPublic: { color: '#087044' },
+  statusPending: { color: '#9a7a17' },
   itemMeta: { color: '#607269', fontSize: 10, marginTop: 4 },
   itemDate: { color: '#8b9c91', fontSize: 9, marginTop: 3 },
+  claimScreen: { flex: 1, backgroundColor: '#dff8e6', marginHorizontal: -16, marginTop: -18, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 24 },
+  claimHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#c9f2d4', borderRadius: 22, paddingVertical: 14, paddingHorizontal: 10, marginBottom: 14 },
+  claimBack: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
+  claimBackText: { color: '#074a32', fontSize: 38, lineHeight: 38 },
+  claimHeaderTitle: { color: '#073f2e', fontSize: 23, fontWeight: '900' },
+  claimHeaderSubtitle: { color: '#2d7453', fontSize: 12, marginTop: 2 },
+  detailImage: { width: '100%', height: 230, borderRadius: 14, backgroundColor: '#c8e9d1' },
+  detailImagePlaceholder: { width: '100%', height: 230, borderRadius: 14, backgroundColor: '#c8e9d1', alignItems: 'center', justifyContent: 'center' },
+  detailTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#a9d7b8' },
+  detailTitle: { color: '#073f2e', fontSize: 23, fontWeight: '900', flex: 1 },
+  detailStatus: { color: '#d8443b', backgroundColor: '#ffd8d3', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 7, fontSize: 9, fontWeight: '900' },
+  detailStatusLost: { color: '#087044', backgroundColor: '#c8f0df' },
+  detailGrid: { flexDirection: 'row', flexWrap: 'wrap', borderBottomWidth: 1, borderBottomColor: '#a9d7b8', paddingVertical: 12 },
+  detailValue: { width: '50%', minHeight: 76, paddingVertical: 7, paddingHorizontal: 7 },
+  detailIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#c6f0d0', alignItems: 'center', justifyContent: 'center' },
+  detailIconText: { color: '#07563c', fontSize: 18, fontWeight: '900' },
+  detailLabel: { color: '#648879', fontSize: 11, marginTop: 4 },
+  detailValueText: { color: '#073f2e', fontSize: 14, fontWeight: '800', marginTop: 2 },
+  detailDescription: { paddingVertical: 14 },
+  detailDescriptionLabel: { color: '#648879', fontSize: 12 },
+  detailDescriptionText: { color: '#073f2e', fontSize: 13, lineHeight: 19, marginTop: 5 },
+  detailInfoNotice: { backgroundColor: '#c8f0df', borderRadius: 14, padding: 14, marginTop: 'auto' },
+  detailInfoNoticeText: { color: '#176b4b', fontSize: 12, lineHeight: 18, textAlign: 'center', fontWeight: '700' },
+  claimButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#159653', borderRadius: 18, paddingVertical: 15, marginTop: 'auto', minHeight: 54 },
+  claimButtonDisabled: { opacity: 0.65 },
+  claimButtonIcon: { color: '#ffffff', fontSize: 22, fontWeight: '900', marginRight: 14 },
+  claimButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '900' },
+  claimItemSummary: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 15, padding: 10, marginBottom: 22 },
+  claimItemImage: { width: 112, height: 78, borderRadius: 10, backgroundColor: '#c8e9d1' },
+  claimItemImagePlaceholder: { width: 112, height: 78, borderRadius: 10, backgroundColor: '#c8e9d1', alignItems: 'center', justifyContent: 'center' },
+  claimItemCopy: { flex: 1, marginLeft: 14 },
+  claimItemTitle: { color: '#073f2e', fontSize: 20, fontWeight: '900' },
+  claimItemStatus: { color: '#648879', fontSize: 14, fontWeight: '700', marginTop: 6 },
+  claimSectionTitle: { color: '#073f2e', fontSize: 18, fontWeight: '900', marginBottom: 10, marginTop: 12 },
+  claimProofInput: { height: 145, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#bde5ca', borderRadius: 15, padding: 14, color: '#073f2e', fontSize: 13, textAlignVertical: 'top' },
+  claimUpload: { minHeight: 126, borderWidth: 1, borderStyle: 'dashed', borderColor: '#8bd3a5', borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3fff5', padding: 16 },
+  claimUploadIcon: { color: '#159653', fontSize: 34, fontWeight: '800' },
+  claimUploadText: { color: '#187856', fontSize: 12, textAlign: 'center', marginTop: 8 },
+  claimDisclaimer: { color: '#4d866e', fontSize: 11, lineHeight: 17, marginTop: 16, paddingHorizontal: 8 },
   emptyState: { minHeight: 440, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
   emptyIcon: { width: 74, height: 74, borderRadius: 37, backgroundColor: '#dff6d7', alignItems: 'center', justifyContent: 'center' },
   emptyIconText: { color: '#087044', fontSize: 34, fontWeight: '800' },
@@ -410,32 +951,144 @@ const styles = StyleSheet.create({
   emptyCopy: { color: '#6f8578', fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
   logoutButton: { backgroundColor: '#087044', borderRadius: 18, paddingHorizontal: 22, paddingVertical: 10, marginTop: 22 },
   logoutText: { color: '#ffffff', fontWeight: '800' },
-  bottomNav: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 86, backgroundColor: '#d9ffd2', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 4 },
-  navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 56 },
-  navIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  navIconActive: { backgroundColor: '#0b9c42' },
-  navIconText: { color: '#315044', fontSize: 22, fontWeight: '800' },
+  logoutConfirmModal: { width: '88%', maxWidth: 340, backgroundColor: '#ffffff', borderRadius: 18, padding: 22, shadowColor: '#003b24', shadowOpacity: 0.25, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 12 },
+  logoutConfirmTitle: { color: '#174a31', fontSize: 18, fontWeight: '900', textAlign: 'center' },
+  logoutConfirmMessage: { color: '#607269', fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 9 },
+  logoutConfirmActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  logoutCancelButton: { flex: 1, alignItems: 'center', borderWidth: 1, borderColor: '#b7d5be', borderRadius: 10, paddingVertical: 11 },
+  logoutCancelText: { color: '#087044', fontSize: 13, fontWeight: '800' },
+  logoutConfirmButton: { flex: 1, alignItems: 'center', backgroundColor: '#087044', borderRadius: 10, paddingVertical: 11 },
+  logoutConfirmText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  bottomNav: { position: 'absolute', left: 16, right: 16, bottom: 10, height: 64, borderRadius: 32, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#c7ddc9', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 4, elevation: 5, shadowColor: '#16442d', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
+  navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 56, height: 54 },
+  navIcon: { width: 34, height: 28, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  navIconActive: { backgroundColor: '#e2f4e4' },
+  navIconText: { color: '#668073', fontSize: 18, fontWeight: '800' },
   navIconTextActive: { color: '#ffffff' },
-  navLabel: { color: '#527064', fontSize: 9, fontWeight: '700', marginTop: 3 },
+  navLabel: { color: '#668073', fontSize: 8, fontWeight: '700', marginTop: 1 },
   navLabelActive: { color: '#087044', fontWeight: '900' },
   pageTitle: { color: '#174a31', fontSize: 26, fontWeight: '900', marginTop: 8 },
   pageCopy: { color: '#6f8578', fontSize: 13, lineHeight: 20, marginTop: 8 },
-  reportChoices: { flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 26 },
-  reportChoice: { flex: 1, minHeight: 126, borderRadius: 14, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#b9dfb4', padding: 13 },
-  foundChoice: { backgroundColor: '#e4f8df', borderColor: '#73b879' },
-  choiceIcon: { color: '#087044', fontSize: 28, fontWeight: '900' },
-  choiceTitle: { color: '#174a31', fontSize: 14, fontWeight: '900', marginTop: 7 },
-  choiceCopy: { color: '#718679', fontSize: 11, lineHeight: 16, marginTop: 5 },
+  reportsScreen: { paddingTop: 2 },
+  reportsTitle: { color: '#174a31', fontSize: 25, fontWeight: '900', marginTop: 4 },
+  reportsCopy: { color: '#6f8578', fontSize: 12, lineHeight: 18, marginTop: 7, maxWidth: 300 },
+  reportChoices: { flexDirection: 'row', gap: 10, marginTop: 19, marginBottom: 25 },
+  reportChoice: { flex: 1, minHeight: 123, borderRadius: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', padding: 13 },
+  choiceTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  choiceIcon: { color: '#087044', backgroundColor: '#f8ecdc', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 4, fontSize: 17, fontWeight: '900' },
+  foundIcon: { backgroundColor: '#e2f3e5' },
+  choiceArrow: { color: '#087044', borderWidth: 1, borderColor: '#c7ddc9', borderRadius: 12, width: 20, height: 20, textAlign: 'center', lineHeight: 17, fontSize: 17 },
+  choiceTitle: { color: '#174a31', fontSize: 13, fontWeight: '900', marginTop: 15 },
+  choiceCopy: { color: '#718679', fontSize: 10, lineHeight: 14, marginTop: 4 },
+  submittedHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 },
+  submittedReportRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 11, borderWidth: 1, borderColor: '#d6e6d8', padding: 13, minHeight: 82, marginBottom: 11 },
+  submittedReportIcon: { width: 46, height: 46, borderRadius: 10, backgroundColor: '#e8f5e9', alignItems: 'center', justifyContent: 'center' },
+  submittedReportIconText: { color: '#087044', fontSize: 23, fontWeight: '800' },
+  submittedReportTitle: { color: '#1d2922', fontSize: 14, fontWeight: '900' },
+  submittedReportMeta: { color: '#7a9183', fontSize: 11, marginTop: 6 },
+  submittedReportEnd: { alignItems: 'flex-end', marginLeft: 10 },
+  reportStatusPill: { maxWidth: 112, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 7, fontSize: 9, fontWeight: '900', textTransform: 'capitalize', textAlign: 'center' },
+  reportStatusPending: { color: '#8b6918', backgroundColor: '#f7edcf' },
+  reportStatusPositive: { color: '#087044', backgroundColor: '#c8f0df' },
   loadingText: { color: '#6f8578', marginTop: 14 },
   reportRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 12, padding: 12, marginTop: 10 },
   reportRowCopy: { flex: 1 },
   reportStatus: { color: '#087044', fontSize: 10, fontWeight: '800', textTransform: 'capitalize', marginLeft: 8 },
+  hubScreen: { flex: 1, backgroundColor: '#eaf9ed', marginHorizontal: -16, marginTop: -18, paddingHorizontal: 16, paddingBottom: 24 },
+  hubBack: { width: 30, height: 30, justifyContent: 'center', marginTop: 2 },
+  hubBackText: { color: '#1b3326', fontSize: 30, lineHeight: 30 },
+  hubTitle: { color: '#174a31', fontSize: 18, fontWeight: '900', marginLeft: 26, marginTop: -28 },
+  hubSubtitle: { color: '#527064', fontSize: 10, marginLeft: 26, marginTop: 1 },
+  hubTabs: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#b7d5be', marginTop: 18, marginBottom: 16 },
+  hubTab: { flex: 1, alignItems: 'center', paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  hubTabActive: { borderBottomColor: '#087044' },
+  hubTabText: { color: '#607269', fontSize: 11, fontWeight: '700' },
+  hubTabTextActive: { color: '#087044', fontWeight: '900' },
+  hubReportCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 7, padding: 8, marginBottom: 10, minHeight: 72, elevation: 1, shadowColor: '#16442d', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+  hubReportImage: { width: 56, height: 56, borderRadius: 5, backgroundColor: '#dcefe0' },
+  hubReportImagePlaceholder: { width: 56, height: 56, borderRadius: 5, backgroundColor: '#dcefe0', alignItems: 'center', justifyContent: 'center' },
+  hubReportImageText: { color: '#087044', fontSize: 24, fontWeight: '800' },
+  hubReportCopy: { flex: 1, marginLeft: 10, minWidth: 0 },
+  hubReportTitle: { color: '#1d2922', fontSize: 12, fontWeight: '900' },
+  hubReportMeta: { color: '#8b9c91', fontSize: 9, marginTop: 3 },
+  hubReportLocation: { color: '#607269', fontSize: 10, marginTop: 5 },
+  hubReportStatus: { alignItems: 'flex-end', marginLeft: 6 },
+  hubReportStatusText: { color: '#087044', backgroundColor: '#c8f0df', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 4, fontSize: 8, fontWeight: '900', maxWidth: 86, textAlign: 'center' },
+  hubReportArrow: { color: '#527064', fontSize: 24, lineHeight: 24, marginTop: 3 },
+  hubEmpty: { alignItems: 'center', paddingHorizontal: 28, paddingVertical: 54 },
+  hubEmptyTitle: { color: '#174a31', fontSize: 18, fontWeight: '900' },
+  hubEmptyText: { color: '#6f8578', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 8 },
+  profileScreen: { paddingTop: 2, paddingBottom: 20 },
+  profileTopBar: { height: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  profileBack: { width: 34, height: 34, justifyContent: 'center' },
+  profileBackText: { color: '#087044', fontSize: 31, lineHeight: 31 },
+  profileTopTitle: { color: '#174a31', fontSize: 16, fontWeight: '900' },
+  profileSettings: { color: '#087044', fontSize: 21, fontWeight: '900' },
+  profileIdentityCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 14, padding: 14, marginTop: 5, minHeight: 88 },
+  profileAvatar: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#087044', alignItems: 'center', justifyContent: 'center' },
+  profileAvatarText: { color: '#ffffff', fontSize: 27, fontWeight: '900' },
+  profileIdentityCopy: { flex: 1, marginLeft: 13 },
+  profileName: { color: '#1d2922', fontSize: 16, fontWeight: '900' },
+  profileEmail: { color: '#7a9183', fontSize: 10, marginTop: 3 },
+  profileCourse: { color: '#527064', fontSize: 10, marginTop: 4 },
+  profileLevelCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e2f3e5', borderRadius: 14, padding: 12, marginTop: 10 },
+  profileLevelBadge: { width: 43, height: 43, borderRadius: 22, backgroundColor: '#f8c62c', alignItems: 'center', justifyContent: 'center' },
+  profileLevelIcon: { color: '#ffffff', fontSize: 23, fontWeight: '900' },
+  profileLevelCopy: { flex: 1, marginLeft: 10 },
+  profileLevelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  profileLevelTitle: { color: '#174a31', fontSize: 14, fontWeight: '900' },
+  profileLevelCount: { color: '#527064', fontSize: 10, fontWeight: '800' },
+  profileLevelTrack: { height: 7, borderRadius: 4, backgroundColor: '#b7d5be', overflow: 'hidden', marginTop: 8 },
+  profileLevelFill: { height: 7, borderRadius: 4, backgroundColor: '#087044' },
+  profileImpactTitle: { color: '#174a31', fontSize: 16, fontWeight: '900', marginTop: 13, marginBottom: 7 },
+  profileStatsRow: { flexDirection: 'row', gap: 8 },
+  profileStat: { flex: 1, flexDirection: 'row', alignItems: 'center', minHeight: 88, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 12, paddingHorizontal: 10 },
+  profileStatIcon: { width: 50, height: 50, marginRight: 8 },
+  profileStatCopy: { flex: 1, alignItems: 'center' },
+  profileStatValue: { color: '#174a31', fontSize: 21, fontWeight: '900' },
+  profileStatLabel: { color: '#7a9183', fontSize: 9, marginTop: 4, textAlign: 'center' },
+  profileImpactCard: { width: '100%', overflow: 'hidden', marginTop: 4, alignSelf: 'stretch' },
+  profileImpactBanner: { width: '100%', maxWidth: '100%', aspectRatio: 3.2, alignSelf: 'stretch' },
+  profileActions: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 12, marginTop: 4, overflow: 'hidden' },
+  profileAction: { minHeight: 50, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#edf3ed', paddingHorizontal: 15 },
+  profileActionIcon: { width: 30, color: '#087044', fontSize: 20, fontWeight: '900' },
+  profileActionLabel: { flex: 1, color: '#315044', fontSize: 13, fontWeight: '700' },
+  profileActionArrow: { color: '#7a9183', fontSize: 26 },
+  profileConversionBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff8dd', borderWidth: 1, borderColor: '#d5b84c', borderRadius: 10, padding: 11, marginTop: 12 },
+  profileConversionTitle: { color: '#806615', fontSize: 10, fontWeight: '900' },
+  profileConversionText: { color: '#9a7a17', fontSize: 9, marginTop: 3 },
+  profileConversionPoints: { color: '#806615', fontSize: 12, fontWeight: '900' },
+  profileSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 9 },
+  profileSectionTitle: { color: '#174a31', fontSize: 15, fontWeight: '900' },
+  profileSectionHint: { color: '#087044', fontSize: 9, fontWeight: '800' },
+  transactionRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 10, padding: 10, marginBottom: 8 },
+  transactionIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#e2f3e5', alignItems: 'center', justifyContent: 'center' },
+  transactionIconText: { color: '#087044', fontSize: 19, fontWeight: '900' },
+  transactionCopy: { flex: 1, marginLeft: 9 },
+  transactionTitle: { color: '#1d2922', fontSize: 11, fontWeight: '800' },
+  transactionDate: { color: '#8b9c91', fontSize: 9, marginTop: 3 },
+  transactionPoints: { color: '#087044', fontSize: 11, fontWeight: '900' },
+  transactionDebit: { color: '#b64036' },
+  profileEmpty: { color: '#6f8578', backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d6e6d8', borderRadius: 10, padding: 14, fontSize: 11, lineHeight: 17 },
   backLink: { alignSelf: 'flex-start', marginBottom: 10 },
   backLinkText: { color: '#087044', fontSize: 14, fontWeight: '800' },
   notice: { backgroundColor: '#fff0ed', borderWidth: 1, borderColor: '#ef8b80', borderRadius: 8, padding: 10, marginTop: 14 },
   noticeText: { color: '#a43d35', fontSize: 11, lineHeight: 16 },
+  requiredNotice: { backgroundColor: '#fff8dd', borderWidth: 1, borderColor: '#d5b84c', borderRadius: 7, padding: 8, marginBottom: 6 },
+  requiredNoticeText: { color: '#806615', fontSize: 11, lineHeight: 16 },
   fieldLabel: { color: '#315044', fontSize: 11, fontWeight: '800', marginTop: 15, marginBottom: 6 },
   formInput: { minHeight: 42, borderWidth: 1, borderColor: '#b7d5be', borderRadius: 7, backgroundColor: '#ffffff', paddingHorizontal: 12, paddingVertical: 10, color: '#20392b', fontSize: 13 },
+  selectInput: { minHeight: 42, borderWidth: 1, borderColor: '#b7d5be', borderRadius: 7, backgroundColor: '#ffffff', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  selectInputText: { color: '#20392b', fontSize: 13 },
+  selectChevron: { color: '#087044', fontSize: 20, fontWeight: '900', lineHeight: 18 },
+  calendarIcon: { color: '#087044', fontSize: 17, fontWeight: '900' },
+  dateHint: { color: '#74927d', fontSize: 10, marginTop: 5 },
+  selectBackdrop: { flex: 1, backgroundColor: 'rgba(0, 32, 18, 0.35)', justifyContent: 'center', padding: 28 },
+  selectMenu: { backgroundColor: '#ffffff', borderRadius: 14, padding: 16, shadowColor: '#16442d', shadowOpacity: 0.2, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 10 },
+  selectMenuTitle: { color: '#174a31', fontSize: 16, fontWeight: '900', marginBottom: 8 },
+  selectOption: { minHeight: 44, borderTopWidth: 1, borderTopColor: '#e5efe6', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  selectOptionText: { color: '#315044', fontSize: 14, fontWeight: '700' },
+  selectCheck: { color: '#087044', fontSize: 18, fontWeight: '900' },
   multiline: { minHeight: 78, textAlignVertical: 'top' },
   privateInput: { backgroundColor: '#fffdf1', borderColor: '#d5b84c' },
   privateHint: { color: '#9a7a17', fontSize: 10, marginTop: 5 },

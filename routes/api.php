@@ -36,6 +36,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('student')->group(function () {
         Route::get('/profile', [StudentProfileController::class, 'apiProfile']);
+        Route::get('/recognition', [StudentProfileController::class, 'apiRecognition']);
+        Route::get('/recognition', [StudentProfileController::class, 'apiRecognition']);
         Route::put('/profile', [StudentProfileController::class, 'apiUpdateProfile']);
         Route::post('/profile/picture', [StudentProfileController::class, 'updateProfilePicture']);
         Route::post('/profile/change-password', [StudentProfileController::class, 'apiChangePassword']);
@@ -49,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/mine', [App\Http\Controllers\ReportController::class, 'mine']);
     Route::get('/reports/{id}', [App\Http\Controllers\ReportController::class, 'show']);
     Route::post('/reports', [App\Http\Controllers\ReportController::class, 'store']);
+    Route::post('/reports/{id}/claims', [App\Http\Controllers\ReportController::class, 'submitClaim']);
     Route::post('/reports/{id}/images', [App\Http\Controllers\ReportController::class, 'uploadImages']);
     Route::delete('/reports/{reportId}/images/{imageId}', [App\Http\Controllers\ReportController::class, 'deleteImage']);
     Route::get('/reports/{id}/matches', [App\Http\Controllers\ReportController::class, 'matches']);
