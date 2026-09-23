@@ -501,23 +501,25 @@ export default function DashboardScreen() {
     <SafeAreaView style={styles.screen}>
       {notice && <NoticeModal notice={notice} onClose={() => { setNotice(null); notice.onClose?.(); }} />}
       {logoutConfirmationOpen && <LogoutConfirmationModal onCancel={() => setLogoutConfirmationOpen(false)} onConfirm={logout} />}
+      <View style={styles.fixedHeader}>
+        <Image source={logoImage} style={styles.logo} resizeMode="contain" />
+        <View style={styles.headerCopy}>
+          <Text style={styles.appName}>FindIt</Text>
+          <Text style={styles.greeting}>Hello, {firstName}</Text>
+        </View>
+        <TouchableOpacity style={styles.bellButton} onPress={() => setActiveTab('Notifications')}>
+          <Text style={styles.bellIcon}>●</Text>
+          {notifications.some((notification) => !notification.is_read) && <View style={styles.bellUnreadDot} />}
+        </TouchableOpacity>
+      </View>
       {activeTab === 'Profile' ? (
-        <View style={styles.profileViewport}>{renderTabContent()}</View>
+        <View style={styles.navigationBody}><View style={styles.profileViewport}>{renderTabContent()}</View></View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
-            <Image source={logoImage} style={styles.logo} resizeMode="contain" />
-            <View style={styles.headerCopy}>
-              <Text style={styles.appName}>FindIt</Text>
-              <Text style={styles.greeting}>Hello, {firstName}</Text>
-            </View>
-            <TouchableOpacity style={styles.bellButton} onPress={() => setActiveTab('Notifications')}>
-              <Text style={styles.bellIcon}>●</Text>
-              {notifications.some((notification) => !notification.is_read) && <View style={styles.bellUnreadDot} />}
-            </TouchableOpacity>
-          </View>
+        <View style={styles.navigationBody}>
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {renderTabContent()}
-        </ScrollView>
+          </ScrollView>
+        </View>
       )}
 
       <View style={styles.bottomNav}>
@@ -961,9 +963,10 @@ function ReportForm({ mode, form, reportLoading, onBack, updateForm, chooseImage
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f1fbef' },
+  fixedHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1fbef', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#d8eadb', zIndex: 10, elevation: 3, shadowColor: '#16442d', shadowOpacity: 0.08, shadowRadius: 5, shadowOffset: { width: 0, height: 2 } },
+  navigationBody: { flex: 1 },
   profileViewport: { flex: 1, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 82, overflow: 'hidden' },
   content: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 120 },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   logo: { width: 48, height: 48 },
   headerCopy: { flex: 1, marginLeft: 8 },
   appName: { color: '#087044', fontSize: 18, fontWeight: '900' },
