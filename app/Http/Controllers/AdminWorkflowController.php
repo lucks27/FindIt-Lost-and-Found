@@ -624,22 +624,22 @@ class AdminWorkflowController extends Controller
             ->latest()
             ->get();
 
-        $grouped = $items->groupBy(fn (EventFine $fine) => $fine->student_id ?? $fine->student?->id ?? $fine->school_id ?? $fine->id)
+        $grouped = $items->groupBy(fn(EventFine $fine) => $fine->student_id ?? $fine->student?->id ?? $fine->school_id ?? $fine->id)
             ->map(function ($group, $key) {
                 $lead = $group->first();
                 $student = $lead?->student;
-                $originalAmount = (float) $group->sum(fn ($fine) => (float) ($fine->original_amount ?? $fine->amount ?? 0));
-                $remainingAmount = (float) $group->sum(fn ($fine) => (float) ($fine->remaining_amount ?? max(0, (float) ($fine->original_amount ?? $fine->amount ?? 0) - (float) ($fine->paid_amount ?? 0))));
-                $paidAmount = (float) $group->sum(fn ($fine) => (float) ($fine->paid_amount ?? 0));
+                $originalAmount = (float) $group->sum(fn($fine) => (float) ($fine->original_amount ?? $fine->amount ?? 0));
+                $remainingAmount = (float) $group->sum(fn($fine) => (float) ($fine->remaining_amount ?? max(0, (float) ($fine->original_amount ?? $fine->amount ?? 0) - (float) ($fine->paid_amount ?? 0))));
+                $paidAmount = (float) $group->sum(fn($fine) => (float) ($fine->paid_amount ?? 0));
                 $status = strtolower((string) ($lead->status ?? 'pending'));
 
                 if ($status === 'rejected') {
                     $status = 'rejected';
                 } elseif ($remainingAmount <= 0) {
                     $status = 'paid';
-                } elseif ($group->contains(fn ($fine) => strtolower((string) ($fine->status ?? '')) === 'partially paid')) {
+                } elseif ($group->contains(fn($fine) => strtolower((string) ($fine->status ?? '')) === 'partially paid')) {
                     $status = 'partially paid';
-                } elseif ($group->contains(fn ($fine) => strtolower((string) ($fine->status ?? '')) === 'approved')) {
+                } elseif ($group->contains(fn($fine) => strtolower((string) ($fine->status ?? '')) === 'approved')) {
                     $status = 'approved';
                 } else {
                     $status = 'pending';

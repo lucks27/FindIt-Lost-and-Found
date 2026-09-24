@@ -27,7 +27,7 @@
             <div v-if="!events.length" class="small-empty">No events have been added yet.</div>
             <div v-else class="event-list">
                 <div v-for="event in events" :key="event.id" class="event-row"><strong>{{ event.name
-                }}</strong><span class="event-amount">₱{{ money(event.fine_amount) }}</span></div>
+                        }}</strong><span class="event-amount">₱{{ money(event.fine_amount) }}</span></div>
             </div>
         </section>
 
@@ -79,7 +79,7 @@
                         @click="currentPage--">Previous</button>
                     <button v-for="page in pageCount" :key="page" type="button"
                         :class="['pagination-button', { active: page === currentPage }]" @click="currentPage = page">{{
-                        page }}</button>
+                            page }}</button>
                     <button type="button" class="pagination-button" :disabled="currentPage === pageCount"
                         @click="currentPage++">Next</button>
                 </div>
