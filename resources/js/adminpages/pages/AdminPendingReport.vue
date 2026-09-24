@@ -400,18 +400,22 @@
                         <section class="modal-overview">
                             <div class="modal-media">
                                 <div class="modal-image-container">
-                                    <img :src="getReportImage(
-                                        selectedReport,
-                                        currentImageIndex
-                                    )
-                                        " :alt="selectedReport.title ||
-                                            'SNSU logo'
-                                            " class="modal-image" :class="{
-                                                'fallback-image':
-                                                    !selectedReport
-                                                        .images
-                                                        ?.length
-                                            }" />
+                                    <button type="button" class="modal-image-button"
+                                        @click="openImagePreview(getReportImages(selectedReport), currentImageIndex)"
+                                        aria-label="View full-size item image">
+                                        <img :src="getReportImage(
+                                            selectedReport,
+                                            currentImageIndex
+                                        )
+                                            " :alt="selectedReport.title ||
+                                                'SNSU logo'
+                                                " class="modal-image" :class="{
+                                                    'fallback-image':
+                                                        !selectedReport
+                                                            .images
+                                                            ?.length
+                                                }" />
+                                    </button>
                                 </div>
 
                                 <!-- Thumbnails -->
@@ -441,6 +445,16 @@ img,
                                                 " />
                                     </button>
                                 </div>
+                            </div>
+
+                            <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
+                                <button type="button" class="image-preview-close" aria-label="Close image preview"
+                                    @click="closeImagePreview">×</button>
+                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev"
+                                    aria-label="Previous image" @click="showPreviousImage">‹</button>
+                                <img :src="previewImageUrl" alt="Full-size item preview" class="image-preview-image" />
+                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next"
+                                    aria-label="Next image" @click="showNextImage">›</button>
                             </div>
 
                             <!-- Summary -->
@@ -757,36 +771,6 @@ img,
                             </p>
                         </section>
 
-                        <!-- ADDITIONAL DETAILS -->
-                        <section v-if="
-                            selectedReport
-                                .additional_details
-                        " class="
-                                detail-panel
-                                detail-panel-wide
-                            ">
-                            <div class="detail-panel-heading">
-                                <span class="detail-icon">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="9" />
-
-                                        <path d="M12 11v5M12 8h.01" />
-                                    </svg>
-                                </span>
-
-                                <h3>
-                                    Additional Details
-                                </h3>
-                            </div>
-
-                            <p class="detail-text">
-                                {{
-                                    selectedReport
-                                        .additional_details
-                                }}
-                            </p>
-                        </section>
-
                         <!-- PRIVATE DETAILS -->
                         <section v-if="
                             selectedReport
@@ -826,96 +810,6 @@ img,
                                         .private_identifying_details
                                 }}
                             </p>
-                        </section>
-
-                        <!-- REPORT TIMELINE -->
-                        <section class="
-                                detail-panel
-                                detail-panel-wide
-                            ">
-                            <div class="detail-panel-heading">
-                                <span class="detail-icon">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="9" />
-
-                                        <path d="M12 7v5l3 2" />
-                                    </svg>
-                                </span>
-
-                                <h3>
-                                    Report Timeline
-                                </h3>
-                            </div>
-
-                            <dl class="timeline-summary">
-                                <div>
-                                    <dt>
-                                        Status
-                                    </dt>
-
-                                    <dd>
-                                        <span class="status-badge" :class="normalizeStatus(
-                                            selectedReport
-                                                .status
-                                        )
-                                            ">
-                                            {{
-                                                formatStatus(
-                                                    selectedReport
-                                                        .status
-                                                )
-                                            }}
-                                        </span>
-                                    </dd>
-                                </div>
-
-                                <div>
-                                    <dt>
-                                        Submitted
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            formatDateTime(
-                                                selectedReport
-                                                    .created_at
-                                            )
-                                        }}
-                                    </dd>
-                                </div>
-
-                                <div>
-                                    <dt>
-                                        Date
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            formatDate(
-                                                selectedReport
-                                                    .date_occurred
-                                            )
-                                        }}
-                                    </dd>
-                                </div>
-
-                                <div v-if="
-                                    selectedReport.updated_at
-                                ">
-                                    <dt>
-                                        Updated
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            formatDateTime(
-                                                selectedReport
-                                                    .updated_at
-                                            )
-                                        }}
-                                    </dd>
-                                </div>
-                            </dl>
                         </section>
 
                         <!-- =================================================
@@ -1126,6 +1020,15 @@ const selectedReport =
 const currentImageIndex =
     ref(0)
 
+const previewImages =
+    ref([])
+
+const previewImageIndex =
+    ref(0)
+
+const previewImageUrl =
+    computed(() => previewImages.value[previewImageIndex.value] || null)
+
 const sortOrder =
     ref('newest')
 
@@ -1229,17 +1132,6 @@ const requestDetailOptions = [
 
         description:
             'Request clarification of the item category or color.'
-    },
-
-    {
-        value:
-            'student_information',
-
-        label:
-            'Student Information',
-
-        description:
-            'Request missing student or contact information.'
     },
 
     {
@@ -1358,6 +1250,24 @@ function getImageUrl(
     }
 
     return fallbackImage
+}
+
+function getReportImages(
+    report
+) {
+    if (Array.isArray(report?.images)) {
+        return report.images.map((image) => getImageUrl(image?.file_path || image?.path || image?.url || image))
+    }
+
+    if (Array.isArray(report?.report_images)) {
+        return report.report_images.map((image) => getImageUrl(image?.file_path || image?.path || image?.url || image))
+    }
+
+    if (report?.image) {
+        return [getImageUrl(report.image)]
+    }
+
+    return []
 }
 
 function getReportImage(
@@ -1835,7 +1745,44 @@ function closeDetailModal() {
     currentImageIndex.value =
         0
 
+    previewImages.value = []
+    previewImageIndex.value = 0
+
     resetRequestDetails()
+}
+
+function normalizePreviewImage(item) {
+    if (!item) return null
+    if (typeof item === 'string') return getImageUrl(item)
+    if (typeof item === 'object') return getImageUrl(item.file_path || item.path || item.url || item.image)
+    return null
+}
+
+function openImagePreview(imageList, index = 0) {
+    const rawList = Array.isArray(imageList) ? imageList : [imageList]
+    const list = rawList.map(normalizePreviewImage).filter(Boolean)
+
+    if (!list.length) return
+
+    previewImages.value = list
+    previewImageIndex.value = Math.min(index, list.length - 1)
+}
+
+function showPreviousImage() {
+    if (!previewImages.value.length) return
+
+    previewImageIndex.value = (previewImageIndex.value - 1 + previewImages.value.length) % previewImages.value.length
+}
+
+function showNextImage() {
+    if (!previewImages.value.length) return
+
+    previewImageIndex.value = (previewImageIndex.value + 1) % previewImages.value.length
+}
+
+function closeImagePreview() {
+    previewImages.value = []
+    previewImageIndex.value = 0
 }
 
 /* =====================================================
@@ -2803,7 +2750,7 @@ onMounted(() => {
 }
 
 .card-meta dt {
-    color: #7f8875;
+    color: #ffffff;
 
     font-size: 0.61rem;
 }
@@ -2813,7 +2760,7 @@ onMounted(() => {
 
     overflow: hidden;
 
-    color: #c9cebb;
+    color: #ffffff;
 
     font-size: 0.64rem;
 
@@ -3266,8 +3213,80 @@ onMounted(() => {
     object-fit: contain;
 }
 
+.modal-image-button {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: zoom-in;
+}
+
 .modal-image.fallback-image {
     padding: 24px;
+}
+
+.image-preview-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(3, 12, 6, 0.82);
+}
+
+.image-preview-close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.image-preview-nav {
+    position: absolute;
+    top: 50%;
+    display: grid;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 2rem;
+    line-height: 1;
+    transform: translateY(-50%);
+    cursor: pointer;
+}
+
+.image-preview-nav.prev {
+    left: 24px;
+}
+
+.image-preview-nav.next {
+    right: 24px;
+}
+
+.image-preview-image {
+    display: block;
+    max-width: min(92vw, 1100px);
+    max-height: 90vh;
+    border-radius: 12px;
+    object-fit: contain;
+    background: #0a190e;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
 }
 
 .image-thumbnails {
@@ -3338,7 +3357,7 @@ onMounted(() => {
 
     margin-bottom: 3px;
 
-    color: #a8b59f;
+    color: #ffffff;
 
     font-size: 0.61rem;
 }
@@ -3483,7 +3502,7 @@ onMounted(() => {
 
 .info-list dt,
 .timeline-summary dt {
-    color: #a8b59f;
+    color: #ffffff;
 
     font-size: 0.61rem;
 }
@@ -3492,7 +3511,7 @@ onMounted(() => {
 .timeline-summary dd {
     margin: 0;
 
-    color: #e1e7d8;
+    color: #ffffff;
 
     font-size: 0.64rem;
 
@@ -3504,7 +3523,7 @@ onMounted(() => {
 .detail-text {
     margin: 0;
 
-    color: #e1e7d8;
+    color: #ffffff;
 
     font-size: 0.66rem;
 
@@ -3521,6 +3540,15 @@ onMounted(() => {
 
     background:
         rgba(220, 38, 38, 0.15);
+}
+
+.private-section h3 {
+    color: #d27d77;
+}
+
+.private-section small,
+.private-section .detail-text {
+    color: #ffffff;
 }
 
 .private-icon {
@@ -3572,7 +3600,7 @@ onMounted(() => {
 .request-details-header p {
     margin: 0;
 
-    color: #b9c3b0;
+    color: #ffffff;
 
     font-size: 0.62rem;
 
@@ -3598,7 +3626,7 @@ onMounted(() => {
 
     background: transparent;
 
-    color: #d1d8c8;
+    color: #ffffff;
 
     font: inherit;
 

@@ -126,6 +126,16 @@
         <Transition name="toast-slide">
             <div v-if="toast.message" class="toast" :class="toast.type" role="status">{{ toast.message }}</div>
         </Transition>
+
+        <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
+            <button type="button" class="image-preview-close" aria-label="Close image preview"
+                @click="closeImagePreview">×</button>
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev"
+                aria-label="Previous image" @click="showPreviousImage">‹</button>
+            <img :src="previewImageUrl" alt="Full-size match preview" class="image-preview-image" />
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next" aria-label="Next image"
+                @click="showNextImage">›</button>
+        </div>
     </main>
 </template>
 
@@ -141,9 +151,13 @@ const loading = ref(false)
 const decisionLoading = ref(false)
 const errorMessage = ref('')
 const selectedMatch = ref(null)
+const previewImages = ref([])
+const previewImageIndex = ref(0)
+const previewImageUrl = computed(() => previewImages.value[previewImageIndex.value] || null)
 const page = ref(1)
 const perPage = 12
 const toast = reactive({ message: '', type: 'success' })
+const fallbackImage = '/images/snsu-logo.png'
 let toastTimer
 
 const statusTabs = [
@@ -172,7 +186,11 @@ const ReportPreview = defineComponent({
     setup(props) {
         return () => h('div', { class: 'report-preview' }, [
             h('span', { class: 'report-label' }, props.label),
-            getReportImageElement(props.report, props.type),
+            h('button', {
+                type: 'button',
+                class: 'report-image-button',
+                onClick: () => openImagePreview(getReportImages(props.report, true), 0),
+            }, [getReportImageElement(props.report, props.type)]),
             h('h3', props.report?.title || 'Untitled report'), h('p', getCategory(props.report)),
             h('small', `Location: ${props.report?.location || 'Not provided'}`),
             h('small', `Reported: ${formatDate(props.report?.created_at || props.report?.date_occurred)}`),
@@ -185,20 +203,38 @@ const ReportDetail = defineComponent({
     setup(props) {
         return () => h('article', { class: 'report-detail' }, [
             h('div', { class: 'detail-heading' }, [h('span', { class: `report-dot ${props.type}` }), h('h3', props.title)]),
-            getReportImageElement(props.report, props.type),
-            h('dl', [
+            h('button', {
+                type: 'button',
+                class: 'report-image-button',
+                onClick: () => openImagePreview(getReportImages(props.report, true), 0),
+            }, [getReportImageElement(props.report, props.type)]),
+            h('div', { class: 'detail-panel-heading' }, [
+                h('span', { class: 'detail-icon' }, [
+                    h('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' }, [
+                        h('path', { d: 'M5 5h14v14H5zM8 9h8M8 13h8M8 17h5' }),
+                    ]),
+                ]),
+                h('h3', 'Item Information'),
+            ]),
+            h('dl', { class: 'info-list' }, [
                 detailRow('Title', props.report?.title || 'Untitled report'),
+                detailRow('Color', props.report?.color || 'N/A'),
                 detailRow('Category', getCategory(props.report)),
-                detailRow('Description', getDescription(props.report), 'description-row'),
                 detailRow('Location', props.report?.location || 'Not provided'),
-                detailRow('Reported by', props.report?.student?.full_name || props.report?.student?.name || 'Student reporter'),
-                detailRow('Reported', formatDate(props.report?.created_at || props.report?.date_occurred)),
+                detailRow('Date', formatDate(props.report?.date_occurred || props.report?.created_at)),
+                detailRow('Time', props.report?.time_found || props.report?.time_occurred || '—'),
+                detailRow('Report ID', props.report?.id ? `#${props.report.id}` : '—'),
             ]),
         ])
     },
 })
 
-function detailRow(label, value, className = '') { return h('div', { class: className }, [h('dt', label), h('dd', value)]) }
+function detailRow(label, value, className = 'info-row') {
+    return h('div', { class: className }, [
+        h('dt', { class: 'info-label' }, label),
+        h('dd', { class: 'info-value' }, value),
+    ])
+}
 function scorePercent(value) { const score = Number(value) || 0; return score <= 1 ? Math.round(score * 100) : Math.round(score) }
 function scoreClass(value) { const score = scorePercent(value); return score >= 90 ? 'high' : score >= 70 ? 'medium' : 'low' }
 function confidenceLabel(value) { return scoreClass(value) === 'high' ? 'High Confidence' : scoreClass(value) === 'medium' ? 'Medium Confidence' : 'Low Confidence' }
@@ -206,16 +242,53 @@ function isPending(value) { return !['confirmed', 'rejected'].includes(String(va
 function statusClass(value) { return String(value || 'pending').toLowerCase() }
 function formatStatus(value) { return String(value || 'pending').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()) }
 function getCategory(report) { return report?.category?.name || report?.category || report?.item_category || 'Uncategorized' }
-function getDescription(report) { return report?.description || report?.additional_details || 'No description provided.' }
+function getDescription(report) { return report?.description || report?.ownership_proof || 'No description provided.' }
 function sourceLabel(match) { return match?.source || 'System generated suggestion' }
-function getReportImage(report) { const image = report?.images?.find((item) => item.is_primary) || report?.images?.[0]; const path = image?.file_path || image?.path || report?.image; if (!path) return null; return path.startsWith('http') || path.startsWith('/') ? path : `/storage/${path}` }
-function getReportImageElement(report, type) { const imagePath = getReportImage(report); return imagePath ? h('img', { src: imagePath, alt: report?.title || `${type} report image` }) : h('div', { class: 'image-placeholder' }, 'No image available') }
+function getImageUrl(imagePath) {
+    if (!imagePath) return fallbackImage
+    if (typeof imagePath === 'string') {
+        const normalized = imagePath.trim()
+        if (!normalized) return fallbackImage
+        if (/^https?:\/\//i.test(normalized) || /^data:|^blob:/i.test(normalized) || normalized.startsWith('/')) return normalized
+        if (normalized.startsWith('public/assets/')) return `/${normalized.replace(/^public\//, '')}`
+        if (normalized.startsWith('assets/')) return `/${normalized}`
+        if (normalized.startsWith('storage/')) return `/${normalized}`
+        return `/storage/${normalized}`
+    }
+    return fallbackImage
+}
+function getReportImages(report, single = false) {
+    const sources = []
+    if (Array.isArray(report?.images)) sources.push(...report.images)
+    if (Array.isArray(report?.report_images)) sources.push(...report.report_images)
+    if (!sources.length && report?.image) return [getImageUrl(report.image)]
+    const urls = sources.map((image) => getImageUrl(image?.file_path || image?.path || image?.url || image))
+    if (single) return urls.slice(0, 1)
+    return urls
+}
+function getReportImage(report, index = 0) {
+    const images = Array.isArray(report?.images) ? report.images : []
+    const image = images[index] || images[0]
+    if (!image) {
+        if (report?.image) return getImageUrl(report.image)
+        return fallbackImage
+    }
+    return getImageUrl(image.file_path || image.path || image.url || report?.image)
+}
+function getReportImageElement(report, type) {
+    const imagePath = getReportImage(report)
+    return h('img', { src: imagePath, alt: report?.title || `${type} report image`, class: 'report-detail-image' })
+}
 function formatDate(value) { return value ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not provided' }
 function matchReasons(match) { const lost = match.lost_report || {}; const found = match.found_report || {}; const reasons = []; if (getCategory(lost).toLowerCase() === getCategory(found).toLowerCase()) reasons.push('Same item category'); if (lost.color && found.color && lost.color.toLowerCase() === found.color.toLowerCase()) reasons.push('Similar color description'); if (lost.location && found.location && (lost.location.toLowerCase().includes(found.location.toLowerCase()) || found.location.toLowerCase().includes(lost.location.toLowerCase()))) reasons.push('Same location area'); if (lost.description && found.description) reasons.push('Matching item details'); return reasons.length ? reasons : ['Backend-generated similarity score', 'Review the report details before deciding'] }
 function showToast(message, type = 'success') { toast.message = message; toast.type = type; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toast.message = '' }, 3500) }
 function openReview(match) { selectedMatch.value = match }
 function closeReview() { if (!decisionLoading.value) selectedMatch.value = null }
 function requestReject(match) { if (window.confirm('Reject this match? This will close this suggestion as a mismatch.')) rejectMatch(match) }
+function openImagePreview(imageList, index = 0) { const list = Array.isArray(imageList) ? imageList : [imageList].filter(Boolean); if (!list.length) return; previewImages.value = list; previewImageIndex.value = Math.min(index, list.length - 1) }
+function showPreviousImage() { if (!previewImages.value.length) return; previewImageIndex.value = (previewImageIndex.value - 1 + previewImages.value.length) % previewImages.value.length }
+function showNextImage() { if (!previewImages.value.length) return; previewImageIndex.value = (previewImageIndex.value + 1) % previewImages.value.length }
+function closeImagePreview() { previewImages.value = []; previewImageIndex.value = 0 }
 
 async function loadMatches() { loading.value = true; errorMessage.value = ''; try { const response = await api.get('/api/admin/matches'); matches.value = Array.isArray(response.data?.data) ? response.data.data : [] } catch (error) { errorMessage.value = error.response?.data?.message || 'Failed to load potential matches.'; matches.value = [] } finally { loading.value = false } }
 async function confirmMatch(match) { decisionLoading.value = true; try { await api.put(`/api/admin/matches/${match.id}/confirm`); match.status = 'confirmed'; showToast('Match confirmed. The student has been notified.'); selectedMatch.value = null; await loadMatches() } catch (error) { showToast(error.response?.data?.message || 'Unable to confirm match.', 'error') } finally { decisionLoading.value = false } }
@@ -841,62 +914,115 @@ button:disabled {
     background: #86efac;
 }
 
-.report-detail>img {
+.report-detail .report-image-button {
+    display: block;
     width: 100%;
-    height: 200px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: zoom-in;
+}
+
+.report-detail>img,
+.report-detail .report-image-button img,
+.report-detail .report-detail-image {
+    display: block;
+    width: 100%;
+    height: 145px;
     margin-bottom: 13px;
     padding: 8px;
     object-fit: contain;
-    border-radius: 6px;
+    border-radius: 9px;
     background: #102316;
 }
 
-.report-detail>.image-placeholder {
+.report-detail>.image-placeholder,
+.report-detail .report-image-button .image-placeholder {
     display: grid;
-    width: 50%;
-    height: 50px;
+    width: 100%;
+    height: 145px;
     margin-bottom: 13px;
     place-items: center;
     border: 1px dashed rgba(255, 255, 255, .16);
-    border-radius: 6px;
+    border-radius: 9px;
     background: rgba(8, 25, 14, .28);
     color: #9eae9f;
     font-size: .68rem;
 }
 
-.report-detail dl {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+.report-detail .detail-panel-heading {
+    display: flex;
+    align-items: center;
     gap: 8px;
-    margin: 0;
+    margin-bottom: 9px;
 }
 
-.report-detail dl>div {
-    min-width: 0;
-    padding: 8px 9px;
-    border: 1px solid rgba(255, 255, 255, .08);
+.report-detail .detail-panel-heading h3 {
+    margin: 0;
+    color: #f4f1e5;
+    font-size: .73rem;
+    font-weight: 750;
+}
+
+.report-detail .detail-icon {
+    display: grid;
+    width: 25px;
+    height: 25px;
+    flex: 0 0 auto;
+    place-items: center;
     border-radius: 6px;
-    background: rgba(255, 255, 255, .035);
+    background: rgba(196, 157, 59, .1);
+    color: #d2b45d;
 }
 
-.report-detail dl>.description-row {
-    grid-column: 1 / -1;
+.report-detail .detail-icon svg {
+    width: 12px;
+    height: 12px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
-.report-detail dt {
-    margin-bottom: 4px;
-    color: #93a794;
-    font-size: .68rem;
-    font-weight: 700;
-}
-
-.report-detail dd {
+.report-detail dl {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
     margin: 0;
-    color: #e1e7d8;
-    font-size: .7rem;
-    font-weight: 600;
-    line-height: 1.4;
+}
+
+.report-detail .info-row {
+    display: grid;
+    grid-template-columns: 94px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 7px 0;
+    border-top: 1px solid rgba(255, 255, 255, .04);
+}
+
+.report-detail .info-row:first-child {
+    border-top: 0;
+}
+
+.report-detail .info-label {
+    display: block;
+    margin: 0;
+    color: #eff7f7;
+    font-size: .61rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.report-detail .info-value {
+    display: block;
+    margin: 0;
+    color: #ffffff;
+    font-size: .64rem;
+    line-height: 1.45;
+    font-weight: 700;
     overflow-wrap: anywhere;
+    text-align: left;
 }
 
 .analysis-panel {

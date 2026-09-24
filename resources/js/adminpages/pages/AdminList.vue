@@ -1,9 +1,7 @@
 <template>
     <section class="student-management-page">
         <header class="page-header">
-            <div class="header-copy">
-                <h1>Manage student accounts and directory records</h1>
-            </div>
+            <div class="header-copy"></div>
 
             <div class="header-actions">
                 <button type="button" class="primary-action-btn" @click="openStudentModal('create')">
@@ -105,7 +103,7 @@
                                 <div>
                                     <div class="student-name">{{ student.name }}</div>
                                     <div class="student-subtext">{{ student.department || student.course || 'No program'
-                                    }}</div>
+                                        }}</div>
                                 </div>
                             </td>
                             <td>{{ studentId(student) }}</td>
@@ -171,7 +169,7 @@
                                 <span>First name *</span>
                                 <input v-model.trim="studentForm.first_name" type="text" placeholder="First name" />
                                 <span v-if="studentErrors.first_name" class="field-error">{{ studentErrors.first_name
-                                }}</span>
+                                    }}</span>
                             </label>
 
                             <label>
@@ -183,7 +181,7 @@
                                 <span>Last name *</span>
                                 <input v-model.trim="studentForm.last_name" type="text" placeholder="Last name" />
                                 <span v-if="studentErrors.last_name" class="field-error">{{ studentErrors.last_name
-                                }}</span>
+                                    }}</span>
                             </label>
                         </div>
 
@@ -191,7 +189,7 @@
                             <span>Student ID *</span>
                             <input v-model.trim="studentForm.student_id" type="text" placeholder="e.g. 2026-00123" />
                             <span v-if="studentErrors.student_id" class="field-error">{{ studentErrors.student_id
-                            }}</span>
+                                }}</span>
                         </label>
                     </div>
 
@@ -204,7 +202,7 @@
                                 <option v-for="course in COURSES" :key="course" :value="course">{{ course }}</option>
                             </select>
                             <span v-if="studentErrors.course_base" class="field-error">{{ studentErrors.course_base
-                            }}</span>
+                                }}</span>
                         </label>
 
                         <label v-if="needsMajorSelection">
@@ -225,7 +223,7 @@
                                 </option>
                             </select>
                             <span v-if="studentErrors.concentration" class="field-error">{{ studentErrors.concentration
-                            }}</span>
+                                }}</span>
                         </label>
 
                         <label>
@@ -235,7 +233,7 @@
                                 <option v-for="year in YEAR_LEVELS" :key="year" :value="year">{{ year }}</option>
                             </select>
                             <span v-if="studentErrors.year_level" class="field-error">{{ studentErrors.year_level
-                            }}</span>
+                                }}</span>
                         </label>
 
                         <label>
@@ -245,7 +243,7 @@
                                 <option v-for="dept in DEPARTMENTS" :key="dept" :value="dept">{{ dept }}</option>
                             </select>
                             <span v-if="studentErrors.department" class="field-error">{{ studentErrors.department
-                            }}</span>
+                                }}</span>
                         </label>
                     </div>
 
@@ -258,6 +256,8 @@
                                     @input="studentEmailEdited = true" />
                                 <span class="email-domain">@ssct.edu.ph</span>
                             </div>
+                            <small v-if="emailDuplicateWarning" class="email-warning">{{ emailDuplicateWarning
+                                }}</small>
                             <span v-if="studentErrors.email" class="field-error">{{ studentErrors.email }}</span>
                         </label>
 
@@ -266,6 +266,9 @@
                             <div class="password-input-wrap">
                                 <input v-model="studentForm.password" :type="showPassword ? 'text' : 'password'"
                                     placeholder="Set password" />
+                                <button type="button" class="generate-password-btn" @click="generateTemporaryPassword">
+                                    Generate
+                                </button>
                                 <button type="button" class="password-toggle-btn"
                                     :aria-label="showPassword ? 'Hide password' : 'Show password'"
                                     @click="showPassword = !showPassword">
@@ -335,25 +338,25 @@
 
                 <div class="details-grid profile-details-grid">
                     <div class="detail-row"><span>School ID</span><strong>{{ studentId(selectedStudent)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Status</span><strong>{{ studentStatus(selectedStudent) }}</strong>
                     </div>
                     <div class="detail-row detail-row-wide"><span>Email</span><strong>{{ selectedStudent.email || '—'
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row detail-row-wide"><span>Course</span><strong>{{ selectedStudent.course || '—'
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Department</span><strong>{{ selectedStudent.department || '—'
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Year level</span><strong>{{ selectedStudent.year_level || '—'
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Recognition points</span><strong>{{ recognitionPoints(selectedStudent)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Peso value</span><strong>₱{{ pesoValue(selectedStudent) }}</strong>
                     </div>
                     <div class="detail-row"><span>Created date</span><strong>{{ formatDate(selectedStudent.created_at)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Updated date</span><strong>{{ formatDate(selectedStudent.updated_at)
-                            }}</strong></div>
+                    }}</strong></div>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="ghost-btn" @click="closeDetailsModal">Close</button>
@@ -386,35 +389,60 @@ import api from '@/bootstrap'
 const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year']
 
 const DEPARTMENTS = [
-    'College of Arts and Sciences',
-    'College of Engineering',
-    'College of Computing and Information Sciences',
-    'College of Teacher Education',
-    'College of Business and Technology',
+    'College of Computing and Information Sciences (CCIS)',
+    'College of Arts & Sciences (CAS)',
+    'College of Engineering (COE)',
+    'College of Teacher Education (CTE)',
+    'College of Business and Technology (CBT)',
+]
+
+const COURSE_DEPARTMENT_MAP = [
+    { keywords: ['computer science', 'bscs'], department: 'College of Computing and Information Sciences (CCIS)' },
+    { keywords: ['information technology', 'bsit', 'b.s. i.t.', 'bs i.t.'], department: 'College of Computing and Information Sciences (CCIS)' },
+    { keywords: ['information systems', 'bsis'], department: 'College of Computing and Information Sciences (CCIS)' },
+    { keywords: ['information system', 'bsis'], department: 'College of Computing and Information Sciences (CCIS)' },
+    { keywords: ['mathematics', 'bsmath', 'bs math'], department: 'College of Arts & Sciences (CAS)' },
+    { keywords: ['environmental science', 'bses'], department: 'College of Arts & Sciences (CAS)' },
+    { keywords: ['english language', 'ba english'], department: 'College of Arts & Sciences (CAS)' },
+    { keywords: ['civil engineering', 'bsce'], department: 'College of Engineering (COE)' },
+    { keywords: ['electrical engineering', 'bsee'], department: 'College of Engineering (COE)' },
+    { keywords: ['electronics engineering', 'bsece'], department: 'College of Engineering (COE)' },
+    { keywords: ['computer engineering', 'bscpe', 'bscope', 'computer engineering'], department: 'College of Engineering (COE)' },
+    { keywords: ['elementary education', 'beed'], department: 'College of Teacher Education (CTE)' },
+    { keywords: ['secondary education', 'bsed', 'bse d'], department: 'College of Teacher Education (CTE)' },
+    { keywords: ['technical teacher education', 'btte'], department: 'College of Teacher Education (CTE)' },
+    { keywords: ['physical education', 'bped'], department: 'College of Teacher Education (CTE)' },
+    { keywords: ['electrical engineering technology', 'beet'], department: 'College of Business and Technology (CBT)' },
+    { keywords: ['electronics engineering technology', 'bexet'], department: 'College of Business and Technology (CBT)' },
+    { keywords: ['mechanical engineering technology', 'bmet'], department: 'College of Business and Technology (CBT)' },
+    { keywords: ['automotive engineering technology', 'baet'], department: 'College of Business and Technology (CBT)' },
+    { keywords: ['industrial technology', 'bindtech', 'industrial technology', 'b ind tech'], department: 'College of Business and Technology (CBT)' },
+    { keywords: ['hospitality management', 'bshm'], department: 'College of Business and Technology (CBT)' },
+    { keywords: ['tourism management', 'bsmt'], department: 'College of Business and Technology (CBT)' },
 ]
 
 const COURSES = [
     'Bachelor of Science in Civil Engineering (BSCE)',
     'Bachelor of Science in Electronics Engineering (BSECE)',
     'Bachelor of Science in Electrical Engineering (BSEE)',
-    'Bachelor of Science in Computer Engineering (BSCoE)',
-    'Bachelor of Automotive Engineering Technology',
-    'Bachelor of Electrical Engineering Technology',
-    'Bachelor of Electronics Engineering Technology',
-    'Bachelor of Mechanical Engineering Technology',
-    'Bachelor of Science in Industrial Technology',
-    'Bachelor of Science in Hospitality Management',
-    'Bachelor of Science in Information System (BSIS)',
-    'Bachelor of Science in Information Technology (BS I.T.)',
+    'Bachelor of Science in Computer Engineering (BSCpE)',
+    'Bachelor of Automotive Engineering Technology (BAET)',
+    'Bachelor of Electrical Engineering Technology (BEET)',
+    'Bachelor of Electronics Engineering Technology (BEXET)',
+    'Bachelor of Mechanical Engineering Technology (BMET)',
+    'Bachelor of Industrial Technology (BIndTech)',
+    'Bachelor of Science in Hospitality Management (BSHM)',
+    'Bachelor of Science in Information Systems (BSIS)',
+    'Bachelor of Science in Information Technology (BSIT)',
     'Bachelor of Science in Computer Science (BSCS)',
-    'Bachelor of Technical Teacher Education (BTTE)',
-    'Bachelor of Secondary Education (BSED)',
-    'Bachelor of Elementary Education (BEED)',
+    'Bachelor of Technical-Vocational Teacher Education (BTVTEd)',
+    'Bachelor of Secondary Education (BSEd)',
+    'Bachelor of Elementary Education (BEEd)',
     'Bachelor of Science in Environmental Science (BSES)',
     'Bachelor of Science in Mathematics (BS Math)',
-    'Bachelor of Science in Tourism Management',
-    'Bachelor of Physical Education',
-    'Bachelor of Arts in English Language',
+    'Bachelor of Science in Tourism Management (BSMT)',
+    'Bachelor of Physical Education (BPEd)',
+    'Bachelor of Arts in English Language (ABEL)',
 ]
 
 const MAJORS_BTTE = ['Automotive Technology', 'Electrical Technology', 'Foods and Services Management']
@@ -510,19 +538,107 @@ function formatDate(value) {
     }).format(date)
 }
 
+function normalizeCourseKey(course) {
+    return String(course || '')
+        .toLowerCase()
+        .replace(/[()]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+function getDepartmentForCourse(course) {
+    const normalized = normalizeCourseKey(course)
+    if (!normalized) return ''
+
+    const match = COURSE_DEPARTMENT_MAP.find(({ keywords }) =>
+        keywords.some((keyword) => normalized.includes(keyword))
+    )
+
+    return match ? match.department : ''
+}
+
+watch(
+    () => studentForm.value.course_base,
+    (course) => {
+        if (!course) {
+            studentForm.value.department = ''
+            return
+        }
+
+        const department = getDepartmentForCourse(course)
+        if (department) {
+            studentForm.value.department = department
+        }
+    },
+    { immediate: true }
+)
+
 function resetMessages() {
     errorMessage.value = ''
     statusMessage.value = ''
+}
+
+function normalizeEmailPrefix(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]/g, '')
+}
+
+function getExistingStudentEmails() {
+    return students.value
+        .map((student) => String(student.email || '').trim().toLowerCase())
+        .filter(Boolean)
+}
+
+function generateUniqueEmailPrefix(firstName, lastName) {
+    const first = (firstName || '').trim()
+    const last = (lastName || '').trim()
+    if (!first && !last) return ''
+
+    const baseLast = normalizeEmailPrefix(last)
+    const firstNameChars = normalizeEmailPrefix(first)
+
+    if (!firstNameChars && baseLast) return baseLast
+    if (!baseLast) return firstNameChars
+
+    let candidateBase = firstNameChars.charAt(0) || ''
+    const candidates = []
+
+    for (let i = 1; i <= firstNameChars.length; i++) {
+        const prefix = firstNameChars.slice(0, i)
+        candidates.push(`${prefix}${baseLast}`)
+    }
+
+    const existing = getExistingStudentEmails()
+    const finalChoice = candidates.find((candidate) => !existing.includes(`${candidate}@ssct.edu.ph`))
+
+    return finalChoice || `${firstNameChars.charAt(0) || 'student'}${baseLast}`
 }
 
 function generateEmailPrefix(firstName, lastName) {
     const first = (firstName || '').trim()
     const last = (lastName || '').trim()
     if (!first && !last) return ''
-    if (!first) return last.toLowerCase()
-    if (!last) return first.toLowerCase()
-    return `${first.charAt(0).toLowerCase()}${last.toLowerCase()}`
+    if (!first) return normalizeEmailPrefix(last)
+    if (!last) return normalizeEmailPrefix(first)
+
+    return generateUniqueEmailPrefix(first, last)
 }
+
+const emailDuplicateWarning = computed(() => {
+    const email = normalizeEmailPrefix(studentForm.value.emailPrefix)
+    if (!email) return ''
+
+    const fullEmail = `${email}@ssct.edu.ph`
+    const exists = students.value.some((student) => String(student.email || '').toLowerCase() === fullEmail)
+
+    if (exists) {
+        return 'This email already exists. A unique email was generated automatically.'
+    }
+
+    return ''
+})
 
 watch(
     [() => studentForm.value.first_name, () => studentForm.value.last_name],
@@ -533,22 +649,50 @@ watch(
     },
 )
 
+function generateTemporaryPassword() {
+    const specials = '!_.-'
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz'
+    const digits = '0123456789'
+
+    const randomChar = (set) => set[Math.floor(Math.random() * set.length)]
+    const password = [
+        randomChar(uppercase),
+        randomChar(lowercase),
+        randomChar(digits),
+        randomChar(specials),
+        randomChar(lowercase),
+        randomChar(digits),
+        randomChar(uppercase),
+        randomChar(specials),
+        randomChar(lowercase),
+        randomChar(digits),
+    ].join('')
+
+    studentForm.value.password = password
+    studentForm.value.confirm_password = password
+}
+
 const needsMajorSelection = computed(() => {
-    return studentForm.value.course_base === 'Bachelor of Technical Teacher Education (BTTE)' || studentForm.value.course_base === 'Bachelor of Secondary Education (BSED)'
+    const course = String(studentForm.value.course_base || '').toLowerCase()
+    return course.includes('technical') && course.includes('teacher education') || course.includes('secondary education')
 })
 
 const needsConcentrationSelection = computed(() => {
-    return studentForm.value.course_base === 'Bachelor of Mechanical Engineering Technology'
+    const course = String(studentForm.value.course_base || '').toLowerCase()
+    return course.includes('mechanical engineering technology') || course.includes('bmet')
 })
 
 const AVAILABLE_MAJORS = computed(() => {
-    if (studentForm.value.course_base === 'Bachelor of Technical Teacher Education (BTTE)') return MAJORS_BTTE
-    if (studentForm.value.course_base === 'Bachelor of Secondary Education (BSED)') return MAJORS_BSED
+    const course = String(studentForm.value.course_base || '').toLowerCase()
+    if ((course.includes('technical') && course.includes('teacher education')) || course.includes('btte')) return MAJORS_BTTE
+    if (course.includes('secondary education') || course.includes('bsed')) return MAJORS_BSED
     return []
 })
 
 const AVAILABLE_CONCENTRATIONS = computed(() => {
-    if (studentForm.value.course_base === 'Bachelor of Mechanical Engineering Technology') return CONCENTRATIONS_BMET
+    const course = String(studentForm.value.course_base || '').toLowerCase()
+    if (course.includes('mechanical engineering technology') || course.includes('bmet')) return CONCENTRATIONS_BMET
     return []
 })
 
@@ -703,11 +847,14 @@ function validateStudentForm() {
     if (!studentForm.value.year_level) errors.year_level = 'Year level is required.'
     if (!studentForm.value.department) errors.department = 'Department is required.'
 
-    const fullEmail = `${studentForm.value.emailPrefix}@ssct.edu.ph`
-    if (!studentForm.value.emailPrefix) {
+    const currentEmail = normalizeEmailPrefix(studentForm.value.emailPrefix)
+    const fullEmail = `${currentEmail}@ssct.edu.ph`
+    if (!currentEmail) {
         errors.email = 'Email username is required.'
     } else if (!validateEmail(fullEmail)) {
         errors.email = 'Enter a valid SSCT email username.'
+    } else if (getExistingStudentEmails().includes(fullEmail)) {
+        errors.email = 'This email already exists. Please use a unique username.'
     }
 
     if (!studentForm.value.password) {
@@ -764,14 +911,10 @@ async function submitStudent() {
         fullCourseName += ` Concentration in ${studentForm.value.concentration}`
     }
 
-    const studentFullName = [studentForm.value.first_name, studentForm.value.middle_name, studentForm.value.last_name]
-        .filter(Boolean)
-        .join(' ')
-    const middleNameValue = studentForm.value.middle_name?.trim() ? studentForm.value.middle_name.trim() : null
-
     const payload = {
-        name: studentFullName,
-        middle_name: middleNameValue,
+        first_name: studentForm.value.first_name.trim(),
+        middle_name: studentForm.value.middle_name?.trim() ? studentForm.value.middle_name.trim() : null,
+        last_name: studentForm.value.last_name.trim(),
         student_id: studentForm.value.student_id,
         course: fullCourseName,
         year_level: studentForm.value.year_level,
@@ -934,6 +1077,8 @@ onMounted(loadListData)
     background: #3d9b61;
     color: #ffffff;
     box-shadow: 0 8px 20px rgba(38, 120, 73, 0.18);
+    padding: 12px 18px;
+    font-size: 15px;
 }
 
 .secondary-action-btn,
@@ -1035,6 +1180,42 @@ onMounted(loadListData)
 
 .password-input-wrap input {
     padding-right: 44px;
+}
+
+.generate-password-btn {
+    position: absolute;
+    right: 34px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 1px solid rgba(76, 129, 93, 0.5);
+    background: #edf7ef;
+    color: #0a6a43;
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-size: 10px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: none;
+    animation: none;
+    box-shadow: none;
+}
+
+.generate-password-btn:hover,
+.generate-password-btn:focus,
+.generate-password-btn:active {
+    transform: translateY(-50%);
+    background: #edf7ef;
+    color: #0a6a43;
+    box-shadow: none;
+    filter: none;
+}
+
+.email-warning {
+    display: block;
+    margin-top: 6px;
+    color: #f3d46a;
+    font-size: 11px;
+    font-weight: 700;
 }
 
 .password-toggle-btn {
@@ -1183,7 +1364,7 @@ onMounted(loadListData)
 }
 
 .admin-table tbody tr:hover {
-    background: rgba(143, 221, 167, 0.08);
+    background: transparent;
 }
 
 .student-cell {
@@ -1670,173 +1851,5 @@ onMounted(loadListData)
     .pagination-controls {
         justify-content: space-between;
     }
-}
-
-/* Match the Recognition Points emerald theme. */
-.student-management-page {
-    color: #ffffff;
-    background: linear-gradient(135deg, #1a6b4f 0%, #2a9a6f 50%, #1e7e5c 100%);
-}
-
-.page-kicker,
-.field-label {
-    color: #f5d88b;
-}
-
-.page-header h1,
-.page-header p,
-.result-count,
-.pagination-summary,
-.rows-per-page {
-    color: #ffffff;
-}
-
-.student-directory-card {
-    background: rgba(30, 126, 92, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
-}
-
-.toolbar-search input,
-.toolbar-filters select,
-.student-form input,
-.student-form select,
-.rows-per-page select {
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(13, 89, 64, 0.6);
-    color: #ffffff;
-}
-
-.toolbar-search input::placeholder,
-.student-form input::placeholder {
-    color: #b0b0b0;
-}
-
-.toolbar-filters select option,
-.student-form select option {
-    color: #ffffff;
-    background: #1e7e5c;
-}
-
-.admin-table th,
-.admin-table td {
-    border-color: rgba(255, 255, 255, 0.15);
-}
-
-.admin-table thead th {
-    color: #ffffff;
-    background: rgba(13, 89, 64, 0.6);
-}
-
-.admin-table tbody tr:hover {
-    background: rgba(30, 126, 92, 0.3);
-}
-
-.student-name,
-.student-subtext,
-.admin-table td,
-.detail-row strong,
-.details-summary h3 {
-    color: #ffffff;
-}
-
-.student-subtext,
-.pagination-summary,
-.detail-row span,
-.details-summary p,
-.modal-copy {
-    color: #b0b0b0;
-}
-
-.student-avatar,
-.profile-modal-avatar {
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(30, 126, 92, 0.5);
-}
-
-.primary-action-btn,
-.delete-btn {
-    background: linear-gradient(135deg, #d4a547, #e0b850);
-    color: #1e7e5c;
-}
-
-.secondary-action-btn,
-.ghost-btn,
-.pagination-btn,
-.icon-button {
-    background: rgba(255, 255, 255, 0.15);
-    color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.3);
-}
-
-.icon-button.danger,
-.error-alert {
-    background: rgba(255, 107, 107, 0.2);
-    color: #ffb3b3;
-    border-color: rgba(255, 107, 107, 0.4);
-}
-
-.success-alert {
-    background: rgba(81, 207, 102, 0.2);
-    color: #99f5b5;
-    border-color: rgba(81, 207, 102, 0.4);
-}
-
-.status-active {
-    background: rgba(81, 207, 102, 0.2);
-    color: #99f5b5;
-}
-
-.status-inactive,
-.status-pending {
-    background: rgba(255, 255, 255, 0.1);
-    color: #b0b0b0;
-}
-
-.modal-overlay {
-    background: rgba(0, 0, 0, 0.6);
-}
-
-.modal-card,
-.confirmation-card {
-    background: #1e7e5c;
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
-}
-
-.modal-header {
-    border-color: rgba(255, 255, 255, 0.15);
-}
-
-.modal-header h2,
-.form-section h3,
-.confirmation-card h3 {
-    color: #ffffff;
-}
-
-.close-button,
-.modal-copy,
-.student-form label {
-    color: #e0e0e0;
-}
-
-.details-summary,
-.detail-row,
-.email-domain {
-    border-color: rgba(255, 255, 255, 0.2);
-    background: rgba(13, 89, 64, 0.6);
-}
-
-.detail-row span {
-    color: #b0b0b0;
-}
-
-.modal-eyebrow {
-    color: #f5d88b;
-}
-
-.locked-field {
-    background: rgba(13, 89, 64, 0.6) !important;
-    color: #b0b0b0 !important;
 }
 </style>

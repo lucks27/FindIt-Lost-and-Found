@@ -27,7 +27,7 @@
             <div v-if="!events.length" class="small-empty">No events have been added yet.</div>
             <div v-else class="event-list">
                 <div v-for="event in events" :key="event.id" class="event-row"><strong>{{ event.name
-                }}</strong><span class="event-amount">₱{{ money(event.fine_amount) }}</span></div>
+                        }}</strong><span class="event-amount">₱{{ money(event.fine_amount) }}</span></div>
             </div>
         </section>
 
@@ -55,7 +55,7 @@
                         <tr>
                             <th>Student name</th>
                             <th>Student ID</th>
-                            <th>Event</th>
+                            <th>Fine balance</th>
                             <th>Amount to pay</th>
                             <th>View</th>
                         </tr>
@@ -79,7 +79,7 @@
                         @click="currentPage--">Previous</button>
                     <button v-for="page in pageCount" :key="page" type="button"
                         :class="['pagination-button', { active: page === currentPage }]" @click="currentPage = page">{{
-                        page }}</button>
+                            page }}</button>
                     <button type="button" class="pagination-button" :disabled="currentPage === pageCount"
                         @click="currentPage++">Next</button>
                 </div>
@@ -91,7 +91,7 @@
                 <div class="modal-top">
                     <div>
                         <p class="page-kicker">Transaction details</p>
-                        <h2 id="transaction-title">{{ selectedTransaction.event_name }}</h2>
+                        <h2 id="transaction-title">{{ selectedTransaction.event_name || 'Combined fine balance' }}</h2>
                     </div><button type="button" class="close-button" aria-label="Close details"
                         @click="selectedTransaction = null">×</button>
                 </div>
@@ -106,13 +106,9 @@
                         selectedTransaction.amount) }}</strong></div>
                     <div><span>Amount to pay</span><strong>₱{{ money(selectedTransaction.amount_to_pay ||
                         selectedTransaction.amount) }}</strong></div>
-                    <div><span>Paid amount</span><strong>₱{{ money(selectedTransaction.paid_amount) }}</strong></div>
-                    <div><span>Remaining amount to pay</span><strong class="remaining">₱{{
+                    <div><span>Balance</span><strong class="remaining">₱{{
                         money(remaining(selectedTransaction)) }}</strong></div>
                     <div><span>Status</span><strong class="status-text">{{ selectedTransaction.status }}</strong></div>
-                    <div class="reason-detail"><span>Reason</span><strong><span v-if="selectedTransaction.reason">{{
-                        selectedTransaction.reason }}</span><span v-else>No reason provided</span></strong>
-                    </div>
                 </div>
                 <div class="modal-actions"><button type="button" class="reject-button"
                         :disabled="selectedTransaction.status === 'rejected'"

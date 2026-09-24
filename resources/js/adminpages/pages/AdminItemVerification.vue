@@ -183,6 +183,7 @@
 
                             <p>
                                 {{
+                                    item.report?.ownership_proof ||
                                     item.ownership_proof ||
                                     'No ownership proof provided.'
                                 }}
@@ -461,19 +462,23 @@
                         <section class="modal-overview">
                             <div class="modal-media">
                                 <div class="modal-image-container">
-                                    <img :src="getReportImage(
-                                        selectedVerification.report,
-                                        currentImageIndex
-                                    )
-                                        " :alt="selectedVerification
-                                            .report?.title ||
-                                            'Found item'
-                                            " class="modal-image" :class="{
-                                                'fallback-image':
-                                                    !hasReportImages(
-                                                        selectedVerification.report
-                                                    )
-                                            }" />
+                                    <button type="button" class="modal-image-button"
+                                        @click="openImagePreview(getReportImages(selectedVerification.report), currentImageIndex)"
+                                        aria-label="View full-size item image">
+                                        <img :src="getReportImage(
+                                            selectedVerification.report,
+                                            currentImageIndex
+                                        )
+                                            " :alt="selectedVerification
+                                                .report?.title ||
+                                                'Found item'
+                                                " class="modal-image" :class="{
+                                                    'fallback-image':
+                                                        !hasReportImages(
+                                                            selectedVerification.report
+                                                        )
+                                                }" />
+                                    </button>
                                 </div>
 
                                 <div v-if="
@@ -503,6 +508,16 @@ image,
                                 </div>
                             </div>
 
+                            <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
+                                <button type="button" class="image-preview-close" aria-label="Close image preview"
+                                    @click="closeImagePreview">×</button>
+                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev"
+                                    aria-label="Previous image" @click="showPreviousImage">‹</button>
+                                <img :src="previewImageUrl" alt="Full-size item preview" class="image-preview-image" />
+                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next"
+                                    aria-label="Next image" @click="showNextImage">›</button>
+                            </div>
+
                             <div class="overview-information">
                                 <div class="overview-field">
                                     <span>
@@ -524,10 +539,11 @@ image,
                                     </span>
 
                                     <strong>
-                                        #{{
-                                            selectedVerification
-                                                .claimant_student_id ||
-                                            '—'
+                                        {{
+                                            getClaimantField(
+                                                selectedVerification,
+                                                'student_id_number'
+                                            )
                                         }}
                                     </strong>
                                 </div>
@@ -590,20 +606,6 @@ image,
                                                 getClaimantName(
                                                     selectedVerification
                                                 )
-                                            }}
-                                        </dd>
-                                    </div>
-
-                                    <div>
-                                        <dt>
-                                            Claimant ID
-                                        </dt>
-
-                                        <dd>
-                                            {{
-                                                selectedVerification
-                                                    .claimant_student_id ||
-                                                '—'
                                             }}
                                         </dd>
                                     </div>
@@ -800,6 +802,20 @@ image,
                                             }}
                                         </dd>
                                     </div>
+
+                                    <div>
+                                        <dt>
+                                            Description
+                                        </dt>
+
+                                        <dd>
+                                            {{
+                                                selectedVerification
+                                                    .report?.description ||
+                                                'No report description provided.'
+                                            }}
+                                        </dd>
+                                    </div>
                                 </dl>
                             </section>
                         </div>
@@ -841,197 +857,32 @@ image,
                                     <p>
                                         {{
                                             selectedVerification
+                                                .report?.ownership_proof ||
+                                            selectedVerification
                                                 .ownership_proof ||
                                             'No ownership proof provided.'
                                         }}
                                     </p>
                                 </div>
 
-                                <div class="evidence-block">
+                                <div class="evidence-block private-evidence">
                                     <span>
-                                        Additional Proof
+                                        Private Identifying Details
                                     </span>
 
                                     <p>
                                         {{
                                             selectedVerification
-                                                .additional_proof ||
-                                            'No additional proof provided.'
+                                                .report?.private_identifying_details ||
+                                            selectedVerification
+                                                .report?.ownership_proof ||
+                                            'No private identifying details provided.'
                                         }}
                                     </p>
-                                </div>
-                            </div>
-                        </section>
 
-                        <section class="description-panel">
-                            <span>
-                                Found Item Description
-                            </span>
-
-                            <p>
-                                {{
-                                    selectedVerification
-                                        .report?.description ||
-                                    'No report description provided.'
-                                }}
-                            </p>
-                        </section>
-
-                        <section class="workflow-panel">
-                            <div class="detail-panel-header">
-                                <span class="detail-icon">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="9" />
-
-                                        <path d="M12 7v5l3 2" />
-                                    </svg>
-                                </span>
-
-                                <h3>
-                                    Claim Review Activity
-                                </h3>
-                            </div>
-
-                            <div class="workflow-grid">
-                                <div class="workflow-item">
-                                    <span>
-                                        Verification ID
-                                    </span>
-
-                                    <strong>
-                                        #{{ selectedVerification.id }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Status
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatStatus(
-                                                selectedVerification.status
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Review Notes
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            getReviewNotes(
-                                                selectedVerification
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Details Requested
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatDateTime(
-                                                selectedVerification
-                                                    .details_requested_at
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Requested By
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            getDetailsRequestAdmin(
-                                                selectedVerification
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Reviewed By
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            getReviewedByAdmin(
-                                                selectedVerification
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Reviewed At
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatDateTime(
-                                                selectedVerification
-                                                    .reviewed_at
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Created
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatDateTime(
-                                                selectedVerification
-                                                    .created_at
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Last Updated
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatDateTime(
-                                                selectedVerification
-                                                    .updated_at
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
-
-                                <div class="workflow-item">
-                                    <span>
-                                        Archived At
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatDateTime(
-                                                selectedVerification
-                                                    .deleted_at
-                                            )
-                                        }}
-                                    </strong>
+                                    <small>
+                                        Visible only to admins and the item owner.
+                                    </small>
                                 </div>
                             </div>
                         </section>
@@ -1362,6 +1213,15 @@ const selectedVerification =
 
 const currentImageIndex =
     ref(0)
+
+const previewImages =
+    ref([])
+
+const previewImageIndex =
+    ref(0)
+
+const previewImageUrl =
+    computed(() => previewImages.value[previewImageIndex.value] || null)
 
 /* =====================================================
    REQUEST DETAILS
@@ -1709,6 +1569,7 @@ function getClaimant(
         item?.claimant_student ||
         item?.claimant ||
         item?.student ||
+        item?.report?.student ||
         null
     )
 }
@@ -1720,16 +1581,22 @@ function getClaimantName(
         getClaimant(
             item
         )
+    const reportStudent =
+        item?.report?.student
 
     return (
         claimant?.name ||
         claimant?.full_name ||
         item?.claimant_name ||
         item?.claimant_student_name ||
+        reportStudent?.name ||
+        reportStudent?.full_name ||
         (
             item?.claimant_student_id
                 ? `Student #${item.claimant_student_id}`
-                : 'Unknown claimant'
+                : item?.report?.student_id
+                    ? `Student #${item.report.student_id}`
+                    : 'Unknown claimant'
         )
     )
 }
@@ -1742,9 +1609,12 @@ function getClaimantField(
         getClaimant(
             item
         )
+    const reportStudent =
+        item?.report?.student
 
     const value =
-        claimant?.[field]
+        claimant?.[field] ??
+        reportStudent?.[field]
 
     return (
         value !== undefined &&
@@ -2557,9 +2427,46 @@ function closeDetailModal() {
     currentImageIndex.value =
         0
 
+    previewImages.value = []
+    previewImageIndex.value = 0
+
     resetRequestDetails()
 
     resetModalMessages()
+}
+
+function normalizePreviewImage(item) {
+    if (!item) return null
+    if (typeof item === 'string') return getImageUrl(item)
+    if (typeof item === 'object') return getImageUrl(item.file_path || item.path || item.url || item.image)
+    return null
+}
+
+function openImagePreview(imageList, index = 0) {
+    const rawList = Array.isArray(imageList) ? imageList : [imageList]
+    const list = rawList.map(normalizePreviewImage).filter(Boolean)
+
+    if (!list.length) return
+
+    previewImages.value = list
+    previewImageIndex.value = Math.min(index, list.length - 1)
+}
+
+function showPreviousImage() {
+    if (!previewImages.value.length) return
+
+    previewImageIndex.value = (previewImageIndex.value - 1 + previewImages.value.length) % previewImages.value.length
+}
+
+function showNextImage() {
+    if (!previewImages.value.length) return
+
+    previewImageIndex.value = (previewImageIndex.value + 1) % previewImages.value.length
+}
+
+function closeImagePreview() {
+    previewImages.value = []
+    previewImageIndex.value = 0
 }
 
 /* =====================================================
@@ -5186,18 +5093,13 @@ onMounted(
 
 .pickup-message-card {
     border:
-        1px solid rgba(215,
-            184,
-            92,
-            0.58);
+        1px solid #d4af37;
 
     background:
-        linear-gradient(135deg,
-            #f6efd3,
-            #ece2bb);
+        #1f6b3a;
 
     color:
-        #173d28;
+        #ffffff;
 }
 
 .pickup-message-icon,
@@ -5226,15 +5128,12 @@ onMounted(
             0.12);
 
     color:
-        #1d5837;
+        #00dd4d;
 }
 
 .transaction-complete-icon {
     background:
-        rgba(34,
-            197,
-            94,
-            0.16);
+        rgba(39, 220, 106, 0.16);
 
     color:
         #b7f3c9;
@@ -5272,7 +5171,8 @@ onMounted(
         3px;
 
     color:
-        #80661e;
+        #facc15;
+    /* Yellow */
 
     font-size:
         0.57rem;
@@ -5301,7 +5201,7 @@ onMounted(
 
 .pickup-message-card h3 {
     color:
-        #173d28;
+        #ffffff;
 }
 
 .pickup-message-card p {
@@ -5309,7 +5209,7 @@ onMounted(
         4px 0 0;
 
     color:
-        #5c6654;
+        #ffffff;
 
     font-size:
         0.61rem;
@@ -5483,9 +5383,81 @@ onMounted(
         contain;
 }
 
+.modal-image-button {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: zoom-in;
+}
+
 .modal-image.fallback-image {
     padding:
         24px;
+}
+
+.image-preview-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(3, 12, 6, 0.82);
+}
+
+.image-preview-close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.image-preview-nav {
+    position: absolute;
+    top: 50%;
+    display: grid;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 2rem;
+    line-height: 1;
+    transform: translateY(-50%);
+    cursor: pointer;
+}
+
+.image-preview-nav.prev {
+    left: 24px;
+}
+
+.image-preview-nav.next {
+    right: 24px;
+}
+
+.image-preview-image {
+    display: block;
+    max-width: min(92vw, 1100px);
+    max-height: 90vh;
+    border-radius: 12px;
+    object-fit: contain;
+    background: #edf4e9;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
 }
 
 .image-thumbnails {
@@ -5927,6 +5899,19 @@ onMounted(
 
     font-weight:
         800;
+}
+
+.private-evidence span,
+.private-evidence p,
+.private-evidence small {
+    color: #fca5a5;
+}
+
+.private-evidence small {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.54rem;
+    font-weight: 700;
 }
 
 .evidence-block p,

@@ -18,6 +18,7 @@ Route::get('/test-me', fn() => response()->json(['status' => 'success']));
 
 // Auth
 Route::post('/login', [StudentLoginController::class, 'login']);
+Route::post('/login/google', [StudentLoginController::class, 'googleLogin']);
 Route::middleware('web')->post('/register', [StudentLoginController::class, 'register']);
 
 // Admin Login Requests
@@ -59,6 +60,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/device-tokens', [App\Http\Controllers\DeviceTokenController::class, 'store']);
     Route::delete('/device-tokens', [App\Http\Controllers\DeviceTokenController::class, 'destroy']);
+    Route::post('/web-push/subscribe', [App\Http\Controllers\DeviceTokenController::class, 'storeWebPushSubscription']);
+    Route::delete('/web-push/unsubscribe', [App\Http\Controllers\DeviceTokenController::class, 'destroyWebPushSubscription']);
 
     Route::post('/logout', [StudentLoginController::class, 'logout']);
 });
@@ -121,6 +124,7 @@ Route::middleware(['web', 'auth:admin'])->group(function () {
     Route::put('/admin/matches/{id}/reset', [App\Http\Controllers\AdminWorkflowController::class, 'resetPotentialMatch']);
 
 
+    Route::post('/admin/event-fine-conversions', [App\Http\Controllers\AdminWorkflowController::class, 'storeEventFineConversion']);
     Route::post('/admin/event-fines/{id}/approve-conversion', [App\Http\Controllers\AdminWorkflowController::class, 'approveEventFineConversion']);
     Route::post('/admin/event-fines/{id}/reject-conversion', [App\Http\Controllers\AdminWorkflowController::class, 'rejectEventFineConversion']);
     Route::post('/admin/event-fines', [App\Http\Controllers\AdminWorkflowController::class, 'storeEventFine']);

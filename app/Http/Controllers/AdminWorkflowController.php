@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\ClaimReview;
 use App\Models\EventFine;
 use App\Models\EventFineArchive;
+use App\Models\EventFineConversion;
 use App\Models\EventFineEvent;
 use App\Models\ItemCategory;
 use App\Models\ItemRelease;
@@ -610,11 +611,6 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $items = EventFine::query()
-            ->with(['student', 'event', 'report', 'issuedByAdmin'])
-            ->latest()
-            ->get();
-
         if ($request->boolean('archived')) {
             return response()->json([
                 'status' => 'success',
@@ -622,11 +618,55 @@ class AdminWorkflowController extends Controller
             ]);
         }
 
-        $items = $items->where('status', '!=', 'paid')->values();
+        $items = EventFine::query()
+            ->with(['student', 'event', 'report', 'issuedByAdmin'])
+            ->where('status', '!=', 'paid')
+            ->latest()
+            ->get();
+
+        $grouped = $items->groupBy(fn(EventFine $fine) => $fine->student_id ?? $fine->student?->id ?? $fine->school_id ?? $fine->id)
+            ->map(function ($group, $key) {
+                $lead = $group->first();
+                $student = $lead?->student;
+                $originalAmount = (float) $group->sum(fn($fine) => (float) ($fine->original_amount ?? $fine->amount ?? 0));
+                $remainingAmount = (float) $group->sum(fn($fine) => (float) ($fine->remaining_amount ?? max(0, (float) ($fine->original_amount ?? $fine->amount ?? 0) - (float) ($fine->paid_amount ?? 0))));
+                $paidAmount = (float) $group->sum(fn($fine) => (float) ($fine->paid_amount ?? 0));
+                $status = strtolower((string) ($lead->status ?? 'pending'));
+
+                if ($status === 'rejected') {
+                    $status = 'rejected';
+                } elseif ($remainingAmount <= 0) {
+                    $status = 'paid';
+                } elseif ($group->contains(fn($fine) => strtolower((string) ($fine->status ?? '')) === 'partially paid')) {
+                    $status = 'partially paid';
+                } elseif ($group->contains(fn($fine) => strtolower((string) ($fine->status ?? '')) === 'approved')) {
+                    $status = 'approved';
+                } else {
+                    $status = 'pending';
+                }
+
+                return [
+                    'id' => $key,
+                    'student_id' => $student?->id ?? $lead?->student_id,
+                    'student_name' => $student?->name ?? $lead?->student_name,
+                    'school_id' => $student?->student_id_number ?? $lead?->school_id,
+                    'event_name' => $group->count() > 1 ? 'Combined fine balance' : ($lead?->event_name ?? 'Student fine balance'),
+                    'amount' => round($originalAmount, 2),
+                    'original_amount' => round($originalAmount, 2),
+                    'amount_to_pay' => round($originalAmount, 2),
+                    'paid_amount' => round($paidAmount, 2),
+                    'remaining_amount' => round($remainingAmount, 2),
+                    'status' => $status,
+                    'student' => $student ? $student->toArray() : null,
+                    'reason' => $lead?->reason,
+                    'due_at' => $lead?->due_at,
+                    'issued_by_admin_id' => $lead?->issued_by_admin_id,
+                ];
+            })->values();
 
         return response()->json([
             'status' => 'success',
-            'data' => $items,
+            'data' => $grouped,
         ]);
     }
 
@@ -1008,9 +1048,14 @@ class AdminWorkflowController extends Controller
             return [
                 'id' => $student->id,
                 'student_id_number' => $student->student_id_number,
+                'student_id' => $student->student_id ?? $student->student_id_number,
                 'profile_photo' => $student->profile_photo,
                 'name' => $student->name,
                 'email' => $student->email,
+                'course' => $student->course,
+                'department' => $student->department,
+                'year_level' => $student->year_level,
+                'status' => $student->status,
                 'recognition_points' => $recognitionPoints,
                 'peso_value' => round($recognitionPoints / self::POINTS_PER_PESO, 2),
                 'report_count' => $student->reports_count,
@@ -1346,6 +1391,22 @@ class AdminWorkflowController extends Controller
                     return response()->json(['status' => 'error', 'message' => 'This report cannot be approved for mobile posting.'], 422);
                 }
 
+                $pointRule = PointRule::query()
+                    ->where(function ($query) use ($report) {
+                        if ($report->category_id) {
+                            $query->where('category_id', $report->category_id);
+                        } else {
+                            $query->where('category_name', $report->category)
+                                ->orWhere('item_category', $report->category);
+                        }
+                    })
+                    ->where(function ($query) {
+                        $query->where('active', true)
+                            ->orWhere('is_active', true);
+                    })
+                    ->latest('id')
+                    ->first();
+
                 $surrender->update([
                     'status' => 'approved',
                     'received_by_admin_id' => $admin->id,
@@ -1356,6 +1417,34 @@ class AdminWorkflowController extends Controller
                     'status' => 'pending_verification',
                     'published_at' => Carbon::now(),
                 ]);
+
+                $basePointsAwarded = $pointRule ? (int) $pointRule->base_points : 5;
+                $pointsAwarded = $basePointsAwarded > 0 ? (int) round($basePointsAwarded / 2) : 0;
+                $pointTransaction = $pointRule ? PointTransaction::firstOrCreate(
+                    [
+                        'reference_type' => SurrenderRequest::class,
+                        'reference_id' => $surrender->id,
+                        'student_id' => $report->student_id,
+                        'type' => 'found_item_published',
+                    ],
+                    [
+                        'amount' => round($pointsAwarded / self::POINTS_PER_PESO, 2),
+                        'points' => $pointsAwarded,
+                        'direction' => 'credit',
+                        'description' => 'Recognition points awarded when a found item was approved for public posting.',
+                        'created_by_admin_id' => $admin->id,
+                    ]
+                ) : null;
+
+                StudentRecognitionRecord::updateOrCreate(
+                    ['student_id' => $report->student_id],
+                    [
+                        'recognition_points' => (int) PointTransaction::where('student_id', $report->student_id)->sum('points'),
+                        'peso_value' => round((int) PointTransaction::where('student_id', $report->student_id)->sum('points') / self::POINTS_PER_PESO, 2),
+                        'reward_count' => (int) ($report->student?->reward_count ?? 0),
+                        'report_count' => $report->student?->reports()->count() ?? 0,
+                    ]
+                );
 
                 ItemVerification::firstOrCreate(
                     ['report_id' => $report->id],
@@ -1374,13 +1463,18 @@ class AdminWorkflowController extends Controller
 
                 Notification::create([
                     'student_id' => $report->student_id,
-                    'title' => 'Found Item Approved',
-                    'message' => "Your found item '{$report->title}' was approved and posted to the mobile app.",
+                    'title' => 'Found Item Published - Points Received',
+                    'message' => "Your found item '{$report->title}' was approved and posted to the mobile app. You received {$pointsAwarded} recognition points.",
                     'action' => 'item_approved',
                     'recipient_id' => $report->student_id,
                     'recipient_role' => 'student',
                     'subject_type' => SurrenderRequest::class,
                     'subject_id' => $surrender->id,
+                    'data' => [
+                        'points_awarded' => $pointsAwarded,
+                        'point_rule_id' => $pointRule?->id,
+                        'point_transaction_id' => $pointTransaction?->id,
+                    ],
                     'is_read' => false,
                 ]);
 
@@ -1392,7 +1486,7 @@ class AdminWorkflowController extends Controller
 
                 return response()->json([
                     'status' => 'success',
-                    'message' => 'Surrender request approved and posted to mobile.',
+                    'message' => "Surrender request approved, posted to mobile, and {$pointsAwarded} recognition points awarded.",
                     'data' => $surrender->fresh(['report', 'student', 'receivedByAdmin']),
                 ]);
             });
@@ -1501,14 +1595,26 @@ class AdminWorkflowController extends Controller
 
                 $report = $verification->report()->lockForUpdate()->firstOrFail();
 
-                if ($report->type !== 'found' || $report->status !== 'pending_verification') {
+                $claim = $report->type === 'lost'
+                    ? ClaimReview::where('report_id', $report->id)
+                        ->whereIn('review_status', ['pending', 'additional_information_required'])
+                        ->latest()
+                        ->lockForUpdate()
+                        ->first()
+                    : null;
+
+                if ($report->type === 'found' && $report->status !== 'pending_verification') {
                     return response()->json(['status' => 'error', 'message' => 'This found report is not ready for verification approval.'], 422);
+                }
+
+                if ($report->type === 'lost' && ($report->status !== 'approved' || !$claim)) {
+                    return response()->json(['status' => 'error', 'message' => 'This lost report has no pending claim ready for USC confirmation.'], 422);
                 }
 
                 $notes = $request->input('notes');
 
                 $verification->update([
-                    'status' => 'verified',
+                    'status' => $report->type === 'lost' ? 'approved' : 'verified',
                     'verifier_admin_id' => $admin->id,
                     'verified_at' => Carbon::now(),
                     'notes' => $notes ?? $verification->notes,
@@ -1517,14 +1623,24 @@ class AdminWorkflowController extends Controller
                     ]),
                 ]);
 
-                $report->update(['status' => 'verified']);
+                if ($claim) {
+                    $claim->update([
+                        'review_status' => 'approved',
+                        'reviewed_by_admin_id' => $admin->id,
+                        'reviewed_at' => Carbon::now(),
+                    ]);
+                } else {
+                    $report->update(['status' => 'verified']);
+                }
 
                 Notification::create([
-                    'student_id' => $report->student_id,
-                    'title' => 'Item Verified by USC',
-                    'message' => "USC has verified your found item '{$report->title}' and it is now visible in the student feed.",
-                    'action' => 'item_verified',
-                    'recipient_id' => $report->student_id,
+                    'student_id' => $claim?->claimant_student_id ?: $report->student_id,
+                    'title' => $claim ? 'Claim Approved by USC' : 'Item Verified by USC',
+                    'message' => $claim
+                        ? 'Your ownership claim was confirmed by USC. The admin will notify you when the item is ready for collection.'
+                        : "USC has verified your found item '{$report->title}' and it is now visible in the student feed.",
+                    'action' => $claim ? 'claim_confirmed' : 'item_verified',
+                    'recipient_id' => $claim?->claimant_student_id ?: $report->student_id,
                     'recipient_role' => 'student',
                     'subject_type' => ItemVerification::class,
                     'subject_id' => $verification->id,
@@ -1537,7 +1653,11 @@ class AdminWorkflowController extends Controller
                     'verified_at' => $verification->verified_at?->toDateTimeString(),
                 ], $request->ip());
 
-                return response()->json(['status' => 'success', 'message' => 'Item verification approved.', 'data' => $verification->fresh(['report', 'verifierAdmin'])]);
+                return response()->json([
+                    'status' => 'success',
+                    'message' => $claim ? 'Claim confirmed. Send the USC Office pickup instruction to the claimant.' : 'Item verification approved.',
+                    'data' => $verification->fresh(['report', 'verifierAdmin']),
+                ]);
             });
         } catch (\Throwable $exception) {
             return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
@@ -1663,6 +1783,7 @@ class AdminWorkflowController extends Controller
             return DB::transaction(function () use ($request, $id, $admin, $validated) {
                 $verification = ItemVerification::with('report')->findOrFail($id);
                 $claim = ClaimReview::where('report_id', $verification->report_id)
+                    ->whereIn('review_status', ['approved', 'pending', 'additional_information_required'])
                     ->whereNotNull('claimant_student_id')
                     ->latest()
                     ->first();
@@ -1674,8 +1795,8 @@ class AdminWorkflowController extends Controller
 
                 Notification::create([
                     'student_id' => $recipientStudentId,
-                    'title' => 'Pickup Instructions',
-                    'message' => $validated['message'],
+                    'title' => 'Item Ready for Claiming',
+                    'message' => $validated['message'] ?: 'Please visit the USC office to claim your item. Bring valid identification and your ownership proof.',
                     'action' => 'claim_pickup_instructions',
                     'recipient_id' => $recipientStudentId,
                     'recipient_role' => 'student',
@@ -1871,8 +1992,11 @@ class AdminWorkflowController extends Controller
                     ->firstOrFail();
 
                 $report = $claim->report()->lockForUpdate()->firstOrFail();
-                if ($report->type !== 'found' || $report->status !== 'verified') {
-                    return response()->json(['status' => 'error', 'message' => 'Only verified found items can be approved for claim review.'], 422);
+                $isClaimReviewReady = ($report->type === 'found' && $report->status === 'verified')
+                    || ($report->type === 'lost' && $report->status === 'approved');
+
+                if (!$isClaimReviewReady) {
+                    return response()->json(['status' => 'error', 'message' => 'Only public approved lost reports or verified found reports can be approved for claim review.'], 422);
                 }
 
                 $claim->update([
@@ -1881,7 +2005,9 @@ class AdminWorkflowController extends Controller
                     'reviewed_at' => Carbon::now(),
                 ]);
 
-                $report->update(['status' => 'ready_for_release']);
+                if ($report->type === 'found') {
+                    $report->update(['status' => 'ready_for_release']);
+                }
 
                 $matchingLostReports = PotentialMatch::where('found_report_id', $report->id)
                     ->with('lostReport')
@@ -1893,12 +2019,14 @@ class AdminWorkflowController extends Controller
                     }
                 }
 
-                $release = ItemRelease::where('report_id', $report->id)
-                    ->where('claimant_student_id', $claim->claimant_student_id)
-                    ->whereIn('status', ['pending', 'approved'])
-                    ->first();
+                $release = $report->type === 'found'
+                    ? ItemRelease::where('report_id', $report->id)
+                        ->where('claimant_student_id', $claim->claimant_student_id)
+                        ->whereIn('status', ['pending', 'approved'])
+                        ->first()
+                    : null;
 
-                if (!$release) {
+                if ($report->type === 'found' && !$release) {
                     $release = ItemRelease::create([
                         'report_id' => $report->id,
                         'claimant_student_id' => $claim->claimant_student_id,
@@ -1919,7 +2047,9 @@ class AdminWorkflowController extends Controller
                 Notification::create([
                     'student_id' => $claim->claimant_student_id,
                     'title' => 'Claim Approved',
-                    'message' => "USC approved your claim for '{$report->title}'.",
+                    'message' => $report->type === 'lost'
+                        ? "USC verified your ownership claim for '{$report->title}'. Please visit the USC office for claiming."
+                        : "USC approved your claim for '{$report->title}'.",
                     'action' => 'claim_approved',
                     'recipient_id' => $claim->claimant_student_id,
                     'recipient_role' => 'student',
@@ -2091,12 +2221,32 @@ class AdminWorkflowController extends Controller
                 $claim->update(['review_status' => 'completed']);
                 $report->update(['status' => 'completed_return']);
 
-                if ($finder) {
-                    $pointRule = PointRule::where('item_category', $report->category)
-                        ->where('active', true)
-                        ->orderByDesc('id')
-                        ->first();
+                $pointRule = PointRule::query()
+                    ->where(function ($query) use ($report) {
+                        if ($report->category_id) {
+                            $query->where('category_id', $report->category_id);
+                        } else {
+                            $query->where('category_name', $report->category)
+                                ->orWhere('item_category', $report->category);
+                        }
+                    })
+                    ->where(function ($query) {
+                        $query->where('active', true)
+                            ->orWhere('is_active', true);
+                    })
+                    ->latest('id')
+                    ->first();
 
+                $publishedAwardPoints = $finder ? (int) PointTransaction::where('student_id', $finder->id)
+                    ->where('reference_type', SurrenderRequest::class)
+                    ->whereIn('reference_id', SurrenderRequest::where('report_id', $report->id)->select('id'))
+                    ->where('type', 'found_item_published')
+                    ->sum('points') : 0;
+
+                $baseReturnPoints = $pointRule ? (int) $pointRule->base_points : 5;
+                $remainingReturnPoints = max(0, $baseReturnPoints - $publishedAwardPoints);
+
+                if ($finder && $remainingReturnPoints > 0) {
                     $existingTransaction = PointTransaction::where('reference_type', ItemRelease::class)
                         ->where('reference_id', $release->id)
                         ->where('student_id', $finder->id)
@@ -2106,10 +2256,10 @@ class AdminWorkflowController extends Controller
                     if (!$existingTransaction) {
                         PointTransaction::create([
                             'student_id' => $finder->id,
-                            'amount' => round((int) ($pointRule?->base_points ?? 5) / self::POINTS_PER_PESO, 2),
-                            'points' => (int) ($pointRule?->base_points ?? 5),
+                            'amount' => round($remainingReturnPoints / self::POINTS_PER_PESO, 2),
+                            'points' => $remainingReturnPoints,
                             'type' => 'return_completion',
-                            'description' => 'Recognition points awarded for completed return.',
+                            'description' => 'Remaining recognition points awarded for completed return.',
                             'reference_type' => ItemRelease::class,
                             'reference_id' => $release->id,
                             'created_by_admin_id' => $admin->id,
@@ -2202,6 +2352,52 @@ class AdminWorkflowController extends Controller
         AuditLog::create($payload);
     }
 
+    public function storeEventFineConversion(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $validated = $request->validate([
+            'student_id' => 'required|exists:students,id',
+            'requested_points' => 'required|integer|min:0',
+            'review_notes' => 'sometimes|nullable|string|max:1000',
+        ]);
+
+        $student = Student::findOrFail($validated['student_id']);
+        $totalOriginalAmount = (float) EventFine::where('student_id', $student->id)->sum('original_amount');
+        $totalRemainingAmount = (float) EventFine::where('student_id', $student->id)->sum('remaining_amount');
+        $availablePoints = (int) $student->pointTransactions()->sum('points');
+        $requestedPoints = min((int) $validated['requested_points'], $availablePoints);
+        $pesoValueConverted = round(min((float) $totalRemainingAmount, $requestedPoints / self::POINTS_PER_PESO), 2);
+        $convertedPoints = (int) round($pesoValueConverted * self::POINTS_PER_PESO);
+        $remainingBalance = max(0, $totalRemainingAmount - $pesoValueConverted);
+
+        $conversion = EventFineConversion::create([
+            'student_id' => $student->id,
+            'event_fine_id' => null,
+            'total_original_amount' => $totalOriginalAmount,
+            'converted_points' => $convertedPoints,
+            'peso_value_converted' => $pesoValueConverted,
+            'remaining_balance' => $remainingBalance,
+            'status' => 'pending',
+            'requested_points' => $requestedPoints,
+            'conversion_rate' => (float) self::POINTS_PER_PESO,
+            'credit_amount' => $pesoValueConverted,
+            'review_notes' => $validated['review_notes'] ?? null,
+            'reviewed_by_admin_id' => null,
+            'reviewed_at' => null,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Fine balance conversion request created.',
+            'data' => $conversion,
+        ]);
+    }
+
     public function approveEventFineConversion($id)
     {
         $admin = Auth::guard('admin')->user();
@@ -2210,10 +2406,67 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $fine = EventFine::findOrFail($id);
-        $fine->update(['status' => (float) $fine->remaining_amount <= 0 ? 'paid' : 'approved']);
+        $conversion = EventFineConversion::find($id);
 
-        return response()->json(['status' => 'success', 'message' => 'Event fine conversion approved.', 'data' => $fine]);
+        if (!$conversion && $student = Student::find($id)) {
+            $conversion = EventFineConversion::where('student_id', $student->id)->latest()->first();
+        }
+
+        if (!$conversion) {
+            $fine = EventFine::findOrFail($id);
+            $fine->update(['status' => (float) $fine->remaining_amount <= 0 ? 'paid' : 'approved']);
+
+            return response()->json(['status' => 'success', 'message' => 'Event fine conversion approved.', 'data' => $fine]);
+        }
+
+        $student = $conversion->student()->firstOrFail();
+        $remainingToApply = (float) $conversion->peso_value_converted;
+        $activeFines = EventFine::where('student_id', $student->id)
+            ->whereNotIn('status', ['paid', 'rejected'])
+            ->orderBy('id')
+            ->get();
+
+        foreach ($activeFines as $fine) {
+            if ($remainingToApply <= 0) {
+                break;
+            }
+
+            $deduction = min((float) ($fine->remaining_amount ?? 0), $remainingToApply);
+            if ($deduction <= 0) {
+                continue;
+            }
+
+            $newRemaining = max(0, (float) ($fine->remaining_amount ?? 0) - $deduction);
+            $fine->update([
+                'paid_amount' => (float) ($fine->paid_amount ?? 0) + $deduction,
+                'paid' => (float) ($fine->paid ?? 0) + $deduction,
+                'remaining_amount' => $newRemaining,
+                'status' => $newRemaining <= 0 ? 'paid' : 'approved',
+            ]);
+
+            $remainingToApply = round($remainingToApply - $deduction, 2);
+        }
+
+        $student->pointTransactions()->create([
+            'type' => 'event_fine_conversion',
+            'direction' => 'debit',
+            'points' => (int) $conversion->converted_points,
+            'amount' => (float) $conversion->peso_value_converted,
+            'description' => 'Student recognition points applied to outstanding fine balance.',
+            'notes' => 'Admin approval for total fine balance conversion.',
+            'processed_by_admin_id' => $admin->id,
+            'created_by_admin_id' => $admin->id,
+        ]);
+
+        $conversion->update([
+            'status' => 'approved',
+            'remaining_balance' => max(0, (float) $conversion->remaining_balance - (float) $conversion->peso_value_converted),
+            'reviewed_by_admin_id' => $admin->id,
+            'reviewed_at' => now(),
+            'review_notes' => $conversion->review_notes ?? 'Approved by admin.',
+        ]);
+
+        return response()->json(['status' => 'success', 'message' => 'Event fine conversion approved.', 'data' => $conversion->fresh()]);
     }
 
     public function rejectEventFineConversion($id)
@@ -2224,10 +2477,27 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $fine = EventFine::findOrFail($id);
-        $fine->update(['status' => 'rejected']);
+        $conversion = EventFineConversion::find($id);
 
-        return response()->json(['status' => 'success', 'message' => 'Event fine conversion rejected.', 'data' => $fine]);
+        if (!$conversion && $student = Student::find($id)) {
+            $conversion = EventFineConversion::where('student_id', $student->id)->latest()->first();
+        }
+
+        if (!$conversion) {
+            $fine = EventFine::findOrFail($id);
+            $fine->update(['status' => 'rejected']);
+
+            return response()->json(['status' => 'success', 'message' => 'Event fine conversion rejected.', 'data' => $fine]);
+        }
+
+        $conversion->update([
+            'status' => 'rejected',
+            'reviewed_by_admin_id' => $admin->id,
+            'reviewed_at' => now(),
+            'review_notes' => $conversion->review_notes ?? 'Rejected by admin.',
+        ]);
+
+        return response()->json(['status' => 'success', 'message' => 'Event fine conversion rejected.', 'data' => $conversion->fresh()]);
     }
 
     public function recordEventFinePayment(Request $request, $id)

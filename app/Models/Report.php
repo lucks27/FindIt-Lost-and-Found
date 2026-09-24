@@ -33,6 +33,7 @@ class Report extends Model
         'date_occurred',
         'time_found',
         'location',
+        'ownership_proof',
         'additional_details',
         'private_identifying_details',
         'status',
@@ -64,6 +65,26 @@ class Report extends Model
         'category',
     ];
 
+    public function getOwnershipProofAttribute()
+    {
+        return $this->attributes['ownership_proof'] ?? $this->attributes['additional_details'] ?? null;
+    }
+
+    public function setOwnershipProofAttribute($value): void
+    {
+        $this->attributes['ownership_proof'] = $value;
+    }
+
+    public function getAdditionalDetailsAttribute()
+    {
+        return $this->getAttribute('ownership_proof');
+    }
+
+    public function setAdditionalDetailsAttribute($value): void
+    {
+        $this->setAttribute('ownership_proof', $value);
+    }
+
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
@@ -77,6 +98,11 @@ class Report extends Model
     public function images(): HasMany
     {
         return $this->hasMany(ReportImage::class);
+    }
+
+    public function visiblePost(): HasOne
+    {
+        return $this->hasOne(VisiblePostedItem::class);
     }
 
     public function rewards(): HasMany

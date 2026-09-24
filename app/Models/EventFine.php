@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EventFine extends Model
 {
@@ -58,5 +59,10 @@ class EventFine extends Model
     public function issuedByAdmin(): BelongsTo
     {
         return $this->belongsTo(Admin::class, 'issued_by_admin_id');
+    }
+
+    public function conversions(): HasMany
+    {
+        return $this->hasMany(EventFineConversion::class, 'event_fine_id');
     }
 }

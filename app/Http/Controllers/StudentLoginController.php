@@ -83,6 +83,61 @@ class StudentLoginController extends Controller
         ], 200);
     }
 
+    public function googleLogin(Request $request)
+    {
+        $email = strtolower(trim((string) $request->input('email', '')));
+        $name = trim((string) $request->input('name', ''));
+        $request->merge(['email' => $email]);
+
+        $request->validate([
+            'email' => 'required|email',
+            'name' => 'nullable|string|max:255',
+        ]);
+
+        if (!str_ends_with($email, '@ssct.edu.ph')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Only SSCT Google accounts are allowed for student login.',
+            ], 401);
+        }
+
+        $student = Student::whereRaw('LOWER(email) = ?', [$email])->first();
+
+        if (!$student) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No student account was found for this Google account. Please contact the administrator to link your school email.',
+            ], 404);
+        }
+
+        if ($name !== '') {
+            $student->update([
+                'first_name' => trim(explode(' ', $name)[0] ?? $student->first_name),
+                'last_name' => trim((string) preg_replace('/^\S+\s*/', '', $name) ?: $student->last_name),
+            ]);
+        }
+
+        $token = $student->createToken('student-google-token')->plainTextToken;
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Google login successful!',
+            'token' => $token,
+            'student_id' => $student->student_id,
+            'student' => [
+                'id' => $student->id,
+                'name' => $student->name,
+                'email' => $student->email,
+                'course' => $student->course,
+                'year_level' => $student->year_level,
+                'department' => $student->department,
+                'profile_photo' => $student->profile_photo,
+                'profile_picture' => $student->profile_photo,
+                'login_method' => 'google',
+            ],
+        ], 200);
+    }
+
     /**
      * Handle student logout for API token auth.
      * This is used by the mobile app when the user taps Logout.
@@ -113,7 +168,9 @@ class StudentLoginController extends Controller
         // Validate input
         $validatedData = $request->validate([
             'student_id' => 'required|string|unique:students,student_id',
-            'name' => 'required|string|max:255',
+            'first_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
             'course' => 'required|string|max:255',
             'email' => 'required|email|unique:students,email',
             'year_level' => 'required|string|max:255',
@@ -126,7 +183,7 @@ class StudentLoginController extends Controller
 
         $validatedData['email'] = strtolower(trim((string) $validatedData['email']));
 
-    // Ensure SSCT email
+        // Ensure SSCT email
         if (!str_ends_with($validatedData['email'], '@ssct.edu.ph')) {
             return response()->json([
                 'status' => 'error',
@@ -134,17 +191,11 @@ class StudentLoginController extends Controller
             ], 422);
         }
 
-        // Create student
-        $nameParts = preg_split('/\s+/', trim($validatedData['name']), -1, PREG_SPLIT_NO_EMPTY);
-        $firstName = $nameParts[0] ?? '';
-        $lastName = count($nameParts) > 1 ? array_pop($nameParts) : $firstName;
-        $middleName = count($nameParts) > 1 ? trim(implode(' ', $nameParts)) : '';
-
         $student = Student::create([
             'student_id_number' => $validatedData['student_id'],
-            'first_name' => $firstName,
-            'middle_name' => $middleName !== '' ? $middleName : null,
-            'last_name' => $lastName,
+            'first_name' => trim($validatedData['first_name']),
+            'middle_name' => trim((string) ($validatedData['middle_name'] ?? '')) !== '' ? trim($validatedData['middle_name']) : null,
+            'last_name' => trim($validatedData['last_name']),
             'course' => $validatedData['course'],
             'email' => $validatedData['email'],
             'year_level' => $validatedData['year_level'],

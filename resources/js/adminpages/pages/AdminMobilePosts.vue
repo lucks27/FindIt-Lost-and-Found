@@ -89,28 +89,132 @@
             </div>
         </section>
 
-        <div v-if="selectedItem" class="modal-overlay" @click.self="selectedItem = null">
+        <div v-if="selectedItem" class="modal-overlay" @click.self="closeItemModal">
             <section class="modal" role="dialog" aria-modal="true"
                 :aria-labelledby="`preview-title-${selectedItem.id}`">
-                <button class="close" type="button" aria-label="Close item details"
-                    @click="selectedItem = null">×</button>
+                <button class="close" type="button" aria-label="Close item details" @click="closeItemModal">×</button>
 
-                <p class="preview-kicker">Student mobile preview</p>
-                <img class="preview" :src="getItemImage(selectedItem)" />
+                <div class="modal-header">
+                    <button class="image-preview-button" type="button"
+                        @click="openImagePreview(getItemImages(selectedItem), 0)" aria-label="View full-size image">
+                        <img class="preview" :src="getItemImage(selectedItem)"
+                            :alt="selectedItem.title || 'Lost and found item'" />
+                    </button>
 
-                <h2 :id="`preview-title-${selectedItem.id}`">{{ selectedItem.title || 'Untitled post' }}</h2>
+                    <div class="modal-header-copy">
+                        <p class="preview-kicker">Student mobile preview</p>
+                        <h2 :id="`preview-title-${selectedItem.id}`">{{ selectedItem.title || 'Untitled post' }}</h2>
 
-                <div class="details">
-                    <p><b>Type:</b> {{ selectedItem.type || 'N/A' }}</p>
-                    <p><b>Category:</b> {{ getCategory(selectedItem) }}</p>
-                    <p><b>Description:</b> {{ getDescription(selectedItem) }}</p>
-                    <p><b>Posted:</b> {{ formatDate(selectedItem.published_at || selectedItem.created_at) }}</p>
-                    <p><b>Location:</b> {{ selectedItem.location || 'N/A' }}</p>
-                    <p><b>Additional Details:</b> {{ selectedItem.additional_details || 'None' }}</p>
-                    <p><b>Status:</b> {{ selectedItem.status }}</p>
-                    <p><b>Visibility:</b> {{ selectedItem.is_visible ? 'Public' : 'Private' }}</p>
+                        <div class="summary-grid">
+                            <div class="summary-field">
+                                <span>Type</span>
+                                <strong>{{ selectedItem.type || 'N/A' }}</strong>
+                            </div>
+                            <div class="summary-field">
+                                <span>Category</span>
+                                <strong>{{ getCategory(selectedItem) }}</strong>
+                            </div>
+                            <div class="summary-field">
+                                <span>Location</span>
+                                <strong>{{ selectedItem.location || 'N/A' }}</strong>
+                            </div>
+                            <div class="summary-field">
+                                <span>Posted</span>
+                                <strong>{{ formatDate(selectedItem.published_at || selectedItem.created_at) }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-grid">
+                    <section class="detail-panel">
+                        <div class="detail-panel-heading">
+                            <span class="detail-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <circle cx="12" cy="8" r="4" />
+                                    <path d="M5 21a7 7 0 0 1 14 0" />
+                                </svg>
+                            </span>
+                            <h3>Student Information</h3>
+                        </div>
+
+                        <dl class="info-list">
+                            <div>
+                                <dt>Name</dt>
+                                <dd>{{ getStudentName(selectedItem) }}</dd>
+                            </div>
+                            <div>
+                                <dt>Student ID</dt>
+                                <dd>{{ getStudentId(selectedItem) }}</dd>
+                            </div>
+                            <div>
+                                <dt>Course</dt>
+                                <dd>{{ getStudentCourse(selectedItem) }}</dd>
+                            </div>
+                            <div>
+                                <dt>Year Level</dt>
+                                <dd>{{ getStudentYearLevel(selectedItem) }}</dd>
+                            </div>
+                            <div>
+                                <dt>Email</dt>
+                                <dd>{{ getStudentEmail(selectedItem) }}</dd>
+                            </div>
+                        </dl>
+                    </section>
+
+                    <section class="detail-panel">
+                        <div class="detail-panel-heading">
+                            <span class="detail-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M5 5h14v14H5zM8 9h8M8 13h8M8 17h5" />
+                                </svg>
+                            </span>
+                            <h3>Item Information</h3>
+                        </div>
+
+                        <dl class="info-list">
+                            <div>
+                                <dt>Title</dt>
+                                <dd>{{ selectedItem.title || '—' }}</dd>
+                            </div>
+                            <div>
+                                <dt>Type</dt>
+                                <dd>{{ selectedItem.type || 'N/A' }}</dd>
+                            </div>
+                            <div>
+                                <dt>Category</dt>
+                                <dd>{{ getCategory(selectedItem) }}</dd>
+                            </div>
+                            <div>
+                                <dt>Location</dt>
+                                <dd>{{ selectedItem.location || 'N/A' }}</dd>
+                            </div>
+                            <div>
+                                <dt>Visibility</dt>
+                                <dd>{{ selectedItem.is_visible ? 'Public' : 'Private' }}</dd>
+                            </div>
+                            <div>
+                                <dt>Ownership Proof</dt>
+                                <dd>{{ selectedItem.ownership_proof || 'None' }}</dd>
+                            </div>
+                            <div class="wide-info">
+                                <dt>Description</dt>
+                                <dd>{{ getDescription(selectedItem) }}</dd>
+                            </div>
+                        </dl>
+                    </section>
                 </div>
             </section>
+        </div>
+
+        <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
+            <button type="button" class="image-preview-close" aria-label="Close image preview"
+                @click="closeImagePreview">×</button>
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev"
+                aria-label="Previous image" @click="showPreviousImage">‹</button>
+            <img :src="previewImageUrl" alt="Full-size item preview" class="image-preview-image" />
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next" aria-label="Next image"
+                @click="showNextImage">›</button>
         </div>
     </main>
 </template>
@@ -121,6 +225,9 @@ import api from '@/bootstrap'
 
 const items = ref([])
 const selectedItem = ref(null)
+const previewImages = ref([])
+const previewImageIndex = ref(0)
+const previewImageUrl = computed(() => previewImages.value[previewImageIndex.value] || null)
 const search = ref('')
 const typeFilter = ref('')
 const categoryFilter = ref('')
@@ -150,9 +257,21 @@ function getImageUrl(path) {
     return '/storage/' + path
 }
 
+function getItemImages(item) {
+    const images = item?.images || []
+    const paths = images
+        .map((img) => img?.file_path || img?.path || img?.url || item?.image)
+        .filter(Boolean)
+
+    if (!paths.length && item?.image) {
+        return [getImageUrl(item.image)]
+    }
+
+    return paths.map((path) => getImageUrl(path))
+}
+
 function getItemImage(item) {
-    const img = item.images?.[0]
-    return getImageUrl(img?.file_path || img?.path || item.image)
+    return getItemImages(item)[0] || '/images/snsu-logo.png'
 }
 
 function getDescription(item) {
@@ -163,11 +282,75 @@ function getCategory(item) {
     return item.category?.name || item.category || item.item?.category?.name || item.item?.category || item.item?.item_category || 'Uncategorized'
 }
 
+function getStudent(item) {
+    return item?.student || item?.item?.student || null
+}
+
+function getStudentName(item) {
+    return item?.student_name || getStudent(item)?.full_name || getStudent(item)?.name || item?.student_full_name || '—'
+}
+
+function getStudentId(item) {
+    return getStudent(item)?.student_id_number || getStudent(item)?.student_id || item?.student_id_number || item?.student_id || '—'
+}
+
+function getStudentCourse(item) {
+    return getStudent(item)?.course || item?.course || 'N/A'
+}
+
+function getStudentYearLevel(item) {
+    return getStudent(item)?.year_level || item?.year_level || 'N/A'
+}
+
+function getStudentEmail(item) {
+    return getStudent(item)?.email || item?.email || '—'
+}
+
 function formatDate(v) {
     return v ? new Date(v).toLocaleString() : 'N/A'
 }
 
-function openItem(item) { selectedItem.value = item }
+function openItem(item) {
+    selectedItem.value = item
+    previewImages.value = []
+    previewImageIndex.value = 0
+}
+
+function closeItemModal() {
+    selectedItem.value = null
+    previewImages.value = []
+    previewImageIndex.value = 0
+}
+
+function normalizePreviewImage(item) {
+    if (!item) return null
+    if (typeof item === 'string') return getImageUrl(item)
+    if (typeof item === 'object') return getImageUrl(item.file_path || item.path || item.url || item.image)
+    return null
+}
+
+function openImagePreview(imageList, index = 0) {
+    const rawList = Array.isArray(imageList) ? imageList : [imageList]
+    const list = rawList.map(normalizePreviewImage).filter(Boolean)
+    if (!list.length) return
+    previewImages.value = list
+    previewImageIndex.value = Math.min(index, list.length - 1)
+}
+
+function showPreviousImage() {
+    if (!previewImages.value.length) return
+    previewImageIndex.value = (previewImageIndex.value - 1 + previewImages.value.length) % previewImages.value.length
+}
+
+function showNextImage() {
+    if (!previewImages.value.length) return
+    previewImageIndex.value = (previewImageIndex.value + 1) % previewImages.value.length
+}
+
+function closeImagePreview() {
+    previewImages.value = []
+    previewImageIndex.value = 0
+}
 
 async function loadItems() {
     const res = await api.get('/api/admin/mobile-posts')
@@ -620,24 +803,67 @@ button:disabled {
     background: #102316;
 }
 
-.details {
-    display: grid;
-    gap: 0;
-    padding: 10px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.08);
+.image-preview-button {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: zoom-in;
 }
 
-.details p {
-    margin: 0;
-    padding: 8px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    color: #d8dfd1;
-    font-size: 0.78rem;
-    line-height: 1.45;
-    overflow-wrap: anywhere;
+.image-preview-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(3, 12, 6, 0.82);
 }
+
+.image-preview-close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.image-preview-nav {
+    position: absolute;
+    top: 50%;
+    display: grid;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 2rem;
+    line-height: 1;
+    transform: translateY(-50%);
+    cursor: pointer;
+}
+
+.image-preview-nav.prev {
+    left: 24px;
+}
+
+.image-preview-nav.next {
+    right: 24px;
+}
+
 
 .details p:last-child {
     border-bottom: 0;
@@ -647,6 +873,130 @@ button:disabled {
     display: inline-block;
     min-width: 118px;
     color: #e7c765;
+}
+
+.modal-header {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+
+.modal-header-copy {
+    min-width: 0;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.summary-field {
+    min-width: 0;
+    padding: 8px 9px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.summary-field span {
+    display: block;
+    margin-bottom: 3px;
+    color: #ffffff;
+    font-size: 0.61rem;
+}
+
+.summary-field strong {
+    display: block;
+    overflow: hidden;
+    color: #e5e9da;
+    font-size: 0.7rem;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.detail-panel {
+    min-width: 0;
+    padding: 11px;
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.detail-panel-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 9px;
+}
+
+.detail-panel-heading h3 {
+    margin: 0;
+    color: #f4f1e5;
+    font-size: 0.73rem;
+    font-weight: 750;
+}
+
+.detail-icon {
+    display: grid;
+    width: 25px;
+    height: 25px;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 6px;
+    background: rgba(196, 157, 59, 0.1);
+    color: #d2b45d;
+}
+
+.detail-icon svg {
+    width: 12px;
+    height: 12px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+}
+
+.info-list {
+    display: grid;
+    gap: 0;
+    margin: 0;
+}
+
+.info-list>div {
+    display: grid;
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 8px;
+    padding: 6px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.info-list>div:first-child {
+    border-top: 0;
+}
+
+.info-list>div.wide-info {
+    grid-column: 1 / -1;
+}
+
+.info-list dt {
+    color: #ffffff;
+    font-size: 0.61rem;
+}
+
+.info-list dd {
+    margin: 0;
+    color: #ffffff;
+    font-size: 0.64rem;
+    line-height: 1.42;
+    word-break: break-word;
 }
 
 @media (max-width: 900px) {
@@ -700,6 +1050,15 @@ button:disabled {
 
     .modal {
         padding: 18px;
+    }
+
+    .modal-header {
+        grid-template-columns: 1fr;
+    }
+
+    .summary-grid,
+    .detail-grid {
+        grid-template-columns: 1fr;
     }
 
     .preview {

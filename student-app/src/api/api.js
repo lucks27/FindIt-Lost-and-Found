@@ -90,6 +90,10 @@ export function loginRequest(email, password) {
   return apiClient.post('/api/login', { email, password });
 }
 
+export function googleLoginRequest(email, name) {
+  return apiClient.post('/api/login/google', { email, name });
+}
+
 export function fetchUser() {
   return apiClient.get('/api/user');
 }

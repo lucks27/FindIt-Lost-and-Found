@@ -119,7 +119,7 @@ onMounted(loadNotificationCount)
     grid-template-columns: 230px minmax(0, 1fr);
     grid-template-rows: 60px minmax(0, 1fr);
     overflow: hidden;
-    background: linear-gradient(180deg, #52b8bf 0%, #2a9aa3 100%);
+    background: transparent;
 }
 
 .mobile-sidebar-backdrop {
@@ -132,7 +132,7 @@ onMounted(loadNotificationCount)
     min-width: 0;
     min-height: 0;
     overflow: auto;
-    background: linear-gradient(180deg, #77d5d4 0%, #5ac1c7 100%);
+    background: transparent;
 }
 
 @media (max-width: 1024px) {

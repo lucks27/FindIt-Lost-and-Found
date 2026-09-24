@@ -15,23 +15,17 @@ class StudentNotificationController extends Controller
     {
         $studentId = $this->getAuthenticatedStudentId();
 
-        $notifications = Notification::whereHas('booking', function ($q) use ($studentId) {
-            $q->where('student_id', $studentId);
+        $notifications = Notification::where(function ($q) use ($studentId) {
+            $q->where(function ($sub) use ($studentId) {
+                $sub->where('recipient_role', 'student')
+                    ->where('recipient_id', $studentId);
+            })->orWhereHas('booking', function ($bookingQuery) use ($studentId) {
+                $bookingQuery->where('student_id', $studentId);
+            });
         })
-            ->where(function ($q) use ($studentId) {
-                $q->where(function ($sub) use ($studentId) {
-                    $sub->where('recipient_role', 'student')
-                        ->where('recipient_id', $studentId);
-                })
-                    ->orWhere(function ($sub) {
-                        $sub->whereNull('recipient_id')
-                            ->whereNull('recipient_role');
-                    });
-            })
             ->with('booking.facility')
             ->latest()
             ->get()
-            ->unique(fn($item) => ($item->booking_id ?? $item->id) . '_' . strtolower($item->action ?? ''))
             ->values();
 
         return response()->json([
@@ -44,9 +38,16 @@ class StudentNotificationController extends Controller
     {
         $studentId = $this->getAuthenticatedStudentId();
 
-        $notification = Notification::whereHas('booking', function ($q) use ($studentId) {
-            $q->where('student_id', $studentId);
-        })->findOrFail($id);
+        $notification = Notification::where('id', $id)
+            ->where(function ($q) use ($studentId) {
+                $q->where(function ($sub) use ($studentId) {
+                    $sub->where('recipient_role', 'student')
+                        ->where('recipient_id', $studentId);
+                })->orWhereHas('booking', function ($bookingQuery) use ($studentId) {
+                    $bookingQuery->where('student_id', $studentId);
+                });
+            })
+            ->firstOrFail();
 
         $notification->delete();
 
@@ -60,9 +61,16 @@ class StudentNotificationController extends Controller
     {
         $studentId = $this->getAuthenticatedStudentId();
 
-        $notification = Notification::whereHas('booking', function ($q) use ($studentId) {
-            $q->where('student_id', $studentId);
-        })->findOrFail($id);
+        $notification = Notification::where('id', $id)
+            ->where(function ($q) use ($studentId) {
+                $q->where(function ($sub) use ($studentId) {
+                    $sub->where('recipient_role', 'student')
+                        ->where('recipient_id', $studentId);
+                })->orWhereHas('booking', function ($bookingQuery) use ($studentId) {
+                    $bookingQuery->where('student_id', $studentId);
+                });
+            })
+            ->firstOrFail();
 
         $notification->update(['is_read' => true]);
 

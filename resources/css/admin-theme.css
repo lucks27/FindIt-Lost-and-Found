@@ -577,7 +577,13 @@ body:has(#admin-app) {
   color: var(--admin-ink-900) !important;
 }
 
-#admin-app .page-header,
+#admin-app .student-management-page .page-header {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--admin-white-soft) !important;
+}
+
 #admin-app .panel-card,
 #admin-app .metric-card,
 #admin-app .report-card,

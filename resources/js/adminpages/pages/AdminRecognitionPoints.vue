@@ -45,7 +45,6 @@
                             <th class="col-student">Student</th>
                             <th class="col-points">Points</th>
                             <th class="col-value">Value</th>
-                            <th class="col-rewards">Rewards</th>
                             <th class="col-reports">Reports</th>
                             <th class="col-action">Action</th>
                         </tr>
@@ -72,9 +71,6 @@
                             <td class="col-value">
                                 ₱{{ Number(student.peso_value ?? ((Number(student.recognition_points) || 0) /
                                     100)).toFixed(2) }}
-                            </td>
-                            <td class="col-rewards">
-                                <span class="badge badge-rewards">{{ student.reward_count || 0 }}</span>
                             </td>
                             <td class="col-reports">
                                 <span class="badge badge-reports">{{ student.report_count || 0 }}</span>
@@ -157,42 +153,6 @@
                                 <label>Year Level</label>
                                 <p>{{ selectedStudent.year_level || '—' }}</p>
                             </div>
-                            <div class="info-item">
-                                <label>Status</label>
-                                <p>
-                                    <span class="status-badge" :class="{
-                                        'status-active': selectedStudent.status === 'active',
-                                        'status-inactive': selectedStudent.status === 'inactive'
-                                    }">
-                                        {{ selectedStudent.status || 'Unknown' }}
-                                    </span>
-                                </p>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- Editable Points & Rewards -->
-                    <section class="modal-section">
-                        <h3 class="section-title">Recognition Metrics</h3>
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label for="points-input">Recognition Points</label>
-                                <input v-model.number="editForm.recognition_points" type="number" id="points-input"
-                                    class="form-input" min="0" />
-                                <small class="form-hint">Current: {{ selectedStudent.recognition_points ?? 0 }}</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="rewards-input">Reward Total</label>
-                                <input v-model.number="editForm.reward_count" type="number" id="rewards-input"
-                                    class="form-input" min="0" />
-                                <small class="form-hint">Current: {{ selectedStudent.reward_count || 0 }}</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="reports-input">Reports Submitted</label>
-                                <input v-model.number="editForm.report_count" type="number" id="reports-input"
-                                    class="form-input" min="0" />
-                                <small class="form-hint">Current: {{ selectedStudent.report_count || 0 }}</small>
-                            </div>
                         </div>
                     </section>
 
@@ -200,16 +160,6 @@
                     <div v-if="modalMessage" class="alert" :class="modalMessageType">
                         {{ modalMessage }}
                     </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @click="closeStudentModal">
-                        Cancel
-                    </button>
-                    <button type="button" class="btn btn-primary" @click="saveStudentChanges" :disabled="savingChanges">
-                        <span v-if="savingChanges" class="spinner-small"></span>
-                        {{ savingChanges ? 'Saving...' : 'Save Changes' }}
-                    </button>
                 </div>
             </div>
         </div>

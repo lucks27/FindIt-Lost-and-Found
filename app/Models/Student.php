@@ -84,6 +84,16 @@ class Student extends Authenticatable
         return $this->hasMany(PointTransaction::class);
     }
 
+    public function eventFines(): HasMany
+    {
+        return $this->hasMany(EventFine::class);
+    }
+
+    public function fineConversions(): HasMany
+    {
+        return $this->hasMany(EventFineConversion::class);
+    }
+
     public function recognitionRecord(): HasOne
     {
         return $this->hasOne(StudentRecognitionRecord::class);

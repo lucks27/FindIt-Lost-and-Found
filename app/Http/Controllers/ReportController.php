@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DeviceToken;
 use App\Models\ClaimReview;
+use App\Models\ItemVerification;
 use App\Models\Notification;
 use App\Models\PotentialMatch;
 use App\Models\Report;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Minishlink\WebPush\WebPush;
 
 class ReportController extends Controller
 {
@@ -44,7 +46,15 @@ class ReportController extends Controller
                         ->where('status', 'approved');
                 })->orWhere(function ($q) {
                     $q->where('type', 'found')
-                        ->where('status', 'verified');
+                        ->whereIn('status', ['pending_verification', 'verified']);
+                });
+            });
+            $query->where(function ($publicQuery) {
+                $publicQuery->whereHas('visiblePost', function ($visiblePostQuery) {
+                    $visiblePostQuery->where('is_visible', true);
+                })->orWhere(function ($legacyQuery) {
+                    $legacyQuery->whereDoesntHave('visiblePost')
+                        ->whereNotNull('published_at');
                 });
             });
         }
@@ -59,7 +69,8 @@ class ReportController extends Controller
             });
         }
 
-        $reports = $query->with(['student', 'images'])->latest()->paginate(20);
+        $perPage = min(max($request->integer('per_page', 20), 1), 100);
+        $reports = $query->with(['student', 'images', 'visiblePost'])->latest()->paginate($perPage);
 
         $reports->getCollection()->each->makeHidden('private_identifying_details');
 
@@ -112,8 +123,15 @@ class ReportController extends Controller
             return DB::transaction(function () use ($request, $id, $user, $validated) {
                 $report = Report::where('id', $id)->lockForUpdate()->firstOrFail();
 
-                if ($report->type !== 'found' || $report->status !== 'verified') {
-                    return response()->json(['status' => 'error', 'message' => 'Only verified found items can be claimed.'], 422);
+                $isPublicClaimableReport = ($report->type === 'found' && $report->status === 'verified')
+                    || ($report->type === 'lost' && $report->status === 'approved');
+
+                if (!$isPublicClaimableReport) {
+                    return response()->json(['status' => 'error', 'message' => 'Only publicly approved lost items or verified found items can be claimed.'], 422);
+                }
+
+                if ((int) $report->student_id === (int) $user->id) {
+                    return response()->json(['status' => 'error', 'message' => 'You cannot submit a claim on your own report.'], 422);
                 }
 
                 $existingClaim = ClaimReview::where('report_id', $report->id)
@@ -149,9 +167,19 @@ class ReportController extends Controller
                     'is_read' => false,
                 ]);
 
+                if ($report->type === 'lost') {
+                    ItemVerification::firstOrCreate(
+                        ['report_id' => $report->id],
+                        [
+                            'status' => 'pending',
+                            'notes' => 'Pending USC confirmation of ownership claim.',
+                        ]
+                    );
+                }
+
                 return response()->json([
                     'status' => 'success',
-                    'message' => 'Your claim was submitted and is waiting for verification.',
+                    'message' => 'Claim request submitted successfully. Please wait for USC confirmation.',
                     'data' => $claim->load('report'),
                 ], 201);
             });
@@ -535,17 +563,33 @@ class ReportController extends Controller
 
     protected function sendPushNotificationToUser(int $studentId, string $title, string $body, array $data = [])
     {
-        $tokens = DeviceToken::where('student_id', $studentId)
-            ->pluck('token')
-            ->filter()
-            ->toArray();
+        $deviceTokens = DeviceToken::where('student_id', $studentId)->get();
 
-        if (empty($tokens)) {
+        if ($deviceTokens->isEmpty()) {
             return false;
         }
 
-        $expoTokens = collect($tokens)->filter(fn($token) => Str::startsWith($token, 'ExponentPushToken'))->values()->all();
-        $fcmTokens = collect($tokens)->filter(fn($token) => !Str::startsWith($token, 'ExponentPushToken'))->values()->all();
+        $expoTokens = [];
+        $fcmTokens = [];
+        $webSubscriptions = [];
+
+        foreach ($deviceTokens as $deviceToken) {
+            $tokenValue = (string) $deviceToken->token;
+
+            if ($deviceToken->platform === 'web') {
+                $subscription = json_decode($tokenValue, true);
+                if (is_array($subscription) && !empty($subscription['endpoint'])) {
+                    $webSubscriptions[] = $subscription;
+                }
+                continue;
+            }
+
+            if (Str::startsWith($tokenValue, 'ExponentPushToken')) {
+                $expoTokens[] = $tokenValue;
+            } else {
+                $fcmTokens[] = $tokenValue;
+            }
+        }
 
         $success = true;
 
@@ -589,6 +633,36 @@ class ReportController extends Controller
                 }
             } else {
                 $success = false;
+            }
+        }
+
+        if (!empty($webSubscriptions)) {
+            $publicKey = env('VAPID_PUBLIC_KEY');
+            $privateKey = env('VAPID_PRIVATE_KEY');
+
+            if (!empty($publicKey) && !empty($privateKey)) {
+                $webPush = new WebPush([
+                    'VAPID' => [
+                        'subject' => env('VAPID_SUBJECT', 'mailto:admin@ssct.edu.ph'),
+                        'publicKey' => $publicKey,
+                        'privateKey' => $privateKey,
+                    ],
+                ]);
+
+                foreach ($webSubscriptions as $subscription) {
+                    try {
+                        $webPush->sendNotification($subscription, json_encode([
+                            'title' => $title,
+                            'body' => $body,
+                            'data' => $data,
+                            'tag' => 'findit-notification',
+                        ]), ['TTL' => 86400]);
+                    } catch (\Throwable $e) {
+                        $success = false;
+                    }
+                }
+
+                $webPush->flush();
             }
         }
 

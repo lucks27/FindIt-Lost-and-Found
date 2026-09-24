@@ -221,20 +221,6 @@
 
                             <div>
                                 <dt>
-                                    Deadline
-                                </dt>
-
-                                <dd>
-                                    {{
-                                        formatDate(
-                                            item.deadline_at
-                                        )
-                                    }}
-                                </dd>
-                            </div>
-
-                            <div>
-                                <dt>
                                     Time Found
                                 </dt>
 
@@ -425,22 +411,26 @@
                         <section class="modal-overview">
                             <div class="modal-media">
                                 <div class="modal-image-container">
-                                    <img :src="getReportImage(
-                                        selectedSurrender
-                                            .report,
-                                        currentImageIndex
-                                    )
-                                        " :alt="selectedSurrender
-                                            .report
-                                            ?.title ||
-                                            'SNSU logo'
-                                            " class="modal-image" :class="{
-                                                'fallback-image':
-                                                    !selectedSurrender
-                                                        .report
-                                                        ?.images
-                                                        ?.length
-                                            }" />
+                                    <button type="button" class="modal-image-button"
+                                        @click="openImagePreview(getReportImages(selectedSurrender.report), currentImageIndex)"
+                                        aria-label="View full-size item image">
+                                        <img :src="getReportImage(
+                                            selectedSurrender
+                                                .report,
+                                            currentImageIndex
+                                        )
+                                            " :alt="selectedSurrender
+                                                .report
+                                                ?.title ||
+                                                'SNSU logo'
+                                                " class="modal-image" :class="{
+                                                    'fallback-image':
+                                                        !selectedSurrender
+                                                            .report
+                                                            ?.images
+                                                            ?.length
+                                                }" />
+                                    </button>
                                 </div>
 
                                 <div v-if="
@@ -474,6 +464,16 @@ img,
                                                 " />
                                     </button>
                                 </div>
+                            </div>
+
+                            <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
+                                <button type="button" class="image-preview-close" aria-label="Close image preview"
+                                    @click="closeImagePreview">×</button>
+                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev"
+                                    aria-label="Previous image" @click="showPreviousImage">‹</button>
+                                <img :src="previewImageUrl" alt="Full-size item preview" class="image-preview-image" />
+                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next"
+                                    aria-label="Next image" @click="showNextImage">›</button>
                             </div>
 
                             <!-- Summary -->
@@ -524,20 +524,6 @@ img,
                                     </strong>
                                 </div>
 
-                                <div class="summary-field">
-                                    <span>
-                                        Deadline
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatDateTime(
-                                                selectedSurrender
-                                                    .deadline_at
-                                            )
-                                        }}
-                                    </strong>
-                                </div>
                             </div>
                         </section>
 
@@ -782,38 +768,6 @@ img,
                             </section>
                         </div>
 
-                        <!-- Additional details -->
-                        <section v-if="
-                            selectedSurrender
-                                .report
-                                ?.additional_details
-                        " class="
-                                detail-panel
-                                detail-panel-wide
-                            ">
-                            <div class="detail-panel-heading">
-                                <span class="detail-icon">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="9" />
-
-                                        <path d="M12 11v5M12 8h.01" />
-                                    </svg>
-                                </span>
-
-                                <h3>
-                                    Additional Details
-                                </h3>
-                            </div>
-
-                            <p class="detail-text">
-                                {{
-                                    selectedSurrender
-                                        .report
-                                        .additional_details
-                                }}
-                            </p>
-                        </section>
-
                         <!-- Private details -->
                         <section v-if="
                             selectedSurrender
@@ -854,96 +808,6 @@ img,
                                         .private_identifying_details
                                 }}
                             </p>
-                        </section>
-
-                        <!-- Timeline -->
-                        <section class="
-                                detail-panel
-                                detail-panel-wide
-                            ">
-                            <div class="detail-panel-heading">
-                                <span class="detail-icon">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="9" />
-
-                                        <path d="M12 7v5l3 2" />
-                                    </svg>
-                                </span>
-
-                                <h3>
-                                    Surrender Timeline
-                                </h3>
-                            </div>
-
-                            <dl class="timeline-summary">
-                                <div>
-                                    <dt>
-                                        Status
-                                    </dt>
-
-                                    <dd>
-                                        <span class="status-badge" :class="statusOf(
-                                            selectedSurrender
-                                        )
-                                            ">
-                                            {{
-                                                selectedSurrender
-                                                    .status ||
-                                                'pending'
-                                            }}
-                                        </span>
-                                    </dd>
-                                </div>
-
-                                <div>
-                                    <dt>
-                                        Deadline
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            formatDateTime(
-                                                selectedSurrender
-                                                    .deadline_at
-                                            )
-                                        }}
-                                    </dd>
-                                </div>
-
-                                <div v-if="
-                                    selectedSurrender
-                                        .received_at
-                                ">
-                                    <dt>
-                                        Received
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            formatDateTime(
-                                                selectedSurrender
-                                                    .received_at
-                                            )
-                                        }}
-                                    </dd>
-                                </div>
-
-                                <div v-if="
-                                    selectedSurrender
-                                        .notes
-                                ">
-                                    <dt>
-                                        Notes
-                                    </dt>
-
-                                    <dd>
-                                        {{
-                                            selectedSurrender
-                                                .notes
-                                        }}
-                                    </dd>
-                                </div>
-                            </dl>
                         </section>
 
                         <!-- REQUEST DETAILS FORM -->
@@ -1150,6 +1014,15 @@ const selectedSurrender =
 const currentImageIndex =
     ref(0)
 
+const previewImages =
+    ref([])
+
+const previewImageIndex =
+    ref(0)
+
+const previewImageUrl =
+    computed(() => previewImages.value[previewImageIndex.value] || null)
+
 const sortOrder =
     ref('newest')
 
@@ -1240,17 +1113,6 @@ const requestDetailOptions = [
 
         description:
             'Request unique marks, contents, serial number, or identifiers.'
-    },
-
-    {
-        value:
-            'student_information',
-
-        label:
-            'Student Information',
-
-        description:
-            'Request missing student or contact information.'
     },
 
     {
@@ -1380,6 +1242,24 @@ function getImageUrl(
     }
 
     return fallbackImage
+}
+
+function getReportImages(
+    report
+) {
+    if (Array.isArray(report?.images)) {
+        return report.images.map((image) => getImageUrl(image?.file_path || image?.path || image?.url || image))
+    }
+
+    if (Array.isArray(report?.report_images)) {
+        return report.report_images.map((image) => getImageUrl(image?.file_path || image?.path || image?.url || image))
+    }
+
+    if (report?.image) {
+        return [getImageUrl(report.image)]
+    }
+
+    return []
 }
 
 function getReportImage(
@@ -1915,7 +1795,44 @@ function closeDetailModal() {
     currentImageIndex.value =
         0
 
+    previewImages.value = []
+    previewImageIndex.value = 0
+
     resetRequestDetails()
+}
+
+function normalizePreviewImage(item) {
+    if (!item) return null
+    if (typeof item === 'string') return getImageUrl(item)
+    if (typeof item === 'object') return getImageUrl(item.file_path || item.path || item.url || item.image)
+    return null
+}
+
+function openImagePreview(imageList, index = 0) {
+    const rawList = Array.isArray(imageList) ? imageList : [imageList]
+    const list = rawList.map(normalizePreviewImage).filter(Boolean)
+
+    if (!list.length) return
+
+    previewImages.value = list
+    previewImageIndex.value = Math.min(index, list.length - 1)
+}
+
+function showPreviousImage() {
+    if (!previewImages.value.length) return
+
+    previewImageIndex.value = (previewImageIndex.value - 1 + previewImages.value.length) % previewImages.value.length
+}
+
+function showNextImage() {
+    if (!previewImages.value.length) return
+
+    previewImageIndex.value = (previewImageIndex.value + 1) % previewImages.value.length
+}
+
+function closeImagePreview() {
+    previewImages.value = []
+    previewImageIndex.value = 0
 }
 
 /* =====================================================
@@ -3086,7 +3003,7 @@ onMounted(() => {
 
 .card-meta dt {
     color:
-        #7f8875;
+        #ffffff;
 
     font-size:
         0.61rem;
@@ -3100,7 +3017,7 @@ onMounted(() => {
         hidden;
 
     color:
-        #c9cebb;
+        #ffffff;
 
     font-size:
         0.64rem;
@@ -3626,7 +3543,7 @@ onMounted(() => {
             0.035);
 
     color:
-        #c7cdb8;
+        #ffffff;
 
     cursor:
         pointer;
@@ -3738,9 +3655,135 @@ onMounted(() => {
         contain;
 }
 
+.modal-image-button {
+    display:
+        block;
+
+    width:
+        100%;
+
+    padding:
+        0;
+
+    border:
+        0;
+
+    background:
+        transparent;
+
+    cursor:
+        zoom-in;
+}
+
 .modal-image.fallback-image {
     padding:
         24px;
+}
+
+.image-preview-overlay {
+    position:
+        fixed;
+
+    inset:
+        0;
+
+    z-index:
+        1100;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    padding:
+        24px;
+
+    background:
+        rgba(3,
+            12,
+            6,
+            0.82);
+}
+
+.image-preview-close {
+    position:
+        absolute;
+
+    top:
+        18px;
+
+    right:
+        18px;
+
+    display:
+        grid;
+
+    width:
+        40px;
+
+    height:
+        40px;
+
+    place-items:
+        center;
+
+    border:
+        1px solid rgba(255,
+            255,
+            255,
+            0.18);
+
+    border-radius:
+        999px;
+
+    background:
+        rgba(255,
+            255,
+            255,
+            0.08);
+
+    color:
+        #fff;
+
+    font-size:
+        1.4rem;
+
+    line-height:
+        1;
+
+    cursor:
+        pointer;
+}
+
+.image-preview-image {
+    display:
+        block;
+
+    max-width:
+        min(92vw,
+            1100px);
+
+    max-height:
+        90vh;
+
+    border-radius:
+        12px;
+
+    object-fit:
+        contain;
+
+    background:
+        #0a190e;
+
+    box-shadow:
+        0 20px 50px rgba(0,
+            0,
+            0,
+            0.45);
 }
 
 .image-thumbnails {
@@ -3844,7 +3887,7 @@ onMounted(() => {
         3px;
 
     color:
-        #818a76;
+        #ffffff;
 
     font-size:
         0.61rem;
@@ -4050,7 +4093,7 @@ onMounted(() => {
 .info-list dt,
 .timeline-summary dt {
     color:
-        #7f8875;
+        #ffffff;
 
     font-size:
         0.61rem;
@@ -4062,7 +4105,7 @@ onMounted(() => {
         0;
 
     color:
-        #cbd1bd;
+        #ffffff;
 
     font-size:
         0.64rem;
@@ -4079,7 +4122,7 @@ onMounted(() => {
         0;
 
     color:
-        #c6ccb8;
+        #ffffff;
 
     font-size:
         0.66rem;
@@ -4103,6 +4146,16 @@ onMounted(() => {
             38,
             38,
             0.15);
+}
+
+.private-section h3 {
+    color: #d27d77;
+}
+
+.private-section small,
+.private-section .detail-text {
+    color:
+        #ffffff;
 }
 
 .private-icon {
@@ -4179,7 +4232,7 @@ onMounted(() => {
         0;
 
     color:
-        #9fa894;
+        #ffffff;
 
     font-size:
         0.62rem;
@@ -4572,20 +4625,11 @@ onMounted(() => {
 }
 
 .request-send-btn {
-    border-color:
-        rgba(196,
-            157,
-            59,
-            0.45);
+    border-color: #f59e0b;
 
-    background:
-        rgba(196,
-            157,
-            59,
-            0.16);
+    background: #fbbf24;
 
-    color:
-        #e5c66a;
+    color: #f0f0f0;
 }
 
 .request-send-btn:hover:not( :disabled) {
