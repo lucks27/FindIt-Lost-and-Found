@@ -17,7 +17,7 @@ import logoImage from '../../assets/logo.png';
 export default function WelcomeScreen() {
   const navigation = useNavigation();
   const { user } = useAuth();
-  const firstName = user?.name?.split(' ')[0] || 'Student';
+  const firstName = user?.first_name || user?.name || 'Student';
 
   return (
     <ImageBackground source={backgroundImage} style={styles.background} resizeMode="cover">

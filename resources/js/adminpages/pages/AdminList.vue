@@ -258,6 +258,8 @@
                                     @input="studentEmailEdited = true" />
                                 <span class="email-domain">@ssct.edu.ph</span>
                             </div>
+                            <small v-if="emailDuplicateWarning" class="email-warning">{{ emailDuplicateWarning
+                            }}</small>
                             <span v-if="studentErrors.email" class="field-error">{{ studentErrors.email }}</span>
                         </label>
 
@@ -266,6 +268,9 @@
                             <div class="password-input-wrap">
                                 <input v-model="studentForm.password" :type="showPassword ? 'text' : 'password'"
                                     placeholder="Set password" />
+                                <button type="button" class="generate-password-btn" @click="generateTemporaryPassword">
+                                    Generate
+                                </button>
                                 <button type="button" class="password-toggle-btn"
                                     :aria-label="showPassword ? 'Hide password' : 'Show password'"
                                     @click="showPassword = !showPassword">
@@ -575,14 +580,67 @@ function resetMessages() {
     statusMessage.value = ''
 }
 
+function normalizeEmailPrefix(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]/g, '')
+}
+
+function getExistingStudentEmails() {
+    return students.value
+        .map((student) => String(student.email || '').trim().toLowerCase())
+        .filter(Boolean)
+}
+
+function generateUniqueEmailPrefix(firstName, lastName) {
+    const first = (firstName || '').trim()
+    const last = (lastName || '').trim()
+    if (!first && !last) return ''
+
+    const baseLast = normalizeEmailPrefix(last)
+    const firstNameChars = normalizeEmailPrefix(first)
+
+    if (!firstNameChars && baseLast) return baseLast
+    if (!baseLast) return firstNameChars
+
+    let candidateBase = firstNameChars.charAt(0) || ''
+    const candidates = []
+
+    for (let i = 1; i <= firstNameChars.length; i++) {
+        const prefix = firstNameChars.slice(0, i)
+        candidates.push(`${prefix}${baseLast}`)
+    }
+
+    const existing = getExistingStudentEmails()
+    const finalChoice = candidates.find((candidate) => !existing.includes(`${candidate}@ssct.edu.ph`))
+
+    return finalChoice || `${firstNameChars.charAt(0) || 'student'}${baseLast}`
+}
+
 function generateEmailPrefix(firstName, lastName) {
     const first = (firstName || '').trim()
     const last = (lastName || '').trim()
     if (!first && !last) return ''
-    if (!first) return last.toLowerCase()
-    if (!last) return first.toLowerCase()
-    return `${first.charAt(0).toLowerCase()}${last.toLowerCase()}`
+    if (!first) return normalizeEmailPrefix(last)
+    if (!last) return normalizeEmailPrefix(first)
+
+    return generateUniqueEmailPrefix(first, last)
 }
+
+const emailDuplicateWarning = computed(() => {
+    const email = normalizeEmailPrefix(studentForm.value.emailPrefix)
+    if (!email) return ''
+
+    const fullEmail = `${email}@ssct.edu.ph`
+    const exists = students.value.some((student) => String(student.email || '').toLowerCase() === fullEmail)
+
+    if (exists) {
+        return 'This email already exists. A unique email was generated automatically.'
+    }
+
+    return ''
+})
 
 watch(
     [() => studentForm.value.first_name, () => studentForm.value.last_name],
@@ -592,6 +650,30 @@ watch(
         }
     },
 )
+
+function generateTemporaryPassword() {
+    const specials = '!_.-'
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz'
+    const digits = '0123456789'
+
+    const randomChar = (set) => set[Math.floor(Math.random() * set.length)]
+    const password = [
+        randomChar(uppercase),
+        randomChar(lowercase),
+        randomChar(digits),
+        randomChar(specials),
+        randomChar(lowercase),
+        randomChar(digits),
+        randomChar(uppercase),
+        randomChar(specials),
+        randomChar(lowercase),
+        randomChar(digits),
+    ].join('')
+
+    studentForm.value.password = password
+    studentForm.value.confirm_password = password
+}
 
 const needsMajorSelection = computed(() => {
     const course = String(studentForm.value.course_base || '').toLowerCase()
@@ -767,11 +849,14 @@ function validateStudentForm() {
     if (!studentForm.value.year_level) errors.year_level = 'Year level is required.'
     if (!studentForm.value.department) errors.department = 'Department is required.'
 
-    const fullEmail = `${studentForm.value.emailPrefix}@ssct.edu.ph`
-    if (!studentForm.value.emailPrefix) {
+    const currentEmail = normalizeEmailPrefix(studentForm.value.emailPrefix)
+    const fullEmail = `${currentEmail}@ssct.edu.ph`
+    if (!currentEmail) {
         errors.email = 'Email username is required.'
     } else if (!validateEmail(fullEmail)) {
         errors.email = 'Enter a valid SSCT email username.'
+    } else if (getExistingStudentEmails().includes(fullEmail)) {
+        errors.email = 'This email already exists. Please use a unique username.'
     }
 
     if (!studentForm.value.password) {
@@ -828,14 +913,10 @@ async function submitStudent() {
         fullCourseName += ` Concentration in ${studentForm.value.concentration}`
     }
 
-    const studentFullName = [studentForm.value.first_name, studentForm.value.middle_name, studentForm.value.last_name]
-        .filter(Boolean)
-        .join(' ')
-    const middleNameValue = studentForm.value.middle_name?.trim() ? studentForm.value.middle_name.trim() : null
-
     const payload = {
-        name: studentFullName,
-        middle_name: middleNameValue,
+        first_name: studentForm.value.first_name.trim(),
+        middle_name: studentForm.value.middle_name?.trim() ? studentForm.value.middle_name.trim() : null,
+        last_name: studentForm.value.last_name.trim(),
         student_id: studentForm.value.student_id,
         course: fullCourseName,
         year_level: studentForm.value.year_level,
@@ -1099,6 +1180,42 @@ onMounted(loadListData)
 
 .password-input-wrap input {
     padding-right: 44px;
+}
+
+.generate-password-btn {
+    position: absolute;
+    right: 34px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 1px solid rgba(76, 129, 93, 0.5);
+    background: #edf7ef;
+    color: #0a6a43;
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-size: 10px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: none;
+    animation: none;
+    box-shadow: none;
+}
+
+.generate-password-btn:hover,
+.generate-password-btn:focus,
+.generate-password-btn:active {
+    transform: translateY(-50%);
+    background: #edf7ef;
+    color: #0a6a43;
+    box-shadow: none;
+    filter: none;
+}
+
+.email-warning {
+    display: block;
+    margin-top: 6px;
+    color: #f3d46a;
+    font-size: 11px;
+    font-weight: 700;
 }
 
 .password-toggle-btn {

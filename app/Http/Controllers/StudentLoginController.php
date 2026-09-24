@@ -113,7 +113,9 @@ class StudentLoginController extends Controller
         // Validate input
         $validatedData = $request->validate([
             'student_id' => 'required|string|unique:students,student_id',
-            'name' => 'required|string|max:255',
+            'first_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
             'course' => 'required|string|max:255',
             'email' => 'required|email|unique:students,email',
             'year_level' => 'required|string|max:255',
@@ -134,32 +136,11 @@ class StudentLoginController extends Controller
             ], 422);
         }
 
-        // Create student
-        $nameParts = preg_split('/\s+/', trim($validatedData['name']), -1, PREG_SPLIT_NO_EMPTY);
-
-        if (count($nameParts) === 0) {
-            $firstName = '';
-            $middleName = null;
-            $lastName = '';
-        } elseif (count($nameParts) === 1) {
-            $firstName = $nameParts[0];
-            $middleName = null;
-            $lastName = $nameParts[0];
-        } elseif (count($nameParts) === 2) {
-            $firstName = $nameParts[0];
-            $middleName = null;
-            $lastName = $nameParts[1];
-        } else {
-            $firstName = $nameParts[0];
-            $middleName = trim(implode(' ', array_slice($nameParts, 1, -1)));
-            $lastName = $nameParts[count($nameParts) - 1];
-        }
-
         $student = Student::create([
             'student_id_number' => $validatedData['student_id'],
-            'first_name' => $firstName,
-            'middle_name' => $middleName !== '' ? $middleName : null,
-            'last_name' => $lastName,
+            'first_name' => trim($validatedData['first_name']),
+            'middle_name' => trim((string) ($validatedData['middle_name'] ?? '')) !== '' ? trim($validatedData['middle_name']) : null,
+            'last_name' => trim($validatedData['last_name']),
             'course' => $validatedData['course'],
             'email' => $validatedData['email'],
             'year_level' => $validatedData['year_level'],

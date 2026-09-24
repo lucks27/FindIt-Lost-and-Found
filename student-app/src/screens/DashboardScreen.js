@@ -75,7 +75,7 @@ export default function DashboardScreen() {
     date: new Date().toISOString().slice(0, 10),
     images: [],
   });
-  const firstName = user?.first_name || user?.name?.split(' ')[0] || 'Student';
+  const firstName = user?.first_name || user?.name || 'Student';
 
   function showNotice(title, message, tone = 'success', onClose = null) {
     setNotice({ title, message, tone, onClose });

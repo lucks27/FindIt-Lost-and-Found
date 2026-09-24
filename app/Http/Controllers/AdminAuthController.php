@@ -77,7 +77,9 @@ class AdminAuthController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'first_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
             'student_id' => 'required|string|max:20|unique:students,student_id_number',
             'email' => 'required|email|ends_with:@ssct.edu.ph|unique:students,email',
             'department' => 'required|string|max:255',
@@ -96,12 +98,11 @@ class AdminAuthController extends Controller
             ], 422);
         }
 
-        $nameParts = $this->splitStudentName($validated['name']);
         $student = Student::create([
             'student_id_number' => $validated['student_id'],
-            'first_name' => $nameParts['first_name'],
-            'middle_name' => $nameParts['middle_name'],
-            'last_name' => $nameParts['last_name'],
+            'first_name' => trim($validated['first_name']),
+            'middle_name' => trim((string) ($validated['middle_name'] ?? '')) !== '' ? trim($validated['middle_name']) : null,
+            'last_name' => trim($validated['last_name']),
             'email' => $validated['email'],
             'department' => $validated['department'],
             'course' => $validated['course'],
@@ -127,7 +128,9 @@ class AdminAuthController extends Controller
         $student = Student::findOrFail($id);
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'first_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
             'student_id' => 'required|string|max:20|unique:students,student_id_number,' . $student->id,
             'course' => 'required|string|max:255',
             'year_level' => 'required|string|max:255',
@@ -142,12 +145,11 @@ class AdminAuthController extends Controller
             ], 422);
         }
 
-        $nameParts = $this->splitStudentName($validated['name']);
         $student->update([
             'student_id_number' => $validated['student_id'],
-            'first_name' => $nameParts['first_name'],
-            'middle_name' => $nameParts['middle_name'],
-            'last_name' => $nameParts['last_name'],
+            'first_name' => trim($validated['first_name']),
+            'middle_name' => trim((string) ($validated['middle_name'] ?? '')) !== '' ? trim($validated['middle_name']) : null,
+            'last_name' => trim($validated['last_name']),
             'course' => $validated['course'],
             'year_level' => $validated['year_level'],
             'department' => $validated['department'],
@@ -187,41 +189,6 @@ class AdminAuthController extends Controller
         }
 
         abort(403, $message);
-    }
-
-    private function splitStudentName(string $name): array
-    {
-        $parts = preg_split('/\s+/', trim($name), -1, PREG_SPLIT_NO_EMPTY);
-
-        if (count($parts) === 0) {
-            return ['first_name' => '', 'middle_name' => null, 'last_name' => ''];
-        }
-
-        if (count($parts) === 1) {
-            return [
-                'first_name' => $parts[0],
-                'middle_name' => null,
-                'last_name' => $parts[0],
-            ];
-        }
-
-        if (count($parts) === 2) {
-            return [
-                'first_name' => $parts[0],
-                'middle_name' => null,
-                'last_name' => $parts[1],
-            ];
-        }
-
-        $firstName = $parts[0];
-        $middleName = trim(implode(' ', array_slice($parts, 1, -1)));
-        $lastName = $parts[count($parts) - 1];
-
-        return [
-            'first_name' => $firstName,
-            'middle_name' => $middleName !== '' ? $middleName : null,
-            'last_name' => $lastName,
-        ];
     }
 
     private function adminUser(): Admin
