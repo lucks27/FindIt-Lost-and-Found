@@ -1008,9 +1008,14 @@ class AdminWorkflowController extends Controller
             return [
                 'id' => $student->id,
                 'student_id_number' => $student->student_id_number,
+                'student_id' => $student->student_id ?? $student->student_id_number,
                 'profile_photo' => $student->profile_photo,
                 'name' => $student->name,
                 'email' => $student->email,
+                'course' => $student->course,
+                'department' => $student->department,
+                'year_level' => $student->year_level,
+                'status' => $student->status,
                 'recognition_points' => $recognitionPoints,
                 'peso_value' => round($recognitionPoints / self::POINTS_PER_PESO, 2),
                 'report_count' => $student->reports_count,
@@ -2176,10 +2181,10 @@ class AdminWorkflowController extends Controller
                 $report->update(['status' => 'completed_return']);
 
                 $publishedAwardExists = $finder && PointTransaction::where('student_id', $finder->id)
-                        ->where('reference_type', SurrenderRequest::class)
-                        ->whereIn('reference_id', SurrenderRequest::where('report_id', $report->id)->select('id'))
-                        ->where('type', 'found_item_published')
-                        ->exists();
+                    ->where('reference_type', SurrenderRequest::class)
+                    ->whereIn('reference_id', SurrenderRequest::where('report_id', $report->id)->select('id'))
+                    ->where('type', 'found_item_published')
+                    ->exists();
 
                 if ($finder && !$publishedAwardExists) {
                     $pointRule = PointRule::where('item_category', $report->category)
