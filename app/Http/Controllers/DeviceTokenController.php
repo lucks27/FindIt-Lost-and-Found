@@ -54,15 +54,18 @@ class DeviceTokenController extends Controller
             ], 422);
         }
 
-        $token = $subscription['endpoint'];
+        $subscriptionPayload = json_encode($subscription);
 
         $deviceToken = DeviceToken::updateOrCreate([
             'student_id' => $user->id,
-            'token' => $token,
+            'token' => $subscription['endpoint'],
         ], [
             'platform' => 'web',
             'last_used_at' => now(),
         ]);
+
+        $deviceToken->token = $subscriptionPayload;
+        $deviceToken->save();
 
         return response()->json([
             'status' => 'success',
@@ -86,7 +89,10 @@ class DeviceTokenController extends Controller
         }
 
         DeviceToken::where('student_id', $user->id)
-            ->where('token', $endpoint)
+            ->where(function ($query) use ($endpoint) {
+                $query->where('token', $endpoint)
+                    ->orWhereRaw('token LIKE ?', ["%\"endpoint\":\"{$endpoint}\"%"]);
+            })
             ->delete();
 
         return response()->json([

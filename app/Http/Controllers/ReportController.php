@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Minishlink\WebPush\WebPush;
 
 class ReportController extends Controller
 {
@@ -562,17 +563,33 @@ class ReportController extends Controller
 
     protected function sendPushNotificationToUser(int $studentId, string $title, string $body, array $data = [])
     {
-        $tokens = DeviceToken::where('student_id', $studentId)
-            ->pluck('token')
-            ->filter()
-            ->toArray();
+        $deviceTokens = DeviceToken::where('student_id', $studentId)->get();
 
-        if (empty($tokens)) {
+        if ($deviceTokens->isEmpty()) {
             return false;
         }
 
-        $expoTokens = collect($tokens)->filter(fn($token) => Str::startsWith($token, 'ExponentPushToken'))->values()->all();
-        $fcmTokens = collect($tokens)->filter(fn($token) => !Str::startsWith($token, 'ExponentPushToken'))->values()->all();
+        $expoTokens = [];
+        $fcmTokens = [];
+        $webSubscriptions = [];
+
+        foreach ($deviceTokens as $deviceToken) {
+            $tokenValue = (string) $deviceToken->token;
+
+            if ($deviceToken->platform === 'web') {
+                $subscription = json_decode($tokenValue, true);
+                if (is_array($subscription) && !empty($subscription['endpoint'])) {
+                    $webSubscriptions[] = $subscription;
+                }
+                continue;
+            }
+
+            if (Str::startsWith($tokenValue, 'ExponentPushToken')) {
+                $expoTokens[] = $tokenValue;
+            } else {
+                $fcmTokens[] = $tokenValue;
+            }
+        }
 
         $success = true;
 
@@ -616,6 +633,36 @@ class ReportController extends Controller
                 }
             } else {
                 $success = false;
+            }
+        }
+
+        if (!empty($webSubscriptions)) {
+            $publicKey = env('VAPID_PUBLIC_KEY');
+            $privateKey = env('VAPID_PRIVATE_KEY');
+
+            if (!empty($publicKey) && !empty($privateKey)) {
+                $webPush = new WebPush([
+                    'VAPID' => [
+                        'subject' => env('VAPID_SUBJECT', 'mailto:admin@ssct.edu.ph'),
+                        'publicKey' => $publicKey,
+                        'privateKey' => $privateKey,
+                    ],
+                ]);
+
+                foreach ($webSubscriptions as $subscription) {
+                    try {
+                        $webPush->sendNotification($subscription, json_encode([
+                            'title' => $title,
+                            'body' => $body,
+                            'data' => $data,
+                            'tag' => 'findit-notification',
+                        ]), ['TTL' => 86400]);
+                    } catch (\Throwable $e) {
+                        $success = false;
+                    }
+                }
+
+                $webPush->flush();
             }
         }
 
