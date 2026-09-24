@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 14,
     paddingTop: 36,
-    paddingBottom: 125,
+    paddingBottom: 140,
   },
   header: {
     flexDirection: 'row',
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 112,
+    height: 150,
     backgroundColor: '#d8ffd2',
     flexDirection: 'row',
     justifyContent: 'space-around',

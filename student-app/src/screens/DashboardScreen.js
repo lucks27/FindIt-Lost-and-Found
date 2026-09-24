@@ -523,7 +523,11 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       </View>
       {activeTab === 'Profile' ? (
-        <View style={styles.navigationBody}><View style={styles.profileViewport}>{renderTabContent()}</View></View>
+        <View style={styles.navigationBody}>
+          <ScrollView style={styles.profileViewport} contentContainerStyle={styles.profileViewportContent} showsVerticalScrollIndicator={false}>
+            {renderTabContent()}
+          </ScrollView>
+        </View>
       ) : selectedItem ? (
         <View style={styles.navigationBody}>{renderTabContent()}</View>
       ) : (
@@ -999,8 +1003,9 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f1fbef' },
   fixedHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1fbef', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#d8eadb', zIndex: 10, elevation: 3, shadowColor: '#16442d', shadowOpacity: 0.08, shadowRadius: 5, shadowOffset: { width: 0, height: 2 } },
   navigationBody: { flex: 1 },
-  profileViewport: { flex: 1, paddingHorizontal: 16, paddingTop: 18, paddingBottom: 82, overflow: 'hidden' },
-  content: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 120 },
+  profileViewport: { flex: 1 },
+  profileViewportContent: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 120 },
+  content: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 132 },
   logo: { width: 48, height: 48 },
   headerCopy: { flex: 1, marginLeft: 8 },
   appName: { color: '#087044', fontSize: 18, fontWeight: '900' },
@@ -1201,13 +1206,13 @@ const styles = StyleSheet.create({
   logoutCancelText: { color: '#087044', fontSize: 13, fontWeight: '800' },
   logoutConfirmButton: { flex: 1, alignItems: 'center', backgroundColor: '#087044', borderRadius: 10, paddingVertical: 11 },
   logoutConfirmText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-  bottomNav: { position: 'absolute', left: 16, right: 16, bottom: 10, height: 64, borderRadius: 32, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#c7ddc9', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 4, elevation: 5, shadowColor: '#16442d', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
-  navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 56, height: 54 },
-  navIcon: { width: 34, height: 28, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  bottomNav: { position: 'absolute', left: 12, right: 12, bottom: 50, height: 78, borderRadius: 22, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#c7ddc9', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 8, elevation: 5, shadowColor: '#16442d', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
+  navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 54, height: 70, paddingVertical: 4 },
+  navIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   navIconActive: { backgroundColor: '#e2f4e4' },
-  navIconText: { color: '#668073', fontSize: 18, fontWeight: '800' },
+  navIconText: { color: '#668073', fontSize: 17, fontWeight: '800' },
   navIconTextActive: { color: '#ffffff' },
-  navLabel: { color: '#668073', fontSize: 8, fontWeight: '700', marginTop: 1 },
+  navLabel: { color: '#668073', fontSize: 9, fontWeight: '700', marginTop: 4 },
   navLabelActive: { color: '#087044', fontWeight: '900' },
   pageTitle: { color: '#174a31', fontSize: 26, fontWeight: '900', marginTop: 8 },
   pageCopy: { color: '#6f8578', fontSize: 13, lineHeight: 20, marginTop: 8 },
