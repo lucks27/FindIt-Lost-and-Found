@@ -12,9 +12,33 @@
       "**/*"
     ],
     "orientation": "portrait",
+    "android": {
+      "package": "com.findit.studentapp",
+      "permissions": [
+        "NOTIFICATIONS"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.findit.studentapp",
+      "supportsTablet": false
+    },
+    "notification": {
+      "icon": "./assets/logo.png",
+      "color": "#198754",
+      "androidMode": "default",
+      "androidCollapsedTitle": "FindIt"
+    },
     "plugins": [
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/logo.png",
+          "color": "#198754",
+          "defaultChannel": "default"
+        }
+      ]
     ]
   }
 }
