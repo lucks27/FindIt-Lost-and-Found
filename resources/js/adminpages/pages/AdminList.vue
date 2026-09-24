@@ -1,9 +1,7 @@
 <template>
     <section class="student-management-page">
         <header class="page-header">
-            <div class="header-copy">
-                <h1>Manage student accounts and directory records</h1>
-            </div>
+            <div class="header-copy"></div>
 
             <div class="header-actions">
                 <button type="button" class="primary-action-btn" @click="openStudentModal('create')">
@@ -105,7 +103,7 @@
                                 <div>
                                     <div class="student-name">{{ student.name }}</div>
                                     <div class="student-subtext">{{ student.department || student.course || 'No program'
-                                    }}</div>
+                                        }}</div>
                                 </div>
                             </td>
                             <td>{{ studentId(student) }}</td>
@@ -171,7 +169,7 @@
                                 <span>First name *</span>
                                 <input v-model.trim="studentForm.first_name" type="text" placeholder="First name" />
                                 <span v-if="studentErrors.first_name" class="field-error">{{ studentErrors.first_name
-                                }}</span>
+                                    }}</span>
                             </label>
 
                             <label>
@@ -183,7 +181,7 @@
                                 <span>Last name *</span>
                                 <input v-model.trim="studentForm.last_name" type="text" placeholder="Last name" />
                                 <span v-if="studentErrors.last_name" class="field-error">{{ studentErrors.last_name
-                                }}</span>
+                                    }}</span>
                             </label>
                         </div>
 
@@ -191,7 +189,7 @@
                             <span>Student ID *</span>
                             <input v-model.trim="studentForm.student_id" type="text" placeholder="e.g. 2026-00123" />
                             <span v-if="studentErrors.student_id" class="field-error">{{ studentErrors.student_id
-                            }}</span>
+                                }}</span>
                         </label>
                     </div>
 
@@ -204,7 +202,7 @@
                                 <option v-for="course in COURSES" :key="course" :value="course">{{ course }}</option>
                             </select>
                             <span v-if="studentErrors.course_base" class="field-error">{{ studentErrors.course_base
-                            }}</span>
+                                }}</span>
                         </label>
 
                         <label v-if="needsMajorSelection">
@@ -225,7 +223,7 @@
                                 </option>
                             </select>
                             <span v-if="studentErrors.concentration" class="field-error">{{ studentErrors.concentration
-                            }}</span>
+                                }}</span>
                         </label>
 
                         <label>
@@ -235,7 +233,7 @@
                                 <option v-for="year in YEAR_LEVELS" :key="year" :value="year">{{ year }}</option>
                             </select>
                             <span v-if="studentErrors.year_level" class="field-error">{{ studentErrors.year_level
-                            }}</span>
+                                }}</span>
                         </label>
 
                         <label>
@@ -245,7 +243,7 @@
                                 <option v-for="dept in DEPARTMENTS" :key="dept" :value="dept">{{ dept }}</option>
                             </select>
                             <span v-if="studentErrors.department" class="field-error">{{ studentErrors.department
-                            }}</span>
+                                }}</span>
                         </label>
                     </div>
 
@@ -259,7 +257,7 @@
                                 <span class="email-domain">@ssct.edu.ph</span>
                             </div>
                             <small v-if="emailDuplicateWarning" class="email-warning">{{ emailDuplicateWarning
-                            }}</small>
+                                }}</small>
                             <span v-if="studentErrors.email" class="field-error">{{ studentErrors.email }}</span>
                         </label>
 
@@ -340,25 +338,25 @@
 
                 <div class="details-grid profile-details-grid">
                     <div class="detail-row"><span>School ID</span><strong>{{ studentId(selectedStudent)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Status</span><strong>{{ studentStatus(selectedStudent) }}</strong>
                     </div>
                     <div class="detail-row detail-row-wide"><span>Email</span><strong>{{ selectedStudent.email || '—'
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row detail-row-wide"><span>Course</span><strong>{{ selectedStudent.course || '—'
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Department</span><strong>{{ selectedStudent.department || '—'
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Year level</span><strong>{{ selectedStudent.year_level || '—'
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Recognition points</span><strong>{{ recognitionPoints(selectedStudent)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Peso value</span><strong>₱{{ pesoValue(selectedStudent) }}</strong>
                     </div>
                     <div class="detail-row"><span>Created date</span><strong>{{ formatDate(selectedStudent.created_at)
-                            }}</strong></div>
+                    }}</strong></div>
                     <div class="detail-row"><span>Updated date</span><strong>{{ formatDate(selectedStudent.updated_at)
-                            }}</strong></div>
+                    }}</strong></div>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="ghost-btn" @click="closeDetailsModal">Close</button>
@@ -1079,6 +1077,8 @@ onMounted(loadListData)
     background: #3d9b61;
     color: #ffffff;
     box-shadow: 0 8px 20px rgba(38, 120, 73, 0.18);
+    padding: 12px 18px;
+    font-size: 15px;
 }
 
 .secondary-action-btn,
@@ -1364,7 +1364,7 @@ onMounted(loadListData)
 }
 
 .admin-table tbody tr:hover {
-    background: rgba(143, 221, 167, 0.08);
+    background: transparent;
 }
 
 .student-cell {
@@ -1851,173 +1851,5 @@ onMounted(loadListData)
     .pagination-controls {
         justify-content: space-between;
     }
-}
-
-/* Match the Recognition Points emerald theme. */
-.student-management-page {
-    color: #ffffff;
-    background: linear-gradient(135deg, #1a6b4f 0%, #2a9a6f 50%, #1e7e5c 100%);
-}
-
-.page-kicker,
-.field-label {
-    color: #f5d88b;
-}
-
-.page-header h1,
-.page-header p,
-.result-count,
-.pagination-summary,
-.rows-per-page {
-    color: #ffffff;
-}
-
-.student-directory-card {
-    background: rgba(30, 126, 92, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
-}
-
-.toolbar-search input,
-.toolbar-filters select,
-.student-form input,
-.student-form select,
-.rows-per-page select {
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(13, 89, 64, 0.6);
-    color: #ffffff;
-}
-
-.toolbar-search input::placeholder,
-.student-form input::placeholder {
-    color: #b0b0b0;
-}
-
-.toolbar-filters select option,
-.student-form select option {
-    color: #ffffff;
-    background: #1e7e5c;
-}
-
-.admin-table th,
-.admin-table td {
-    border-color: rgba(255, 255, 255, 0.15);
-}
-
-.admin-table thead th {
-    color: #ffffff;
-    background: rgba(13, 89, 64, 0.6);
-}
-
-.admin-table tbody tr:hover {
-    background: rgba(30, 126, 92, 0.3);
-}
-
-.student-name,
-.student-subtext,
-.admin-table td,
-.detail-row strong,
-.details-summary h3 {
-    color: #ffffff;
-}
-
-.student-subtext,
-.pagination-summary,
-.detail-row span,
-.details-summary p,
-.modal-copy {
-    color: #b0b0b0;
-}
-
-.student-avatar,
-.profile-modal-avatar {
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(30, 126, 92, 0.5);
-}
-
-.primary-action-btn,
-.delete-btn {
-    background: linear-gradient(135deg, #d4a547, #e0b850);
-    color: #1e7e5c;
-}
-
-.secondary-action-btn,
-.ghost-btn,
-.pagination-btn,
-.icon-button {
-    background: rgba(255, 255, 255, 0.15);
-    color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.3);
-}
-
-.icon-button.danger,
-.error-alert {
-    background: rgba(255, 107, 107, 0.2);
-    color: #ffb3b3;
-    border-color: rgba(255, 107, 107, 0.4);
-}
-
-.success-alert {
-    background: rgba(81, 207, 102, 0.2);
-    color: #99f5b5;
-    border-color: rgba(81, 207, 102, 0.4);
-}
-
-.status-active {
-    background: rgba(81, 207, 102, 0.2);
-    color: #99f5b5;
-}
-
-.status-inactive,
-.status-pending {
-    background: rgba(255, 255, 255, 0.1);
-    color: #b0b0b0;
-}
-
-.modal-overlay {
-    background: rgba(0, 0, 0, 0.6);
-}
-
-.modal-card,
-.confirmation-card {
-    background: #1e7e5c;
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
-}
-
-.modal-header {
-    border-color: rgba(255, 255, 255, 0.15);
-}
-
-.modal-header h2,
-.form-section h3,
-.confirmation-card h3 {
-    color: #ffffff;
-}
-
-.close-button,
-.modal-copy,
-.student-form label {
-    color: #e0e0e0;
-}
-
-.details-summary,
-.detail-row,
-.email-domain {
-    border-color: rgba(255, 255, 255, 0.2);
-    background: rgba(13, 89, 64, 0.6);
-}
-
-.detail-row span {
-    color: #b0b0b0;
-}
-
-.modal-eyebrow {
-    color: #f5d88b;
-}
-
-.locked-field {
-    background: rgba(13, 89, 64, 0.6) !important;
-    color: #b0b0b0 !important;
 }
 </style>
