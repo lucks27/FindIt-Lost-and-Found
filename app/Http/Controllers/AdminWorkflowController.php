@@ -1378,7 +1378,8 @@ class AdminWorkflowController extends Controller
                     'published_at' => Carbon::now(),
                 ]);
 
-                $pointsAwarded = $pointRule ? (int) $pointRule->base_points : 0;
+                $basePointsAwarded = $pointRule ? (int) $pointRule->base_points : 5;
+                $pointsAwarded = $basePointsAwarded > 0 ? (int) round($basePointsAwarded / 2) : 0;
                 $pointTransaction = $pointRule ? PointTransaction::firstOrCreate(
                     [
                         'reference_type' => SurrenderRequest::class,
@@ -2180,18 +2181,32 @@ class AdminWorkflowController extends Controller
                 $claim->update(['review_status' => 'completed']);
                 $report->update(['status' => 'completed_return']);
 
-                $publishedAwardExists = $finder && PointTransaction::where('student_id', $finder->id)
+                $pointRule = PointRule::query()
+                    ->where(function ($query) use ($report) {
+                        if ($report->category_id) {
+                            $query->where('category_id', $report->category_id);
+                        } else {
+                            $query->where('category_name', $report->category)
+                                ->orWhere('item_category', $report->category);
+                        }
+                    })
+                    ->where(function ($query) {
+                        $query->where('active', true)
+                            ->orWhere('is_active', true);
+                    })
+                    ->latest('id')
+                    ->first();
+
+                $publishedAwardPoints = $finder ? (int) PointTransaction::where('student_id', $finder->id)
                     ->where('reference_type', SurrenderRequest::class)
                     ->whereIn('reference_id', SurrenderRequest::where('report_id', $report->id)->select('id'))
                     ->where('type', 'found_item_published')
-                    ->exists();
+                    ->sum('points') : 0;
 
-                if ($finder && !$publishedAwardExists) {
-                    $pointRule = PointRule::where('item_category', $report->category)
-                        ->where('active', true)
-                        ->orderByDesc('id')
-                        ->first();
+                $baseReturnPoints = $pointRule ? (int) $pointRule->base_points : 5;
+                $remainingReturnPoints = max(0, $baseReturnPoints - $publishedAwardPoints);
 
+                if ($finder && $remainingReturnPoints > 0) {
                     $existingTransaction = PointTransaction::where('reference_type', ItemRelease::class)
                         ->where('reference_id', $release->id)
                         ->where('student_id', $finder->id)
@@ -2201,10 +2216,10 @@ class AdminWorkflowController extends Controller
                     if (!$existingTransaction) {
                         PointTransaction::create([
                             'student_id' => $finder->id,
-                            'amount' => round((int) ($pointRule?->base_points ?? 5) / self::POINTS_PER_PESO, 2),
-                            'points' => (int) ($pointRule?->base_points ?? 5),
+                            'amount' => round($remainingReturnPoints / self::POINTS_PER_PESO, 2),
+                            'points' => $remainingReturnPoints,
                             'type' => 'return_completion',
-                            'description' => 'Recognition points awarded for completed return.',
+                            'description' => 'Remaining recognition points awarded for completed return.',
                             'reference_type' => ItemRelease::class,
                             'reference_id' => $release->id,
                             'created_by_admin_id' => $admin->id,
