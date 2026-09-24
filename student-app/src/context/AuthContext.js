@@ -3,7 +3,7 @@ import { Alert } from 'react-native';
 import * as api from '../api/api';
 import EventBus from '../utils/EventBus';
 import RealtimeSync from '../utils/RealtimeSync';
-import { registerPushToken, unregisterPushToken } from '../utils/NotificationService';
+import { registerPushToken, showLocalNotification, unregisterPushToken } from '../utils/NotificationService';
 
 const AuthContext = createContext({
   user: null,
@@ -61,6 +61,7 @@ export function AuthProvider({ children }) {
 
       // Register or renew the push notification token after login
       await registerPushToken();
+      await showLocalNotification('FindIt notifications enabled', 'You can now receive pop-up alerts on your device.');
 
       return true;
     } catch (err) {
@@ -101,6 +102,7 @@ export function AuthProvider({ children }) {
       setUser(userResponse.data);
       RealtimeSync.startRealtimeSync();
       await registerPushToken();
+      await showLocalNotification('FindIt notifications enabled', 'You can now receive pop-up alerts on your device.');
 
       return true;
     } catch (err) {

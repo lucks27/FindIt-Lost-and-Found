@@ -60,6 +60,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/device-tokens', [App\Http\Controllers\DeviceTokenController::class, 'store']);
     Route::delete('/device-tokens', [App\Http\Controllers\DeviceTokenController::class, 'destroy']);
+    Route::post('/web-push/subscribe', [App\Http\Controllers\DeviceTokenController::class, 'storeWebPushSubscription']);
+    Route::delete('/web-push/unsubscribe', [App\Http\Controllers\DeviceTokenController::class, 'destroyWebPushSubscription']);
 
     Route::post('/logout', [StudentLoginController::class, 'logout']);
 });
