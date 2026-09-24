@@ -386,35 +386,60 @@ import api from '@/bootstrap'
 const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year']
 
 const DEPARTMENTS = [
-    'College of Arts and Sciences',
-    'College of Engineering',
-    'College of Computing and Information Sciences',
-    'College of Teacher Education',
-    'College of Business and Technology',
+    'College of Computing and Information Sciences (CCIS)',
+    'College of Arts & Sciences (CAS)',
+    'College of Engineering (COE)',
+    'College of Teacher Education (CTE)',
+    'College of Business and Technology (CBT)',
+]
+
+const COURSE_DEPARTMENT_MAP = [
+    { keywords: ['computer science', 'bscs'], department: 'College of Computing and Information Sciences (CCIS)' },
+    { keywords: ['information technology', 'bsit', 'b.s. i.t.', 'bs i.t.'], department: 'College of Computing and Information Sciences (CCIS)' },
+    { keywords: ['information systems', 'bsis'], department: 'College of Computing and Information Sciences (CCIS)' },
+    { keywords: ['information system', 'bsis'], department: 'College of Computing and Information Sciences (CCIS)' },
+    { keywords: ['mathematics', 'bsmath', 'bs math'], department: 'College of Arts & Sciences (CAS)' },
+    { keywords: ['environmental science', 'bses'], department: 'College of Arts & Sciences (CAS)' },
+    { keywords: ['english language', 'ba english'], department: 'College of Arts & Sciences (CAS)' },
+    { keywords: ['civil engineering', 'bsce'], department: 'College of Engineering (COE)' },
+    { keywords: ['electrical engineering', 'bsee'], department: 'College of Engineering (COE)' },
+    { keywords: ['electronics engineering', 'bsece'], department: 'College of Engineering (COE)' },
+    { keywords: ['computer engineering', 'bscpe', 'bscope', 'computer engineering'], department: 'College of Engineering (COE)' },
+    { keywords: ['elementary education', 'beed'], department: 'College of Teacher Education (CTE)' },
+    { keywords: ['secondary education', 'bsed', 'bse d'], department: 'College of Teacher Education (CTE)' },
+    { keywords: ['technical teacher education', 'btte'], department: 'College of Teacher Education (CTE)' },
+    { keywords: ['physical education', 'bped'], department: 'College of Teacher Education (CTE)' },
+    { keywords: ['electrical engineering technology', 'beet'], department: 'College of Business and Technology (CBT)' },
+    { keywords: ['electronics engineering technology', 'bexet'], department: 'College of Business and Technology (CBT)' },
+    { keywords: ['mechanical engineering technology', 'bmet'], department: 'College of Business and Technology (CBT)' },
+    { keywords: ['automotive engineering technology', 'baet'], department: 'College of Business and Technology (CBT)' },
+    { keywords: ['industrial technology', 'bindtech', 'industrial technology', 'b ind tech'], department: 'College of Business and Technology (CBT)' },
+    { keywords: ['hospitality management', 'bshm'], department: 'College of Business and Technology (CBT)' },
+    { keywords: ['tourism management', 'bsmt'], department: 'College of Business and Technology (CBT)' },
 ]
 
 const COURSES = [
     'Bachelor of Science in Civil Engineering (BSCE)',
     'Bachelor of Science in Electronics Engineering (BSECE)',
     'Bachelor of Science in Electrical Engineering (BSEE)',
-    'Bachelor of Science in Computer Engineering (BSCoE)',
-    'Bachelor of Automotive Engineering Technology',
-    'Bachelor of Electrical Engineering Technology',
-    'Bachelor of Electronics Engineering Technology',
-    'Bachelor of Mechanical Engineering Technology',
-    'Bachelor of Science in Industrial Technology',
-    'Bachelor of Science in Hospitality Management',
-    'Bachelor of Science in Information System (BSIS)',
-    'Bachelor of Science in Information Technology (BS I.T.)',
+    'Bachelor of Science in Computer Engineering (BSCpE)',
+    'Bachelor of Automotive Engineering Technology (BAET)',
+    'Bachelor of Electrical Engineering Technology (BEET)',
+    'Bachelor of Electronics Engineering Technology (BEXET)',
+    'Bachelor of Mechanical Engineering Technology (BMET)',
+    'Bachelor of Industrial Technology (BIndTech)',
+    'Bachelor of Science in Hospitality Management (BSHM)',
+    'Bachelor of Science in Information Systems (BSIS)',
+    'Bachelor of Science in Information Technology (BSIT)',
     'Bachelor of Science in Computer Science (BSCS)',
-    'Bachelor of Technical Teacher Education (BTTE)',
-    'Bachelor of Secondary Education (BSED)',
-    'Bachelor of Elementary Education (BEED)',
+    'Bachelor of Technical-Vocational Teacher Education (BTVTEd)',
+    'Bachelor of Secondary Education (BSEd)',
+    'Bachelor of Elementary Education (BEEd)',
     'Bachelor of Science in Environmental Science (BSES)',
     'Bachelor of Science in Mathematics (BS Math)',
-    'Bachelor of Science in Tourism Management',
-    'Bachelor of Physical Education',
-    'Bachelor of Arts in English Language',
+    'Bachelor of Science in Tourism Management (BSMT)',
+    'Bachelor of Physical Education (BPEd)',
+    'Bachelor of Arts in English Language (ABEL)',
 ]
 
 const MAJORS_BTTE = ['Automotive Technology', 'Electrical Technology', 'Foods and Services Management']
@@ -510,6 +535,41 @@ function formatDate(value) {
     }).format(date)
 }
 
+function normalizeCourseKey(course) {
+    return String(course || '')
+        .toLowerCase()
+        .replace(/[()]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+function getDepartmentForCourse(course) {
+    const normalized = normalizeCourseKey(course)
+    if (!normalized) return ''
+
+    const match = COURSE_DEPARTMENT_MAP.find(({ keywords }) =>
+        keywords.some((keyword) => normalized.includes(keyword))
+    )
+
+    return match ? match.department : ''
+}
+
+watch(
+    () => studentForm.value.course_base,
+    (course) => {
+        if (!course) {
+            studentForm.value.department = ''
+            return
+        }
+
+        const department = getDepartmentForCourse(course)
+        if (department) {
+            studentForm.value.department = department
+        }
+    },
+    { immediate: true }
+)
+
 function resetMessages() {
     errorMessage.value = ''
     statusMessage.value = ''
@@ -534,21 +594,25 @@ watch(
 )
 
 const needsMajorSelection = computed(() => {
-    return studentForm.value.course_base === 'Bachelor of Technical Teacher Education (BTTE)' || studentForm.value.course_base === 'Bachelor of Secondary Education (BSED)'
+    const course = String(studentForm.value.course_base || '').toLowerCase()
+    return course.includes('technical') && course.includes('teacher education') || course.includes('secondary education')
 })
 
 const needsConcentrationSelection = computed(() => {
-    return studentForm.value.course_base === 'Bachelor of Mechanical Engineering Technology'
+    const course = String(studentForm.value.course_base || '').toLowerCase()
+    return course.includes('mechanical engineering technology') || course.includes('bmet')
 })
 
 const AVAILABLE_MAJORS = computed(() => {
-    if (studentForm.value.course_base === 'Bachelor of Technical Teacher Education (BTTE)') return MAJORS_BTTE
-    if (studentForm.value.course_base === 'Bachelor of Secondary Education (BSED)') return MAJORS_BSED
+    const course = String(studentForm.value.course_base || '').toLowerCase()
+    if ((course.includes('technical') && course.includes('teacher education')) || course.includes('btte')) return MAJORS_BTTE
+    if (course.includes('secondary education') || course.includes('bsed')) return MAJORS_BSED
     return []
 })
 
 const AVAILABLE_CONCENTRATIONS = computed(() => {
-    if (studentForm.value.course_base === 'Bachelor of Mechanical Engineering Technology') return CONCENTRATIONS_BMET
+    const course = String(studentForm.value.course_base || '').toLowerCase()
+    if (course.includes('mechanical engineering technology') || course.includes('bmet')) return CONCENTRATIONS_BMET
     return []
 })
 

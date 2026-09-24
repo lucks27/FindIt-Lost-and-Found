@@ -126,7 +126,7 @@ class StudentLoginController extends Controller
 
         $validatedData['email'] = strtolower(trim((string) $validatedData['email']));
 
-    // Ensure SSCT email
+        // Ensure SSCT email
         if (!str_ends_with($validatedData['email'], '@ssct.edu.ph')) {
             return response()->json([
                 'status' => 'error',
@@ -136,9 +136,24 @@ class StudentLoginController extends Controller
 
         // Create student
         $nameParts = preg_split('/\s+/', trim($validatedData['name']), -1, PREG_SPLIT_NO_EMPTY);
-        $firstName = $nameParts[0] ?? '';
-        $lastName = count($nameParts) > 1 ? array_pop($nameParts) : $firstName;
-        $middleName = count($nameParts) > 1 ? trim(implode(' ', $nameParts)) : '';
+
+        if (count($nameParts) === 0) {
+            $firstName = '';
+            $middleName = null;
+            $lastName = '';
+        } elseif (count($nameParts) === 1) {
+            $firstName = $nameParts[0];
+            $middleName = null;
+            $lastName = $nameParts[0];
+        } elseif (count($nameParts) === 2) {
+            $firstName = $nameParts[0];
+            $middleName = null;
+            $lastName = $nameParts[1];
+        } else {
+            $firstName = $nameParts[0];
+            $middleName = trim(implode(' ', array_slice($nameParts, 1, -1)));
+            $lastName = $nameParts[count($nameParts) - 1];
+        }
 
         $student = Student::create([
             'student_id_number' => $validatedData['student_id'],

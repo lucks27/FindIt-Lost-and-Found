@@ -192,9 +192,30 @@ class AdminAuthController extends Controller
     private function splitStudentName(string $name): array
     {
         $parts = preg_split('/\s+/', trim($name), -1, PREG_SPLIT_NO_EMPTY);
-        $firstName = $parts[0] ?? '';
-        $lastName = count($parts) > 1 ? array_pop($parts) : $firstName;
-        $middleName = $parts ? trim(implode(' ', array_slice($parts, 1))) : '';
+
+        if (count($parts) === 0) {
+            return ['first_name' => '', 'middle_name' => null, 'last_name' => ''];
+        }
+
+        if (count($parts) === 1) {
+            return [
+                'first_name' => $parts[0],
+                'middle_name' => null,
+                'last_name' => $parts[0],
+            ];
+        }
+
+        if (count($parts) === 2) {
+            return [
+                'first_name' => $parts[0],
+                'middle_name' => null,
+                'last_name' => $parts[1],
+            ];
+        }
+
+        $firstName = $parts[0];
+        $middleName = trim(implode(' ', array_slice($parts, 1, -1)));
+        $lastName = $parts[count($parts) - 1];
 
         return [
             'first_name' => $firstName,
