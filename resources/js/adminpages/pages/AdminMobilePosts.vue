@@ -227,7 +227,7 @@ const items = ref([])
 const selectedItem = ref(null)
 const previewImages = ref([])
 const previewImageIndex = ref(0)
-const previewImageUrl = ref(null)
+const previewImageUrl = computed(() => previewImages.value[previewImageIndex.value] || null)
 const search = ref('')
 const typeFilter = ref('')
 const categoryFilter = ref('')
@@ -314,40 +314,42 @@ function openItem(item) {
     selectedItem.value = item
     previewImages.value = []
     previewImageIndex.value = 0
-    previewImageUrl.value = null
 }
 
 function closeItemModal() {
     selectedItem.value = null
     previewImages.value = []
     previewImageIndex.value = 0
-    previewImageUrl.value = null
+}
+
+function normalizePreviewImage(item) {
+    if (!item) return null
+    if (typeof item === 'string') return getImageUrl(item)
+    if (typeof item === 'object') return getImageUrl(item.file_path || item.path || item.url || item.image)
+    return null
 }
 
 function openImagePreview(imageList, index = 0) {
-    const list = Array.isArray(imageList) ? imageList : [imageList].filter(Boolean)
+    const rawList = Array.isArray(imageList) ? imageList : [imageList]
+    const list = rawList.map(normalizePreviewImage).filter(Boolean)
     if (!list.length) return
     previewImages.value = list
     previewImageIndex.value = Math.min(index, list.length - 1)
-    previewImageUrl.value = list[previewImageIndex.value]
 }
 
 function showPreviousImage() {
     if (!previewImages.value.length) return
     previewImageIndex.value = (previewImageIndex.value - 1 + previewImages.value.length) % previewImages.value.length
-    previewImageUrl.value = previewImages.value[previewImageIndex.value]
 }
 
 function showNextImage() {
     if (!previewImages.value.length) return
     previewImageIndex.value = (previewImageIndex.value + 1) % previewImages.value.length
-    previewImageUrl.value = previewImages.value[previewImageIndex.value]
 }
 
 function closeImagePreview() {
     previewImages.value = []
     previewImageIndex.value = 0
-    previewImageUrl.value = null
 }
 
 async function loadItems() {

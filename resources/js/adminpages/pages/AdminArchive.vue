@@ -256,7 +256,8 @@ const filteredItems = computed(() => {
 
 function openDetails(item) { selectedItem.value = item }
 function closeItemDetails() { selectedItem.value = null; previewImages.value = []; previewImageIndex.value = 0 }
-function openImagePreview(imageList, index = 0) { const list = Array.isArray(imageList) ? imageList : [imageList].filter(Boolean); if (!list.length) return; previewImages.value = list; previewImageIndex.value = Math.min(index, list.length - 1) }
+function normalizePreviewImage(item) { if (!item) return null; if (typeof item === 'string') return item.startsWith('http') || item.startsWith('/') ? item : `/storage/${item}`; if (typeof item === 'object') return normalizePreviewImage(item.file_path || item.path || item.url || item.image); return null }
+function openImagePreview(imageList, index = 0) { const rawList = Array.isArray(imageList) ? imageList : [imageList]; const list = rawList.map(normalizePreviewImage).filter(Boolean); if (!list.length) return; previewImages.value = list; previewImageIndex.value = Math.min(index, list.length - 1) }
 function showPreviousImage() { if (!previewImages.value.length) return; previewImageIndex.value = (previewImageIndex.value - 1 + previewImages.value.length) % previewImages.value.length }
 function showNextImage() { if (!previewImages.value.length) return; previewImageIndex.value = (previewImageIndex.value + 1) % previewImages.value.length }
 function closeImagePreview() { previewImages.value = []; previewImageIndex.value = 0 }

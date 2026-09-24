@@ -1252,6 +1252,24 @@ function getImageUrl(
     return fallbackImage
 }
 
+function getReportImages(
+    report
+) {
+    if (Array.isArray(report?.images)) {
+        return report.images.map((image) => getImageUrl(image?.file_path || image?.path || image?.url || image))
+    }
+
+    if (Array.isArray(report?.report_images)) {
+        return report.report_images.map((image) => getImageUrl(image?.file_path || image?.path || image?.url || image))
+    }
+
+    if (report?.image) {
+        return [getImageUrl(report.image)]
+    }
+
+    return []
+}
+
 function getReportImage(
     report,
     index = 0
@@ -1733,8 +1751,16 @@ function closeDetailModal() {
     resetRequestDetails()
 }
 
+function normalizePreviewImage(item) {
+    if (!item) return null
+    if (typeof item === 'string') return getImageUrl(item)
+    if (typeof item === 'object') return getImageUrl(item.file_path || item.path || item.url || item.image)
+    return null
+}
+
 function openImagePreview(imageList, index = 0) {
-    const list = Array.isArray(imageList) ? imageList : [imageList].filter(Boolean)
+    const rawList = Array.isArray(imageList) ? imageList : [imageList]
+    const list = rawList.map(normalizePreviewImage).filter(Boolean)
 
     if (!list.length) return
 

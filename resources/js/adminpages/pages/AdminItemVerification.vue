@@ -2435,8 +2435,16 @@ function closeDetailModal() {
     resetModalMessages()
 }
 
+function normalizePreviewImage(item) {
+    if (!item) return null
+    if (typeof item === 'string') return getImageUrl(item)
+    if (typeof item === 'object') return getImageUrl(item.file_path || item.path || item.url || item.image)
+    return null
+}
+
 function openImagePreview(imageList, index = 0) {
-    const list = Array.isArray(imageList) ? imageList : [imageList].filter(Boolean)
+    const rawList = Array.isArray(imageList) ? imageList : [imageList]
+    const list = rawList.map(normalizePreviewImage).filter(Boolean)
 
     if (!list.length) return
 
