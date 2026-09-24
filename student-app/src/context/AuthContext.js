@@ -10,6 +10,7 @@ const AuthContext = createContext({
   loading: true,
   error: null,
   login: async () => {},
+  loginWithGoogle: async () => {},
   logout: async () => {},
 });
 
@@ -84,6 +85,46 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function loginWithGoogle(email, name) {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await api.googleLoginRequest(email, name);
+      const token = response.data?.token || null;
+
+      if (token) {
+        await api.setSavedToken(token);
+      }
+
+      const userResponse = await api.fetchUser();
+      setUser(userResponse.data);
+      RealtimeSync.startRealtimeSync();
+      await registerPushToken();
+
+      return true;
+    } catch (err) {
+      console.error('Google login request failed:', err.response?.data || err.message || err);
+
+      const serverMessage = err.response?.data?.message;
+      const validationErrors = err.response?.data?.errors
+        ? Object.values(err.response.data.errors).flat().join('\n')
+        : null;
+      const message =
+        serverMessage ||
+        validationErrors ||
+        (err.request ? 'Network error: Unable to reach the backend server.' : null) ||
+        err.message ||
+        'Google sign-in failed.';
+
+      setError(message);
+      Alert.alert('Google Sign-In Error', message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function logout() {
     setLoading(true);
     // Stop real-time sync before logout
@@ -119,7 +160,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, error, login, loginWithGoogle, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

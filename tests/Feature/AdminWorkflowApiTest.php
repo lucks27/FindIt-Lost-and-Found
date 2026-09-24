@@ -118,6 +118,32 @@ class AdminWorkflowApiTest extends TestCase
             ->assertJsonPath('data.0.year_level', '3rd Year');
     }
 
+    public function test_student_google_login_accepts_registered_ssct_email(): void
+    {
+        Student::create([
+            'student_id_number' => '2026-4001',
+            'first_name' => 'Cora',
+            'last_name' => 'Luna',
+            'email' => 'cora.luna@ssct.edu.ph',
+            'password' => bcrypt('Secret123!'),
+            'course' => 'BSIT',
+            'department' => 'CCIS',
+            'year_level' => '3rd Year',
+            'status' => 'active',
+        ]);
+
+        $response = $this->postJson('/api/login/google', [
+            'email' => 'cora.luna@ssct.edu.ph',
+            'name' => 'Cora Luna',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('student.email', 'cora.luna@ssct.edu.ph');
+
+        $this->assertNotNull($response->json('token'));
+    }
+
     public function test_admin_event_fines_are_grouped_by_student_balance(): void
     {
         $admin = Admin::create([

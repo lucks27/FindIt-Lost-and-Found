@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   View,
@@ -12,17 +12,85 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import LoadingOverlay from '../components/LoadingOverlay';
 import bgImage from '../../assets/bg.png';
 import logoImage from '../../assets/logo.png';
 
+WebBrowser.maybeCompleteAuthSession();
+
 export default function LoginScreen() {
-  const { login, loading, error } = useAuth();
+  const { login, loginWithGoogle, loading, error } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  const googleConfig = {
+    expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    scopes: ['openid', 'profile', 'email'],
+  };
+
+  const [, googleResponse, promptGoogleAsync] = Google.useAuthRequest(googleConfig);
+
+  useEffect(() => {
+    if (!googleResponse || googleResponse.type !== 'success') {
+      return;
+    }
+
+    const idToken = googleResponse.params?.id_token;
+    if (!idToken) {
+      Alert.alert('Google Sign-In Error', 'Google did not return an ID token.');
+      return;
+    }
+
+    try {
+      const base64Payload = idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const paddedPayload = base64Payload.padEnd(Math.ceil(base64Payload.length / 4) * 4, '=');
+      const payload = JSON.parse(atob(paddedPayload));
+      const userEmail = String(payload.email || '').toLowerCase();
+      const userName = payload.name || [payload.given_name, payload.family_name].filter(Boolean).join(' ');
+
+      if (!userEmail || !userEmail.endsWith('@ssct.edu.ph')) {
+        Alert.alert('Google Sign-In', 'Only SSCT Google accounts can sign in to the student app.');
+        return;
+      }
+
+      loginWithGoogle(userEmail, userName);
+    } catch (err) {
+      console.error('Google token decode failed:', err);
+      Alert.alert('Google Sign-In Error', 'Unable to decode Google account information.');
+    }
+  }, [googleResponse, loginWithGoogle]);
+
+  async function handleGoogleLogin() {
+    const hasGoogleClient = Boolean(
+      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+      process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID ||
+      process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+      process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
+    );
+
+    if (!hasGoogleClient) {
+      Alert.alert(
+        'Google Sign-In Not Configured',
+        'Add the Google OAuth client IDs to the student app environment before enabling Google login.'
+      );
+      return;
+    }
+
+    try {
+      await promptGoogleAsync();
+    } catch (error) {
+      console.error('Google prompt failed:', error);
+      Alert.alert('Google Sign-In Error', 'Unable to start Google authentication.');
+    }
+  }
 
   async function handleSubmit() {
     const trimmedEmail = email.trim();
@@ -106,9 +174,9 @@ export default function LoginScreen() {
                     <Text style={styles.buttonText}>{loading ? 'Logging in...' : 'Login'}</Text>
                   </TouchableOpacity>
                   <Text style={styles.orText}>OR</Text>
-                  <TouchableOpacity style={styles.googleButton} onPress={() => Alert.alert('Google sign-in', 'Use your authorized @ssct.edu.ph school account. Google sign-in will be enabled when the school OAuth credentials are connected.')} activeOpacity={0.85}>
+                  <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin} activeOpacity={0.85}>
                     <Text style={styles.googleMark}>G</Text>
-                    <Text style={styles.googleButtonText}>Sign in with Google</Text>
+                    <Text style={styles.googleButtonText}>{loading ? 'Connecting...' : 'Sign in with Google'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => setShowForm(false)} style={styles.backButton}>
                     <Text style={styles.backText}>Back</Text>
