@@ -153,17 +153,6 @@
                                 <label>Year Level</label>
                                 <p>{{ selectedStudent.year_level || '—' }}</p>
                             </div>
-                            <div class="info-item">
-                                <label>Status</label>
-                                <p>
-                                    <span class="status-badge" :class="{
-                                        'status-active': selectedStudent.status === 'active',
-                                        'status-inactive': selectedStudent.status === 'inactive'
-                                    }">
-                                        {{ selectedStudent.status || 'Unknown' }}
-                                    </span>
-                                </p>
-                            </div>
                         </div>
                     </section>
 
@@ -171,16 +160,6 @@
                     <div v-if="modalMessage" class="alert" :class="modalMessageType">
                         {{ modalMessage }}
                     </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @click="closeStudentModal">
-                        Cancel
-                    </button>
-                    <button type="button" class="btn btn-primary" @click="saveStudentChanges" :disabled="savingChanges">
-                        <span v-if="savingChanges" class="spinner-small"></span>
-                        {{ savingChanges ? 'Saving...' : 'Save Changes' }}
-                    </button>
                 </div>
             </div>
         </div>

@@ -121,6 +121,7 @@ Route::middleware(['web', 'auth:admin'])->group(function () {
     Route::put('/admin/matches/{id}/reset', [App\Http\Controllers\AdminWorkflowController::class, 'resetPotentialMatch']);
 
 
+    Route::post('/admin/event-fine-conversions', [App\Http\Controllers\AdminWorkflowController::class, 'storeEventFineConversion']);
     Route::post('/admin/event-fines/{id}/approve-conversion', [App\Http\Controllers\AdminWorkflowController::class, 'approveEventFineConversion']);
     Route::post('/admin/event-fines/{id}/reject-conversion', [App\Http\Controllers\AdminWorkflowController::class, 'rejectEventFineConversion']);
     Route::post('/admin/event-fines', [App\Http\Controllers\AdminWorkflowController::class, 'storeEventFine']);

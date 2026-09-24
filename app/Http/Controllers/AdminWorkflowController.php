@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\ClaimReview;
 use App\Models\EventFine;
 use App\Models\EventFineArchive;
+use App\Models\EventFineConversion;
 use App\Models\EventFineEvent;
 use App\Models\ItemCategory;
 use App\Models\ItemRelease;
@@ -610,11 +611,6 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $items = EventFine::query()
-            ->with(['student', 'event', 'report', 'issuedByAdmin'])
-            ->latest()
-            ->get();
-
         if ($request->boolean('archived')) {
             return response()->json([
                 'status' => 'success',
@@ -622,11 +618,55 @@ class AdminWorkflowController extends Controller
             ]);
         }
 
-        $items = $items->where('status', '!=', 'paid')->values();
+        $items = EventFine::query()
+            ->with(['student', 'event', 'report', 'issuedByAdmin'])
+            ->where('status', '!=', 'paid')
+            ->latest()
+            ->get();
+
+        $grouped = $items->groupBy(fn (EventFine $fine) => $fine->student_id ?? $fine->student?->id ?? $fine->school_id ?? $fine->id)
+            ->map(function ($group, $key) {
+                $lead = $group->first();
+                $student = $lead?->student;
+                $originalAmount = (float) $group->sum(fn ($fine) => (float) ($fine->original_amount ?? $fine->amount ?? 0));
+                $remainingAmount = (float) $group->sum(fn ($fine) => (float) ($fine->remaining_amount ?? max(0, (float) ($fine->original_amount ?? $fine->amount ?? 0) - (float) ($fine->paid_amount ?? 0))));
+                $paidAmount = (float) $group->sum(fn ($fine) => (float) ($fine->paid_amount ?? 0));
+                $status = strtolower((string) ($lead->status ?? 'pending'));
+
+                if ($status === 'rejected') {
+                    $status = 'rejected';
+                } elseif ($remainingAmount <= 0) {
+                    $status = 'paid';
+                } elseif ($group->contains(fn ($fine) => strtolower((string) ($fine->status ?? '')) === 'partially paid')) {
+                    $status = 'partially paid';
+                } elseif ($group->contains(fn ($fine) => strtolower((string) ($fine->status ?? '')) === 'approved')) {
+                    $status = 'approved';
+                } else {
+                    $status = 'pending';
+                }
+
+                return [
+                    'id' => $key,
+                    'student_id' => $student?->id ?? $lead?->student_id,
+                    'student_name' => $student?->name ?? $lead?->student_name,
+                    'school_id' => $student?->student_id_number ?? $lead?->school_id,
+                    'event_name' => $group->count() > 1 ? 'Combined fine balance' : ($lead?->event_name ?? 'Student fine balance'),
+                    'amount' => round($originalAmount, 2),
+                    'original_amount' => round($originalAmount, 2),
+                    'amount_to_pay' => round($originalAmount, 2),
+                    'paid_amount' => round($paidAmount, 2),
+                    'remaining_amount' => round($remainingAmount, 2),
+                    'status' => $status,
+                    'student' => $student ? $student->toArray() : null,
+                    'reason' => $lead?->reason,
+                    'due_at' => $lead?->due_at,
+                    'issued_by_admin_id' => $lead?->issued_by_admin_id,
+                ];
+            })->values();
 
         return response()->json([
             'status' => 'success',
-            'data' => $items,
+            'data' => $grouped,
         ]);
     }
 
@@ -2312,6 +2352,52 @@ class AdminWorkflowController extends Controller
         AuditLog::create($payload);
     }
 
+    public function storeEventFineConversion(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (!$admin) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $validated = $request->validate([
+            'student_id' => 'required|exists:students,id',
+            'requested_points' => 'required|integer|min:0',
+            'review_notes' => 'sometimes|nullable|string|max:1000',
+        ]);
+
+        $student = Student::findOrFail($validated['student_id']);
+        $totalOriginalAmount = (float) EventFine::where('student_id', $student->id)->sum('original_amount');
+        $totalRemainingAmount = (float) EventFine::where('student_id', $student->id)->sum('remaining_amount');
+        $availablePoints = (int) $student->pointTransactions()->sum('points');
+        $requestedPoints = min((int) $validated['requested_points'], $availablePoints);
+        $pesoValueConverted = round(min((float) $totalRemainingAmount, $requestedPoints / self::POINTS_PER_PESO), 2);
+        $convertedPoints = (int) round($pesoValueConverted * self::POINTS_PER_PESO);
+        $remainingBalance = max(0, $totalRemainingAmount - $pesoValueConverted);
+
+        $conversion = EventFineConversion::create([
+            'student_id' => $student->id,
+            'event_fine_id' => null,
+            'total_original_amount' => $totalOriginalAmount,
+            'converted_points' => $convertedPoints,
+            'peso_value_converted' => $pesoValueConverted,
+            'remaining_balance' => $remainingBalance,
+            'status' => 'pending',
+            'requested_points' => $requestedPoints,
+            'conversion_rate' => (float) self::POINTS_PER_PESO,
+            'credit_amount' => $pesoValueConverted,
+            'review_notes' => $validated['review_notes'] ?? null,
+            'reviewed_by_admin_id' => null,
+            'reviewed_at' => null,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Fine balance conversion request created.',
+            'data' => $conversion,
+        ]);
+    }
+
     public function approveEventFineConversion($id)
     {
         $admin = Auth::guard('admin')->user();
@@ -2320,10 +2406,67 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $fine = EventFine::findOrFail($id);
-        $fine->update(['status' => (float) $fine->remaining_amount <= 0 ? 'paid' : 'approved']);
+        $conversion = EventFineConversion::find($id);
 
-        return response()->json(['status' => 'success', 'message' => 'Event fine conversion approved.', 'data' => $fine]);
+        if (!$conversion && $student = Student::find($id)) {
+            $conversion = EventFineConversion::where('student_id', $student->id)->latest()->first();
+        }
+
+        if (!$conversion) {
+            $fine = EventFine::findOrFail($id);
+            $fine->update(['status' => (float) $fine->remaining_amount <= 0 ? 'paid' : 'approved']);
+
+            return response()->json(['status' => 'success', 'message' => 'Event fine conversion approved.', 'data' => $fine]);
+        }
+
+        $student = $conversion->student()->firstOrFail();
+        $remainingToApply = (float) $conversion->peso_value_converted;
+        $activeFines = EventFine::where('student_id', $student->id)
+            ->whereNotIn('status', ['paid', 'rejected'])
+            ->orderBy('id')
+            ->get();
+
+        foreach ($activeFines as $fine) {
+            if ($remainingToApply <= 0) {
+                break;
+            }
+
+            $deduction = min((float) ($fine->remaining_amount ?? 0), $remainingToApply);
+            if ($deduction <= 0) {
+                continue;
+            }
+
+            $newRemaining = max(0, (float) ($fine->remaining_amount ?? 0) - $deduction);
+            $fine->update([
+                'paid_amount' => (float) ($fine->paid_amount ?? 0) + $deduction,
+                'paid' => (float) ($fine->paid ?? 0) + $deduction,
+                'remaining_amount' => $newRemaining,
+                'status' => $newRemaining <= 0 ? 'paid' : 'approved',
+            ]);
+
+            $remainingToApply = round($remainingToApply - $deduction, 2);
+        }
+
+        $student->pointTransactions()->create([
+            'type' => 'event_fine_conversion',
+            'direction' => 'debit',
+            'points' => (int) $conversion->converted_points,
+            'amount' => (float) $conversion->peso_value_converted,
+            'description' => 'Student recognition points applied to outstanding fine balance.',
+            'notes' => 'Admin approval for total fine balance conversion.',
+            'processed_by_admin_id' => $admin->id,
+            'created_by_admin_id' => $admin->id,
+        ]);
+
+        $conversion->update([
+            'status' => 'approved',
+            'remaining_balance' => max(0, (float) $conversion->remaining_balance - (float) $conversion->peso_value_converted),
+            'reviewed_by_admin_id' => $admin->id,
+            'reviewed_at' => now(),
+            'review_notes' => $conversion->review_notes ?? 'Approved by admin.',
+        ]);
+
+        return response()->json(['status' => 'success', 'message' => 'Event fine conversion approved.', 'data' => $conversion->fresh()]);
     }
 
     public function rejectEventFineConversion($id)
@@ -2334,10 +2477,27 @@ class AdminWorkflowController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $fine = EventFine::findOrFail($id);
-        $fine->update(['status' => 'rejected']);
+        $conversion = EventFineConversion::find($id);
 
-        return response()->json(['status' => 'success', 'message' => 'Event fine conversion rejected.', 'data' => $fine]);
+        if (!$conversion && $student = Student::find($id)) {
+            $conversion = EventFineConversion::where('student_id', $student->id)->latest()->first();
+        }
+
+        if (!$conversion) {
+            $fine = EventFine::findOrFail($id);
+            $fine->update(['status' => 'rejected']);
+
+            return response()->json(['status' => 'success', 'message' => 'Event fine conversion rejected.', 'data' => $fine]);
+        }
+
+        $conversion->update([
+            'status' => 'rejected',
+            'reviewed_by_admin_id' => $admin->id,
+            'reviewed_at' => now(),
+            'review_notes' => $conversion->review_notes ?? 'Rejected by admin.',
+        ]);
+
+        return response()->json(['status' => 'success', 'message' => 'Event fine conversion rejected.', 'data' => $conversion->fresh()]);
     }
 
     public function recordEventFinePayment(Request $request, $id)
