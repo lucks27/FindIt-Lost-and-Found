@@ -129,8 +129,9 @@ export default function LoginScreen() {
                     <Text style={styles.buttonText}>Login</Text>
                   </TouchableOpacity>
                   <Text style={styles.orText}>OR</Text>
-                  <TouchableOpacity style={styles.outlineButton} onPress={() => setShowForm(true)} activeOpacity={0.85}>
-                    <Text style={styles.outlineButtonText}>Sign Up</Text>
+                  <TouchableOpacity style={styles.outlineButton} onPress={handleGoogleLogin} activeOpacity={0.85}>
+                    <Text style={styles.googleMark}>G</Text>
+                    <Text style={styles.outlineButtonText}>Sign in with Google</Text>
                   </TouchableOpacity>
                 </>
               ) : (
@@ -172,11 +173,6 @@ export default function LoginScreen() {
                     disabled={loading}
                   >
                     <Text style={styles.buttonText}>{loading ? 'Logging in...' : 'Login'}</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.orText}>OR</Text>
-                  <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin} activeOpacity={0.85}>
-                    <Text style={styles.googleMark}>G</Text>
-                    <Text style={styles.googleButtonText}>{loading ? 'Connecting...' : 'Sign in with Google'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => setShowForm(false)} style={styles.backButton}>
                     <Text style={styles.backText}>Back</Text>
@@ -287,13 +283,21 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     borderWidth: 1,
     borderColor: '#19763b',
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 8,
   },
   outlineButtonText: {
     color: '#164d2b',
     fontSize: 12,
     fontWeight: '700',
+  },
+  googleMark: {
+    color: '#4285f4',
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   orText: {
     color: '#5b665f',
