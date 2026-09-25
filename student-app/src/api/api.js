@@ -10,7 +10,7 @@ export let API_BASE_URL;
 if (Platform.OS !== 'web') {
   const expoHost = Constants.expoConfig?.hostUri?.split(':')[0]
     || Constants.manifest?.debuggerHost?.split(':')[0];
-  const developmentHost = expoHost || '192.168.1.102'; // Replace with your development machine's IP address
+  const developmentHost = expoHost || '192.168.1.101'; // Replace with your development machine's IP address
   API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || `http://${developmentHost}:8000`;
 } else {
   API_BASE_URL = 'http://127.0.0.1:8000';

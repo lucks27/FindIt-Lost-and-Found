@@ -3,6 +3,7 @@
         "name": "FindIt",
         "slug": "student-app",
         "version": "1.0.0",
+        "scheme": "findit",
         "platforms": ["ios", "android", "web"],
         "assetBundlePatterns": ["**/*"],
         "orientation": "portrait",

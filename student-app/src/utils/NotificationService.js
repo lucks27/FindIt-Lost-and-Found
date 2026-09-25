@@ -1,24 +1,39 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { savePushToken, removeSavedPushToken } from './PushTokenManager';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+const isExpoGo =
+  Constants.appOwnership === 'expo' || Constants.executionEnvironment === 'storeClient';
+
+let notificationsModule;
+
+async function getNotificationsModule() {
+  if (!notificationsModule) {
+    notificationsModule = await import('expo-notifications');
+    notificationsModule.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  }
+
+  return notificationsModule;
+}
 
 export async function requestPushPermission() {
+  if (isExpoGo) {
+    return 'unavailable';
+  }
+
   if (Platform.OS === 'web') {
-    if (!('Notification' in window)) {
-      return 'unsupported';
-    }
+    if (!('Notification' in window)) return 'unsupported';
 
     return Notification.requestPermission();
   }
 
+  const Notifications = await getNotificationsModule();
   const { status } = await Notifications.requestPermissionsAsync();
   return status;
 }
@@ -37,6 +52,11 @@ export async function showLocalNotification(title, body, data = {}) {
     });
   }
 
+  if (isExpoGo) {
+    return null;
+  }
+
+  const Notifications = await getNotificationsModule();
   return Notifications.scheduleNotificationAsync({
     content: {
       title,
@@ -49,14 +69,17 @@ export async function showLocalNotification(title, body, data = {}) {
 }
 
 export async function registerPushToken() {
+  if (Platform.OS === 'web' || isExpoGo) {
+    if (isExpoGo) {
+      console.warn('Push token registration is unavailable in Expo Go. Use a development build for remote notifications.');
+    }
+    return null;
+  }
+
   try {
     const permission = await requestPushPermission();
     if (permission !== 'granted') {
       console.warn('Push permission not granted:', permission);
-      return null;
-    }
-
-    if (Platform.OS === 'web') {
       return null;
     }
 
