@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Admin;
 use App\Models\AdminAnnouncement;
+use App\Models\AdminSetting;
 use App\Models\ArchiveItem;
 use App\Models\AuditLog;
 use App\Models\ClaimReview;
@@ -22,16 +23,15 @@ use App\Models\Report;
 use App\Models\Student;
 use App\Models\StudentRecognitionRecord;
 use App\Models\SurrenderRequest;
-use App\Models\AdminSetting;
 use App\Models\VisiblePostedItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Support\Carbon;
 
 class AdminWorkflowController extends Controller
 {
@@ -137,16 +137,23 @@ class AdminWorkflowController extends Controller
 
         $fileName = 'audit-logs-' . now()->format('Ymd_His') . '.json';
         $relativePath = 'public/exports/' . $fileName;
-        Storage::put($relativePath, json_encode($logs->map(fn($log) => [
-            'id' => $log->id,
-            'date' => $log->created_at?->toDateTimeString(),
-            'user_name' => $log->actorAdmin?->name ?? 'System',
-            'action' => $log->action,
-            'subject_type' => $log->subject_type,
-            'subject_label' => $log->subject_label,
-            'details' => $log->details,
-            'ip_address' => $log->ip_address,
-        ])->all(), JSON_PRETTY_PRINT));
+
+        Storage::put(
+            $relativePath,
+            json_encode(
+                $logs->map(fn ($log) => [
+                    'id' => $log->id,
+                    'date' => $log->created_at?->toDateTimeString(),
+                    'user_name' => $log->actorAdmin?->name ?? 'System',
+                    'action' => $log->action,
+                    'subject_type' => $log->subject_type,
+                    'subject_label' => $log->subject_label,
+                    'details' => $log->details,
+                    'ip_address' => $log->ip_address,
+                ])->all(),
+                JSON_PRETTY_PRINT
+            )
+        );
 
         return response()->json([
             'status' => 'success',
@@ -162,7 +169,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $items = AdminAnnouncement::query()
@@ -182,12 +192,19 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $query = Report::query()
-            ->where('type', 'lost')
-            ->whereIn('status', ['pending', 'pending_approval', 'correction_requested']);
+            ->where('type', Report::TYPE_LOST)
+            ->whereIn('status', [
+                'pending',
+                Report::STATUS_PENDING_APPROVAL,
+                'correction_requested',
+            ]);
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
@@ -195,15 +212,20 @@ class AdminWorkflowController extends Controller
 
         if ($request->filled('search')) {
             $search = strtolower($request->input('search'));
+
             $query->where(function ($subQuery) use ($search) {
-                $subQuery->whereRaw('LOWER(title) LIKE ?', ["%{$search}%"])
+                $subQuery
+                    ->whereRaw('LOWER(title) LIKE ?', ["%{$search}%"])
                     ->orWhereRaw('LOWER(description) LIKE ?', ["%{$search}%"])
                     ->orWhereRaw('LOWER(location) LIKE ?', ["%{$search}%"])
                     ->orWhereRaw('LOWER(category) LIKE ?', ["%{$search}%"]);
             });
         }
 
-        $items = $query->with(['student', 'images'])->latest()->get();
+        $items = $query
+            ->with(['student', 'images'])
+            ->latest()
+            ->get();
 
         return response()->json([
             'status' => 'success',
@@ -216,7 +238,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $items = VisiblePostedItem::query()
@@ -259,11 +284,18 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $items = ArchiveItem::query()
-            ->with(['report.student', 'report.images', 'report.category'])
+            ->with([
+                'report.student',
+                'report.images',
+                'report.categoryRelation',
+            ])
             ->latest('archived_at')
             ->get()
             ->map(function (ArchiveItem $archiveItem) {
@@ -290,7 +322,10 @@ class AdminWorkflowController extends Controller
             ->filter()
             ->values();
 
-        return response()->json(['status' => 'success', 'data' => $items]);
+        return response()->json([
+            'status' => 'success',
+            'data' => $items,
+        ]);
     }
 
     public function restoreArchiveItem($id)
@@ -298,15 +333,20 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $report = Report::findOrFail($id);
+
         ArchiveItem::where('report_id', $report->id)->delete();
 
         $report->update([
-            'status' => $report->type === 'lost' ? 'pending_approval' : 'pending_surrender',
+            'status' => Report::initialStatusForType($report->type),
             'archived_at' => null,
+            'completed_at' => null,
         ]);
 
         return response()->json([
@@ -321,12 +361,18 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $report = Report::findOrFail($id);
-        $isVisible = ($report->type === 'lost' && $report->status === 'approved')
-            || ($report->type === 'found' && $report->status === 'verified');
+
+        $isVisible =
+            ($report->type === Report::TYPE_LOST && $report->status === Report::STATUS_APPROVED)
+            ||
+            ($report->type === Report::TYPE_FOUND && $report->status === Report::STATUS_VERIFIED);
 
         if (!$isVisible) {
             return response()->json([
@@ -335,7 +381,9 @@ class AdminWorkflowController extends Controller
             ], 422);
         }
 
-        $report->update(['published_at' => Carbon::now()]);
+        $report->update([
+            'published_at' => Carbon::now(),
+        ]);
 
         VisiblePostedItem::updateOrCreate(
             ['report_id' => $report->id],
@@ -359,22 +407,40 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
             'is_visible' => 'required|boolean',
         ]);
 
-        $visibleItem = VisiblePostedItem::firstOrCreate(['report_id' => $id]);
+        $report = Report::findOrFail($id);
+
+        if ($validated['is_visible'] && !$report->isPubliclyVisible()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'This report is not in a public workflow status.',
+            ], 422);
+        }
+
+        $visibleItem = VisiblePostedItem::firstOrCreate([
+            'report_id' => $id,
+        ]);
+
         $visibleItem->update([
             'is_visible' => $validated['is_visible'],
             'posted_by_admin_id' => $admin->id,
+            'posted_at' => $visibleItem->posted_at ?? Carbon::now(),
         ]);
 
         return response()->json([
             'status' => 'success',
-            'message' => $validated['is_visible'] ? 'Mobile post is now visible.' : 'Mobile post is now hidden.',
+            'message' => $validated['is_visible']
+                ? 'Mobile post is now visible.'
+                : 'Mobile post is now hidden.',
             'data' => $visibleItem->fresh(),
         ]);
     }
@@ -384,7 +450,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $report = Report::findOrFail($id);
@@ -392,8 +461,9 @@ class AdminWorkflowController extends Controller
         VisiblePostedItem::where('report_id', $report->id)->delete();
 
         $report->update([
-            'status' => $report->type === 'lost' ? 'archived' : 'archived',
+            'status' => Report::STATUS_ARCHIVED,
             'published_at' => null,
+            'archived_at' => Carbon::now(),
         ]);
 
         $archiveItem = ArchiveItem::updateOrCreate(
@@ -419,7 +489,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $items = Notification::query()
@@ -433,6 +506,8 @@ class AdminWorkflowController extends Controller
                     'pending_report' => 'superadmin.pending-report',
                     'item_verification' => 'superadmin.item-verification',
                     'potential_match' => 'superadmin.matches',
+                    'potential_match_found' => 'superadmin.matches',
+                    'claim_submitted' => 'superadmin.claims',
                     'fine_request' => 'superadmin.fines',
                 ];
 
@@ -454,7 +529,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -485,12 +563,20 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $items = ItemVerification::query()
             ->where('status', '!=', 'archived')
-            ->with(['report.student', 'report.images', 'report.category', 'verifierAdmin'])
+            ->with([
+                'report.student',
+                'report.images',
+                'report.categoryRelation',
+                'verifierAdmin',
+            ])
             ->latest()
             ->get();
 
@@ -505,11 +591,19 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $items = PotentialMatch::query()
-            ->with(['lostReport.images', 'lostReport.student', 'foundReport.images', 'foundReport.student'])
+            ->with([
+                'lostReport.images',
+                'lostReport.student',
+                'foundReport.images',
+                'foundReport.student',
+            ])
             ->latest()
             ->get();
 
@@ -524,7 +618,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $categories = ItemCategory::query()
@@ -542,30 +639,67 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | EXISTING SURRENDER REQUESTS
+        |--------------------------------------------------------------------------
+        |
+        | surrender_requests.status = pending / overdue
+        | reports.status = pending_surrender
+        |
+        */
+
         $surrenderItems = SurrenderRequest::query()
+            ->whereIn('status', [
+                'pending',
+                'overdue',
+            ])
             ->whereHas('report', function ($reportQuery) {
-                $reportQuery->where('type', 'found')
-                    ->whereIn('status', ['pending', 'pending_surrender', 'published', 'approved']);
+                $reportQuery
+                    ->where('type', Report::TYPE_FOUND)
+                    ->where('status', Report::STATUS_PENDING_SURRENDER);
             })
-            ->whereNotIn('status', ['received', 'rejected'])
-            ->with(['report.student', 'report.category', 'report.images', 'student', 'receivedByAdmin'])
+            ->with([
+                'report.student',
+                'report.images',
+                'report.categoryRelation',
+                'student',
+                'receivedByAdmin',
+            ])
             ->latest()
             ->get()
             ->map(function (SurrenderRequest $surrender) {
                 $payload = $surrender->toArray();
                 $payload['has_surrender_record'] = true;
+
+                if ($surrender->report) {
+                    $payload['report']['category'] = $surrender->report->category;
+                }
+
                 return $payload;
-            })
-            ->all();
+            });
+
+        /*
+        |--------------------------------------------------------------------------
+        | FALLBACK FOUND REPORTS WITHOUT SURRENDER REQUEST
+        |--------------------------------------------------------------------------
+        */
 
         $reportItems = Report::query()
-            ->where('type', 'found')
-            ->whereIn('status', ['pending', 'pending_surrender', 'published', 'approved'])
+            ->where('type', Report::TYPE_FOUND)
+            ->where('status', Report::STATUS_PENDING_SURRENDER)
             ->whereDoesntHave('surrenderRequest')
-            ->with(['student', 'category', 'images'])
+            ->with([
+                'student',
+                'images',
+                'categoryRelation',
+            ])
             ->latest()
             ->get()
             ->map(function (Report $report) {
@@ -573,29 +707,31 @@ class AdminWorkflowController extends Controller
                     'id' => $report->id,
                     'report_id' => $report->id,
                     'student_id' => $report->student_id,
-                    'status' => $report->status,
+                    'status' => 'pending',
                     'deadline_at' => $report->created_at?->copy()->addDays(3)->toDateTimeString(),
                     'received_at' => null,
                     'received_by_admin_id' => null,
                     'notes' => null,
                     'has_surrender_record' => false,
-                    'report' => $report->toArray(),
+                    'report' => [
+                        ...$report->toArray(),
+                        'category' => $report->category,
+                    ],
                     'student' => $report->student?->toArray(),
                     'receivedByAdmin' => null,
                 ];
+            });
+
+        $items = $surrenderItems
+            ->concat($reportItems)
+            ->sortBy(function ($item) {
+                $deadline = data_get($item, 'deadline_at');
+
+                return $deadline
+                    ? strtotime($deadline)
+                    : PHP_INT_MAX;
             })
-            ->all();
-
-        $items = array_merge($surrenderItems, $reportItems);
-        usort($items, function ($left, $right) {
-            $leftDeadline = data_get($left, 'deadline_at');
-            $rightDeadline = data_get($right, 'deadline_at');
-
-            $leftTime = $leftDeadline ? strtotime($leftDeadline) : PHP_INT_MAX;
-            $rightTime = $rightDeadline ? strtotime($rightDeadline) : PHP_INT_MAX;
-
-            return $leftTime <=> $rightTime;
-        });
+            ->values();
 
         return response()->json([
             'status' => 'success',
@@ -608,13 +744,19 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         if ($request->boolean('archived')) {
             return response()->json([
                 'status' => 'success',
-                'data' => EventFineArchive::query()->with('student')->latest('paid_at')->get(),
+                'data' => EventFineArchive::query()
+                    ->with('student')
+                    ->latest('paid_at')
+                    ->get(),
             ]);
         }
 
@@ -624,22 +766,23 @@ class AdminWorkflowController extends Controller
             ->latest()
             ->get();
 
-        $grouped = $items->groupBy(fn(EventFine $fine) => $fine->student_id ?? $fine->student?->id ?? $fine->school_id ?? $fine->id)
+        $grouped = $items
+            ->groupBy(fn (EventFine $fine) => $fine->student_id ?? $fine->student?->id ?? $fine->school_id ?? $fine->id)
             ->map(function ($group, $key) {
                 $lead = $group->first();
                 $student = $lead?->student;
-                $originalAmount = (float) $group->sum(fn($fine) => (float) ($fine->original_amount ?? $fine->amount ?? 0));
-                $remainingAmount = (float) $group->sum(fn($fine) => (float) ($fine->remaining_amount ?? max(0, (float) ($fine->original_amount ?? $fine->amount ?? 0) - (float) ($fine->paid_amount ?? 0))));
-                $paidAmount = (float) $group->sum(fn($fine) => (float) ($fine->paid_amount ?? 0));
+                $originalAmount = (float) $group->sum(fn ($fine) => (float) ($fine->original_amount ?? $fine->amount ?? 0));
+                $remainingAmount = (float) $group->sum(fn ($fine) => (float) ($fine->remaining_amount ?? max(0, (float) ($fine->original_amount ?? $fine->amount ?? 0) - (float) ($fine->paid_amount ?? 0))));
+                $paidAmount = (float) $group->sum(fn ($fine) => (float) ($fine->paid_amount ?? 0));
                 $status = strtolower((string) ($lead->status ?? 'pending'));
 
                 if ($status === 'rejected') {
                     $status = 'rejected';
                 } elseif ($remainingAmount <= 0) {
                     $status = 'paid';
-                } elseif ($group->contains(fn($fine) => strtolower((string) ($fine->status ?? '')) === 'partially paid')) {
+                } elseif ($group->contains(fn ($fine) => strtolower((string) ($fine->status ?? '')) === 'partially paid')) {
                     $status = 'partially paid';
-                } elseif ($group->contains(fn($fine) => strtolower((string) ($fine->status ?? '')) === 'approved')) {
+                } elseif ($group->contains(fn ($fine) => strtolower((string) ($fine->status ?? '')) === 'approved')) {
                     $status = 'approved';
                 } else {
                     $status = 'pending';
@@ -650,7 +793,9 @@ class AdminWorkflowController extends Controller
                     'student_id' => $student?->id ?? $lead?->student_id,
                     'student_name' => $student?->name ?? $lead?->student_name,
                     'school_id' => $student?->student_id_number ?? $lead?->school_id,
-                    'event_name' => $group->count() > 1 ? 'Combined fine balance' : ($lead?->event_name ?? 'Student fine balance'),
+                    'event_name' => $group->count() > 1
+                        ? 'Combined fine balance'
+                        : ($lead?->event_name ?? 'Student fine balance'),
                     'amount' => round($originalAmount, 2),
                     'original_amount' => round($originalAmount, 2),
                     'amount_to_pay' => round($originalAmount, 2),
@@ -662,7 +807,8 @@ class AdminWorkflowController extends Controller
                     'due_at' => $lead?->due_at,
                     'issued_by_admin_id' => $lead?->issued_by_admin_id,
                 ];
-            })->values();
+            })
+            ->values();
 
         return response()->json([
             'status' => 'success',
@@ -675,7 +821,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -688,6 +837,7 @@ class AdminWorkflowController extends Controller
 
         $event = EventFineEvent::findOrFail($validated['event_fine_event_id']);
         $student = Student::findOrFail($validated['student_id']);
+
         if ((float) $validated['amount_to_pay'] > (float) $event->fine_amount) {
             return response()->json([
                 'status' => 'error',
@@ -736,20 +886,30 @@ class AdminWorkflowController extends Controller
     public function indexEventFineEvents(Request $request)
     {
         if (!Auth::guard('admin')->user()) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         return response()->json([
             'status' => 'success',
-            'data' => EventFineEvent::query()->where('is_active', true)->latest()->get(),
+            'data' => EventFineEvent::query()
+                ->where('is_active', true)
+                ->latest()
+                ->get(),
         ]);
     }
 
     public function storeEventFineEvent(Request $request)
     {
         $admin = Auth::guard('admin')->user();
+
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -768,7 +928,9 @@ class AdminWorkflowController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => $event->wasRecentlyCreated ? 'Event fine option created.' : 'Event name already exists. Existing event returned.',
+            'message' => $event->wasRecentlyCreated
+                ? 'Event fine option created.'
+                : 'Event name already exists. Existing event returned.',
             'data' => $event,
         ], $event->wasRecentlyCreated ? 201 : 200);
     }
@@ -778,7 +940,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $items = AdminSetting::query()
@@ -797,7 +962,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -823,28 +991,53 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
-        $pendingSurrenderStatuses = ['pending', 'pending_surrender', 'published', 'approved'];
-        $pendingSurrenders = Report::where('type', 'found')
-            ->whereIn('status', $pendingSurrenderStatuses)
+        $pendingSurrenders = Report::query()
+            ->where('type', Report::TYPE_FOUND)
+            ->where('status', Report::STATUS_PENDING_SURRENDER)
             ->where(function ($reportQuery) {
-                $reportQuery->whereDoesntHave('surrenderRequest')
+                $reportQuery
+                    ->whereDoesntHave('surrenderRequest')
                     ->orWhereHas('surrenderRequest', function ($surrenderQuery) {
-                        $surrenderQuery->whereNotIn('status', ['received', 'rejected']);
+                        $surrenderQuery->whereIn('status', [
+                            'pending',
+                            'overdue',
+                        ]);
                     });
             });
 
         $summary = [
             'total_reports' => Report::count(),
-            'open_reports' => Report::whereIn('status', ['pending', 'pending_approval', 'pending_surrender', 'pending_verification', 'correction_requested'])->count(),
+            'open_reports' => Report::whereIn('status', [
+                'pending',
+                Report::STATUS_PENDING_APPROVAL,
+                Report::STATUS_PENDING_SURRENDER,
+                Report::STATUS_PENDING_VERIFICATION,
+                'correction_requested',
+                Report::STATUS_APPROVED,
+                Report::STATUS_VERIFIED,
+                Report::STATUS_POTENTIAL_MATCH_FOUND,
+                Report::STATUS_UNDER_CLAIM_REVIEW,
+                Report::STATUS_READY_FOR_RELEASE,
+            ])->count(),
             'pending_surrenders' => $pendingSurrenders->count(),
-            'pending_reports' => Report::where('type', 'lost')->whereIn('status', ['pending', 'pending_approval', 'correction_requested'])->count(),
+            'pending_reports' => Report::where('type', Report::TYPE_LOST)
+                ->whereIn('status', [
+                    'pending',
+                    Report::STATUS_PENDING_APPROVAL,
+                    'correction_requested',
+                ])
+                ->count(),
             'pending_verifications' => ItemVerification::where('status', 'pending')
                 ->whereHas('report', function ($reportQuery) {
-                    $reportQuery->where('type', 'found')
-                        ->whereNotIn('status', ['rejected', 'completed', 'completed_return', 'archived', 'returned']);
+                    $reportQuery
+                        ->where('type', Report::TYPE_FOUND)
+                        ->where('status', Report::STATUS_PENDING_VERIFICATION);
                 })
                 ->count(),
             'mobile_posts' => VisiblePostedItem::whereHas('report')->count(),
@@ -856,12 +1049,17 @@ class AdminWorkflowController extends Controller
         ];
 
         $recentActivity = [
-            ...Report::with('student')->latest()->take(3)->get()->map(fn($report) => [
-                'id' => $report->id,
-                'type' => 'report',
-                'label' => "Report '{$report->title}' ({$report->status})",
-                'when' => $report->created_at?->toDateTimeString(),
-            ])->all(),
+            ...Report::with('student')
+                ->latest()
+                ->take(3)
+                ->get()
+                ->map(fn ($report) => [
+                    'id' => $report->id,
+                    'type' => 'report',
+                    'label' => "Report '{$report->title}' ({$report->status})",
+                    'when' => $report->created_at?->toDateTimeString(),
+                ])
+                ->all(),
         ];
 
         return response()->json([
@@ -869,7 +1067,7 @@ class AdminWorkflowController extends Controller
             'data' => [
                 'summary' => $summary,
                 'recent_activity' => $recentActivity,
-            ]
+            ],
         ]);
     }
 
@@ -878,7 +1076,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $pointRuleQuery = PointRule::query()
@@ -902,7 +1103,10 @@ class AdminWorkflowController extends Controller
                 return $item;
             });
 
-        return response()->json(['status' => 'success', 'data' => $items]);
+        return response()->json([
+            'status' => 'success',
+            'data' => $items,
+        ]);
     }
 
     public function storePointRule(Request $request)
@@ -910,7 +1114,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -936,7 +1143,9 @@ class AdminWorkflowController extends Controller
             );
 
             if (array_key_exists('description', $validated)) {
-                $category->update(['description' => $validated['description']]);
+                $category->update([
+                    'description' => $validated['description'],
+                ]);
             }
 
             if (PointRule::where('category_id', $category->id)->exists()) {
@@ -955,7 +1164,11 @@ class AdminWorkflowController extends Controller
 
         $item = PointRule::create($pointRuleData);
 
-        return response()->json(['status' => 'success', 'message' => 'Point rule created successfully.', 'data' => $item], 201);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Point rule created successfully.',
+            'data' => $item,
+        ], 201);
     }
 
     public function updatePointRule(Request $request, $id)
@@ -963,10 +1176,14 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $item = PointRule::findOrFail($id);
+
         $validated = $request->validate([
             'category_name' => 'sometimes|required|string|max:120',
             'description' => 'sometimes|nullable|string|max:1000',
@@ -986,12 +1203,18 @@ class AdminWorkflowController extends Controller
         }
 
         if (array_key_exists('description', $validated) && $item->category) {
-            $item->category->update(['description' => $validated['description']]);
+            $item->category->update([
+                'description' => $validated['description'],
+            ]);
         }
 
         $item->update($pointRuleData);
 
-        return response()->json(['status' => 'success', 'message' => 'Point rule updated successfully.', 'data' => $item]);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Point rule updated successfully.',
+            'data' => $item,
+        ]);
     }
 
     public function destroyPointRule($id)
@@ -999,13 +1222,19 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $item = PointRule::findOrFail($id);
         $item->delete();
 
-        return response()->json(['status' => 'success', 'message' => 'Point rule deleted successfully.']);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Point rule deleted successfully.',
+        ]);
     }
 
     public function indexPointBalances(Request $request)
@@ -1013,7 +1242,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $students = Student::query()
@@ -1063,7 +1295,10 @@ class AdminWorkflowController extends Controller
             ];
         });
 
-        return response()->json(['status' => 'success', 'data' => $data]);
+        return response()->json([
+            'status' => 'success',
+            'data' => $data,
+        ]);
     }
 
     public function updatePointBalance(Request $request, $id)
@@ -1071,7 +1306,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -1113,11 +1351,14 @@ class AdminWorkflowController extends Controller
             }
 
             if (array_key_exists('reward_count', $validated)) {
-                $student->update(['reward_count' => $validated['reward_count']]);
+                $student->update([
+                    'reward_count' => $validated['reward_count'],
+                ]);
             }
         });
 
         $student->refresh();
+
         StudentRecognitionRecord::updateOrCreate(
             ['student_id' => $student->id],
             [
@@ -1146,7 +1387,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $items = ClaimReview::query()
@@ -1165,7 +1409,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $items = ItemRelease::query()
@@ -1184,13 +1431,22 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $notification = Notification::where('recipient_role', 'admin')->findOrFail($id);
-        $notification->update(['is_read' => true]);
+        $notification->update([
+            'is_read' => true,
+        ]);
 
-        return response()->json(['status' => 'success', 'message' => 'Notification marked as read.', 'data' => $notification]);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Notification marked as read.',
+            'data' => $notification,
+        ]);
     }
 
     public function updateAnnouncement(Request $request, $id)
@@ -1198,10 +1454,14 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $item = AdminAnnouncement::findOrFail($id);
+
         $validated = $request->validate([
             'title' => 'sometimes|required|string|max:255',
             'message' => 'sometimes|required|string',
@@ -1215,7 +1475,11 @@ class AdminWorkflowController extends Controller
 
         $item->update($validated);
 
-        return response()->json(['status' => 'success', 'message' => 'Announcement updated successfully.', 'data' => $item]);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Announcement updated successfully.',
+            'data' => $item,
+        ]);
     }
 
     public function deleteAnnouncement($id)
@@ -1223,13 +1487,19 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $item = AdminAnnouncement::findOrFail($id);
         $item->delete();
 
-        return response()->json(['status' => 'success', 'message' => 'Announcement deleted successfully.']);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Announcement deleted successfully.',
+        ]);
     }
 
     public function publishAnnouncement($id)
@@ -1237,13 +1507,23 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $item = AdminAnnouncement::findOrFail($id);
-        $item->update(['status' => 'published', 'published_at' => $item->published_at ?? Carbon::now()]);
+        $item->update([
+            'status' => 'published',
+            'published_at' => $item->published_at ?? Carbon::now(),
+        ]);
 
-        return response()->json(['status' => 'success', 'message' => 'Announcement published successfully.', 'data' => $item]);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Announcement published successfully.',
+            'data' => $item,
+        ]);
     }
 
     public function unpublishAnnouncement($id)
@@ -1251,17 +1531,29 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $item = AdminAnnouncement::findOrFail($id);
-        $item->update(['status' => 'draft']);
+        $item->update([
+            'status' => 'draft',
+        ]);
 
-        return response()->json(['status' => 'success', 'message' => 'Announcement unpublished successfully.', 'data' => $item]);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Announcement unpublished successfully.',
+            'data' => $item,
+        ]);
     }
 
-    private function syncArchiveRecord(Report $report, string $archiveType = 'completed', ?string $reason = null): void
-    {
+    private function syncArchiveRecord(
+        Report $report,
+        string $archiveType = 'completed',
+        ?string $reason = null
+    ): void {
         ArchiveItem::updateOrCreate(
             ['report_id' => $report->id],
             [
@@ -1279,12 +1571,25 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $report = Report::findOrFail($id);
+
+        if ($report->type !== Report::TYPE_LOST) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Only lost-item reports can be approved here.',
+            ], 422);
+        }
+
         $report->update([
-            'status' => 'approved',
+            'status' => Report::STATUS_APPROVED,
+            'approved_by_admin_id' => $admin->id,
+            'approved_at' => Carbon::now(),
             'published_at' => Carbon::now(),
         ]);
 
@@ -1298,7 +1603,25 @@ class AdminWorkflowController extends Controller
             ]
         );
 
-        return response()->json(['status' => 'success', 'message' => 'Report approved and posted to mobile successfully.', 'data' => $report->fresh('student')]);
+        Notification::create([
+            'student_id' => $report->student_id,
+            'type' => 'lost_report_approved',
+            'title' => 'Lost Report Approved',
+            'message' => "Your lost-item report '{$report->title}' was approved and is now visible in the student feed.",
+            'action' => 'lost_report_approved',
+            'status' => 'pending',
+            'recipient_id' => $report->student_id,
+            'recipient_role' => 'student',
+            'subject_type' => Report::class,
+            'subject_id' => $report->id,
+            'is_read' => false,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Report approved and posted to mobile successfully.',
+            'data' => $report->fresh('student'),
+        ]);
     }
 
     public function rejectLostReport($id)
@@ -1306,14 +1629,48 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $report = Report::findOrFail($id);
-        $report->update(['status' => 'rejected']);
-        $this->syncArchiveRecord($report, 'rejected', 'Rejected by admin review.');
 
-        return response()->json(['status' => 'success', 'message' => 'Report rejected successfully.', 'data' => $report]);
+        $report->update([
+            'status' => Report::STATUS_REJECTED,
+            'rejected_by_admin_id' => $admin->id,
+            'rejected_at' => Carbon::now(),
+            'published_at' => null,
+        ]);
+
+        VisiblePostedItem::where('report_id', $report->id)->delete();
+
+        $this->syncArchiveRecord(
+            $report,
+            'rejected',
+            'Rejected by admin review.'
+        );
+
+        Notification::create([
+            'student_id' => $report->student_id,
+            'type' => 'lost_report_rejected',
+            'title' => 'Lost Report Rejected',
+            'message' => "Your lost-item report '{$report->title}' was rejected by USC.",
+            'action' => 'lost_report_rejected',
+            'status' => 'pending',
+            'recipient_id' => $report->student_id,
+            'recipient_role' => 'student',
+            'subject_type' => Report::class,
+            'subject_id' => $report->id,
+            'is_read' => false,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Report rejected successfully.',
+            'data' => $report,
+        ]);
     }
 
     public function requestLostReportCorrection(Request $request, $id)
@@ -1321,7 +1678,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -1329,9 +1689,22 @@ class AdminWorkflowController extends Controller
         ]);
 
         $report = Report::findOrFail($id);
-        $report->update(['status' => 'correction_requested', 'metadata' => array_merge($report->metadata ?? [], ['correction_request' => $validated['message'] ?? ''])]);
 
-        return response()->json(['status' => 'success', 'message' => 'Correction requested successfully.', 'data' => $report]);
+        $report->update([
+            'status' => 'correction_requested',
+            'metadata' => array_merge(
+                $report->metadata ?? [],
+                [
+                    'correction_request' => $validated['message'] ?? '',
+                ]
+            ),
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Correction requested successfully.',
+            'data' => $report,
+        ]);
     }
 
     private function resolveSurrenderRequest($id): SurrenderRequest
@@ -1372,126 +1745,154 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         try {
             return DB::transaction(function () use ($request, $id, $admin) {
-                $surrender = SurrenderRequest::whereKey(
-                    $this->resolveSurrenderRequest($id)->id
-                )->lockForUpdate()->firstOrFail();
+                $resolved = $this->resolveSurrenderRequest($id);
+
+                $surrender = SurrenderRequest::query()
+                    ->whereKey($resolved->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
                 if ($surrender->received_at || $surrender->received_by_admin_id) {
-                    return response()->json(['status' => 'error', 'message' => 'This surrender request has already been received.'], 409);
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'This surrender request has already been received.',
+                    ], 409);
                 }
 
-                $report = $surrender->report()->lockForUpdate()->firstOrFail();
+                $report = $surrender
+                    ->report()
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-                if ($report->type !== 'found' || in_array($report->status, ['rejected', 'completed', 'archived'], true)) {
-                    return response()->json(['status' => 'error', 'message' => 'This report cannot be approved for mobile posting.'], 422);
+                if ($report->type !== Report::TYPE_FOUND) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Only found-item reports can be processed in the surrender queue.',
+                    ], 422);
                 }
 
-                $pointRule = PointRule::query()
-                    ->where(function ($query) use ($report) {
-                        if ($report->category_id) {
-                            $query->where('category_id', $report->category_id);
-                        } else {
-                            $query->where('category_name', $report->category)
-                                ->orWhere('item_category', $report->category);
-                        }
-                    })
-                    ->where(function ($query) {
-                        $query->where('active', true)
-                            ->orWhere('is_active', true);
-                    })
-                    ->latest('id')
-                    ->first();
+                if ($report->status !== Report::STATUS_PENDING_SURRENDER) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'This found item is no longer waiting for surrender.',
+                    ], 422);
+                }
 
                 $surrender->update([
-                    'status' => 'approved',
+                    'status' => 'received',
                     'received_by_admin_id' => $admin->id,
                     'received_at' => Carbon::now(),
                 ]);
 
                 $report->update([
-                    'status' => 'pending_verification',
-                    'published_at' => Carbon::now(),
+                    'status' => Report::STATUS_PENDING_VERIFICATION,
+                    'published_at' => null,
                 ]);
 
-                $basePointsAwarded = $pointRule ? (int) $pointRule->base_points : 5;
-                $pointsAwarded = $basePointsAwarded > 0 ? (int) round($basePointsAwarded / 2) : 0;
-                $pointTransaction = $pointRule ? PointTransaction::firstOrCreate(
-                    [
-                        'reference_type' => SurrenderRequest::class,
-                        'reference_id' => $surrender->id,
-                        'student_id' => $report->student_id,
-                        'type' => 'found_item_published',
-                    ],
-                    [
-                        'amount' => round($pointsAwarded / self::POINTS_PER_PESO, 2),
-                        'points' => $pointsAwarded,
-                        'direction' => 'credit',
-                        'description' => 'Recognition points awarded when a found item was approved for public posting.',
-                        'created_by_admin_id' => $admin->id,
-                    ]
-                ) : null;
-
-                StudentRecognitionRecord::updateOrCreate(
-                    ['student_id' => $report->student_id],
-                    [
-                        'recognition_points' => (int) PointTransaction::where('student_id', $report->student_id)->sum('points'),
-                        'peso_value' => round((int) PointTransaction::where('student_id', $report->student_id)->sum('points') / self::POINTS_PER_PESO, 2),
-                        'reward_count' => (int) ($report->student?->reward_count ?? 0),
-                        'report_count' => $report->student?->reports()->count() ?? 0,
-                    ]
-                );
-
-                ItemVerification::firstOrCreate(
-                    ['report_id' => $report->id],
-                    ['status' => 'pending']
-                );
-
-                VisiblePostedItem::updateOrCreate(
+                $verification = ItemVerification::firstOrCreate(
                     ['report_id' => $report->id],
                     [
-                        'post_type' => 'public',
-                        'is_visible' => true,
-                        'posted_at' => Carbon::now(),
-                        'posted_by_admin_id' => $admin->id,
+                        'status' => 'pending',
+                        'notes' => 'Physical found item received by USC and waiting for verification.',
                     ]
                 );
+
+                if ($verification->status !== 'pending') {
+                    $verification->update([
+                        'status' => 'pending',
+                        'verifier_admin_id' => null,
+                        'verified_at' => null,
+                    ]);
+                }
+
+                /*
+                |------------------------------------------------------------------
+                | IMPORTANT
+                |------------------------------------------------------------------
+                | A surrendered item is NOT public yet. It must be verified first.
+                */
+
+                VisiblePostedItem::where('report_id', $report->id)->delete();
 
                 Notification::create([
                     'student_id' => $report->student_id,
-                    'title' => 'Found Item Published - Points Received',
-                    'message' => "Your found item '{$report->title}' was approved and posted to the mobile app. You received {$pointsAwarded} recognition points.",
-                    'action' => 'item_approved',
+                    'type' => 'found_item_received',
+                    'title' => 'Found Item Received by USC',
+                    'message' => "USC received your found item '{$report->title}'. It is now waiting for verification.",
+                    'action' => 'pending_verification',
+                    'status' => 'pending',
                     'recipient_id' => $report->student_id,
                     'recipient_role' => 'student',
-                    'subject_type' => SurrenderRequest::class,
-                    'subject_id' => $surrender->id,
+                    'subject_type' => ItemVerification::class,
+                    'subject_id' => $verification->id,
                     'data' => [
-                        'points_awarded' => $pointsAwarded,
-                        'point_rule_id' => $pointRule?->id,
-                        'point_transaction_id' => $pointTransaction?->id,
+                        'report_id' => $report->id,
+                        'verification_id' => $verification->id,
                     ],
                     'is_read' => false,
                 ]);
 
-                $this->recordAuditLog($admin, 'surrender_approved', SurrenderRequest::class, $surrender->id, 'Surrender Request', [
-                    'report_id' => $report->id,
-                    'received_by_admin_id' => $admin->id,
-                    'received_at' => $surrender->received_at?->toDateTimeString(),
-                ], $request->ip());
+                Notification::create([
+                    'type' => 'item_verification',
+                    'title' => 'Found Item Ready for Verification',
+                    'message' => "The found item '{$report->title}' has been surrendered and is ready for verification.",
+                    'action' => 'item_verification',
+                    'status' => 'pending',
+                    'recipient_role' => 'admin',
+                    'subject_type' => ItemVerification::class,
+                    'subject_id' => $verification->id,
+                    'data' => [
+                        'report_id' => $report->id,
+                        'verification_id' => $verification->id,
+                    ],
+                    'is_read' => false,
+                ]);
+
+                $this->recordAuditLog(
+                    $admin,
+                    'surrender_received',
+                    SurrenderRequest::class,
+                    $surrender->id,
+                    'Surrender Request',
+                    [
+                        'report_id' => $report->id,
+                        'received_by_admin_id' => $admin->id,
+                        'received_at' => $surrender->received_at?->toDateTimeString(),
+                        'next_status' => Report::STATUS_PENDING_VERIFICATION,
+                    ],
+                    $request->ip()
+                );
 
                 return response()->json([
                     'status' => 'success',
-                    'message' => "Surrender request approved, posted to mobile, and {$pointsAwarded} recognition points awarded.",
-                    'data' => $surrender->fresh(['report', 'student', 'receivedByAdmin']),
+                    'message' => 'Found item received successfully. It has been moved to Pending Verification.',
+                    'data' => $surrender->fresh([
+                        'report.student',
+                        'report.images',
+                        'student',
+                        'receivedByAdmin',
+                    ]),
                 ]);
             });
         } catch (\Throwable $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+            Log::error('Receive surrender failed', [
+                'surrender_id' => $id,
+                'message' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ], 422);
         }
     }
 
@@ -1500,19 +1901,56 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $surrender = $this->resolveSurrenderRequest($id);
-        $surrender->update(['status' => 'rejected']);
+
+        $surrender->update([
+            'status' => 'rejected',
+        ]);
 
         $report = $surrender->report()->first();
+
         if ($report) {
-            $report->update(['status' => 'rejected']);
-            $this->syncArchiveRecord($report, 'rejected', 'Rejected surrender request.');
+            $report->update([
+                'status' => Report::STATUS_REJECTED,
+                'rejected_by_admin_id' => $admin->id,
+                'rejected_at' => Carbon::now(),
+                'published_at' => null,
+            ]);
+
+            VisiblePostedItem::where('report_id', $report->id)->delete();
+
+            $this->syncArchiveRecord(
+                $report,
+                'rejected',
+                'Rejected surrender request.'
+            );
+
+            Notification::create([
+                'student_id' => $report->student_id,
+                'type' => 'found_surrender_rejected',
+                'title' => 'Found Item Surrender Rejected',
+                'message' => "USC rejected the surrender request for '{$report->title}'.",
+                'action' => 'found_surrender_rejected',
+                'status' => 'pending',
+                'recipient_id' => $report->student_id,
+                'recipient_role' => 'student',
+                'subject_type' => SurrenderRequest::class,
+                'subject_id' => $surrender->id,
+                'is_read' => false,
+            ]);
         }
 
-        return response()->json(['status' => 'success', 'message' => 'Surrender request rejected.', 'data' => $surrender]);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Surrender request rejected.',
+            'data' => $surrender,
+        ]);
     }
 
     public function requestSurrenderDetails(Request $request, $id)
@@ -1520,7 +1958,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -1533,22 +1974,35 @@ class AdminWorkflowController extends Controller
         $surrender = $this->resolveSurrenderRequest($id);
         $requestedDetails = $validated['requested_details'] ?? [];
         $message = $validated['note'] ?? $validated['message'] ?? '';
+
         if ($requestedDetails) {
-            $message = trim($message . ($message ? "\n" : '') . 'Please provide: ' . implode(', ', $requestedDetails));
+            $message = trim(
+                $message
+                . ($message ? "\n" : '')
+                . 'Please provide: '
+                . implode(', ', $requestedDetails)
+            );
         }
+
         $message = $message ?: 'Please provide more details for this surrender request.';
 
         $surrender->update([
-            'notes' => trim($surrender->notes ? $surrender->notes . "\n" : '') . $message,
+            'notes' => trim(
+                ($surrender->notes ? $surrender->notes . "\n" : '')
+                . $message
+            ),
         ]);
 
         $report = $surrender->report;
+
         if ($report?->student_id) {
             Notification::create([
                 'student_id' => $report->student_id,
+                'type' => 'surrender_details_requested',
                 'title' => 'More Details Needed',
                 'message' => $message,
                 'action' => 'surrender_details_requested',
+                'status' => 'pending',
                 'recipient_id' => $report->student_id,
                 'recipient_role' => 'student',
                 'subject_type' => SurrenderRequest::class,
@@ -1569,13 +2023,23 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $surrender = SurrenderRequest::findOrFail($id);
-        $surrender->update(['status' => 'overdue']);
 
-        return response()->json(['status' => 'success', 'message' => 'Surrender request marked overdue.', 'data' => $surrender]);
+        $surrender->update([
+            'status' => 'overdue',
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Surrender request marked overdue.',
+            'data' => $surrender,
+        ]);
     }
 
     public function verifyItem(Request $request, $id)
@@ -1583,84 +2047,128 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         try {
             return DB::transaction(function () use ($request, $id, $admin) {
-                $verification = ItemVerification::where('id', $id)
-                    ->where('status', 'pending')
+                $verification = ItemVerification::query()
+                    ->where('id', $id)
+                    ->whereIn('status', [
+                        'pending',
+                        'needs_more_information',
+                    ])
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $report = $verification->report()->lockForUpdate()->firstOrFail();
+                $report = $verification
+                    ->report()
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-                $claim = $report->type === 'lost'
-                    ? ClaimReview::where('report_id', $report->id)
-                        ->whereIn('review_status', ['pending', 'additional_information_required'])
-                        ->latest()
-                        ->lockForUpdate()
-                        ->first()
-                    : null;
-
-                if ($report->type === 'found' && $report->status !== 'pending_verification') {
-                    return response()->json(['status' => 'error', 'message' => 'This found report is not ready for verification approval.'], 422);
+                if ($report->type !== Report::TYPE_FOUND) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Only found items are verified in this workflow.',
+                    ], 422);
                 }
 
-                if ($report->type === 'lost' && ($report->status !== 'approved' || !$claim)) {
-                    return response()->json(['status' => 'error', 'message' => 'This lost report has no pending claim ready for USC confirmation.'], 422);
+                if ($report->status !== Report::STATUS_PENDING_VERIFICATION) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'This found report is not ready for verification approval.',
+                    ], 422);
                 }
 
                 $notes = $request->input('notes');
 
                 $verification->update([
-                    'status' => $report->type === 'lost' ? 'approved' : 'verified',
+                    'status' => 'verified',
                     'verifier_admin_id' => $admin->id,
                     'verified_at' => Carbon::now(),
                     'notes' => $notes ?? $verification->notes,
-                    'checklist' => array_merge($verification->checklist ?? [], [
-                        'verified_by_admin' => $admin->id,
-                    ]),
+                    'checklist' => array_merge(
+                        $verification->checklist ?? [],
+                        [
+                            'verified_by_admin' => $admin->id,
+                        ]
+                    ),
                 ]);
 
-                if ($claim) {
-                    $claim->update([
-                        'review_status' => 'approved',
-                        'reviewed_by_admin_id' => $admin->id,
-                        'reviewed_at' => Carbon::now(),
-                    ]);
-                } else {
-                    $report->update(['status' => 'verified']);
-                }
+                $report->update([
+                    'status' => Report::STATUS_VERIFIED,
+                    'published_at' => Carbon::now(),
+                ]);
+
+                /*
+                |------------------------------------------------------------------
+                | NOW THE FOUND ITEM MAY APPEAR PUBLICLY
+                |------------------------------------------------------------------
+                */
+
+                VisiblePostedItem::updateOrCreate(
+                    ['report_id' => $report->id],
+                    [
+                        'post_type' => 'public',
+                        'is_visible' => true,
+                        'posted_at' => Carbon::now(),
+                        'posted_by_admin_id' => $admin->id,
+                    ]
+                );
 
                 Notification::create([
-                    'student_id' => $claim?->claimant_student_id ?: $report->student_id,
-                    'title' => $claim ? 'Claim Approved by USC' : 'Item Verified by USC',
-                    'message' => $claim
-                        ? 'Your ownership claim was confirmed by USC. The admin will notify you when the item is ready for collection.'
-                        : "USC has verified your found item '{$report->title}' and it is now visible in the student feed.",
-                    'action' => $claim ? 'claim_confirmed' : 'item_verified',
-                    'recipient_id' => $claim?->claimant_student_id ?: $report->student_id,
+                    'student_id' => $report->student_id,
+                    'type' => 'found_item_verified',
+                    'title' => 'Item Verified by USC',
+                    'message' => "USC has verified your found item '{$report->title}' and it is now visible in the student feed.",
+                    'action' => 'item_verified',
+                    'status' => 'pending',
+                    'recipient_id' => $report->student_id,
                     'recipient_role' => 'student',
                     'subject_type' => ItemVerification::class,
                     'subject_id' => $verification->id,
+                    'data' => [
+                        'report_id' => $report->id,
+                    ],
                     'is_read' => false,
                 ]);
 
-                $this->recordAuditLog($admin, 'verification_approved', ItemVerification::class, $verification->id, 'Item Verification', [
-                    'report_id' => $report->id,
-                    'verifier_admin_id' => $admin->id,
-                    'verified_at' => $verification->verified_at?->toDateTimeString(),
-                ], $request->ip());
+                $this->recordAuditLog(
+                    $admin,
+                    'verification_approved',
+                    ItemVerification::class,
+                    $verification->id,
+                    'Item Verification',
+                    [
+                        'report_id' => $report->id,
+                        'verifier_admin_id' => $admin->id,
+                        'verified_at' => $verification->verified_at?->toDateTimeString(),
+                    ],
+                    $request->ip()
+                );
 
                 return response()->json([
                     'status' => 'success',
-                    'message' => $claim ? 'Claim confirmed. Send the USC Office pickup instruction to the claimant.' : 'Item verification approved.',
-                    'data' => $verification->fresh(['report', 'verifierAdmin']),
+                    'message' => 'Item verification approved. The found item is now visible in the student feed.',
+                    'data' => $verification->fresh([
+                        'report',
+                        'verifierAdmin',
+                    ]),
                 ]);
             });
         } catch (\Throwable $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+            Log::error('Verify item failed', [
+                'verification_id' => $id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ], 422);
         }
     }
 
@@ -1669,7 +2177,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -1678,12 +2189,20 @@ class AdminWorkflowController extends Controller
 
         try {
             return DB::transaction(function () use ($request, $id, $admin, $validated) {
-                $verification = ItemVerification::where('id', $id)
-                    ->where('status', 'pending')
+                $verification = ItemVerification::query()
+                    ->where('id', $id)
+                    ->whereIn('status', [
+                        'pending',
+                        'needs_more_information',
+                    ])
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $report = $verification->report()->lockForUpdate()->firstOrFail();
+                $report = $verification
+                    ->report()
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
                 $verification->update([
                     'status' => 'archived',
                     'verifier_admin_id' => $admin->id,
@@ -1691,14 +2210,28 @@ class AdminWorkflowController extends Controller
                     'notes' => $validated['notes'],
                 ]);
 
-                $report->update(['status' => 'rejected']);
-                $this->syncArchiveRecord($report, 'rejected', $validated['notes']);
+                $report->update([
+                    'status' => Report::STATUS_REJECTED,
+                    'rejected_by_admin_id' => $admin->id,
+                    'rejected_at' => Carbon::now(),
+                    'published_at' => null,
+                ]);
+
+                VisiblePostedItem::where('report_id', $report->id)->delete();
+
+                $this->syncArchiveRecord(
+                    $report,
+                    'rejected',
+                    $validated['notes']
+                );
 
                 Notification::create([
                     'student_id' => $report->student_id,
+                    'type' => 'found_item_verification_rejected',
                     'title' => 'Item Verification Rejected',
                     'message' => "USC rejected the verification of your found item '{$report->title}'.",
                     'action' => 'item_verification_rejected',
+                    'status' => 'pending',
                     'recipient_id' => $report->student_id,
                     'recipient_role' => 'student',
                     'subject_type' => ItemVerification::class,
@@ -1706,15 +2239,33 @@ class AdminWorkflowController extends Controller
                     'is_read' => false,
                 ]);
 
-                $this->recordAuditLog($admin, 'verification_rejected', ItemVerification::class, $verification->id, 'Item Verification', [
-                    'report_id' => $report->id,
-                    'rejection_notes' => $validated['notes'],
-                ], $request->ip());
+                $this->recordAuditLog(
+                    $admin,
+                    'verification_rejected',
+                    ItemVerification::class,
+                    $verification->id,
+                    'Item Verification',
+                    [
+                        'report_id' => $report->id,
+                        'rejection_notes' => $validated['notes'],
+                    ],
+                    $request->ip()
+                );
 
-                return response()->json(['status' => 'success', 'message' => 'Item verification rejected.', 'data' => $verification->fresh(['report', 'verifierAdmin'])]);
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Item verification rejected.',
+                    'data' => $verification->fresh([
+                        'report',
+                        'verifierAdmin',
+                    ]),
+                ]);
             });
         } catch (\Throwable $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ], 422);
         }
     }
 
@@ -1723,7 +2274,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -1732,12 +2286,20 @@ class AdminWorkflowController extends Controller
 
         try {
             return DB::transaction(function () use ($request, $id, $admin, $validated) {
-                $verification = ItemVerification::where('id', $id)
-                    ->where('status', 'pending')
+                $verification = ItemVerification::query()
+                    ->where('id', $id)
+                    ->whereIn('status', [
+                        'pending',
+                        'needs_more_information',
+                    ])
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $report = $verification->report()->lockForUpdate()->firstOrFail();
+                $report = $verification
+                    ->report()
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
                 $verification->update([
                     'status' => 'needs_more_information',
                     'notes' => $validated['notes'],
@@ -1745,25 +2307,48 @@ class AdminWorkflowController extends Controller
 
                 Notification::create([
                     'student_id' => $report->student_id,
+                    'type' => 'verification_details_requested',
                     'title' => 'Verification Details Needed',
                     'message' => "USC requested more details for your found item '{$report->title}'.",
                     'action' => 'verification_details_requested',
+                    'status' => 'pending',
                     'recipient_id' => $report->student_id,
                     'recipient_role' => 'student',
                     'subject_type' => ItemVerification::class,
                     'subject_id' => $verification->id,
+                    'data' => [
+                        'notes' => $validated['notes'],
+                    ],
                     'is_read' => false,
                 ]);
 
-                $this->recordAuditLog($admin, 'verification_details_requested', ItemVerification::class, $verification->id, 'Item Verification', [
-                    'report_id' => $report->id,
-                    'notes' => $validated['notes'],
-                ], $request->ip());
+                $this->recordAuditLog(
+                    $admin,
+                    'verification_details_requested',
+                    ItemVerification::class,
+                    $verification->id,
+                    'Item Verification',
+                    [
+                        'report_id' => $report->id,
+                        'notes' => $validated['notes'],
+                    ],
+                    $request->ip()
+                );
 
-                return response()->json(['status' => 'success', 'message' => 'Verification details requested.', 'data' => $verification->fresh(['report', 'verifierAdmin'])]);
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Verification details requested.',
+                    'data' => $verification->fresh([
+                        'report',
+                        'verifierAdmin',
+                    ]),
+                ]);
             });
         } catch (\Throwable $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ], 422);
         }
     }
 
@@ -1772,7 +2357,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -1782,22 +2370,34 @@ class AdminWorkflowController extends Controller
         try {
             return DB::transaction(function () use ($request, $id, $admin, $validated) {
                 $verification = ItemVerification::with('report')->findOrFail($id);
+
                 $claim = ClaimReview::where('report_id', $verification->report_id)
-                    ->whereIn('review_status', ['approved', 'pending', 'additional_information_required'])
+                    ->whereIn('review_status', [
+                        'approved',
+                        'pending',
+                        'additional_information_required',
+                    ])
                     ->whereNotNull('claimant_student_id')
                     ->latest()
                     ->first();
-                $recipientStudentId = $claim?->claimant_student_id ?: $verification->report?->student_id;
+
+                $recipientStudentId = $claim?->claimant_student_id
+                    ?: $verification->report?->student_id;
 
                 if (!$recipientStudentId) {
-                    return response()->json(['status' => 'error', 'message' => 'No claimant student is associated with this verification.'], 422);
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'No claimant student is associated with this verification.',
+                    ], 422);
                 }
 
                 Notification::create([
                     'student_id' => $recipientStudentId,
+                    'type' => 'claim_pickup_instructions',
                     'title' => 'Item Ready for Claiming',
-                    'message' => $validated['message'] ?: 'Please visit the USC office to claim your item. Bring valid identification and your ownership proof.',
+                    'message' => $validated['message'],
                     'action' => 'claim_pickup_instructions',
+                    'status' => 'pending',
                     'recipient_id' => $recipientStudentId,
                     'recipient_role' => 'student',
                     'subject_type' => $claim ? ClaimReview::class : ItemVerification::class,
@@ -1805,20 +2405,34 @@ class AdminWorkflowController extends Controller
                     'is_read' => false,
                 ]);
 
-                $this->recordAuditLog($admin, 'claim_pickup_instructions_sent', $claim ? ClaimReview::class : ItemVerification::class, $claim?->id ?: $verification->id, $claim ? 'Claim Review' : 'Item Verification', [
-                    'report_id' => $verification->report_id,
-                    'claimant_student_id' => $recipientStudentId,
-                    'message' => $validated['message'],
-                ], $request->ip());
+                $this->recordAuditLog(
+                    $admin,
+                    'claim_pickup_instructions_sent',
+                    $claim ? ClaimReview::class : ItemVerification::class,
+                    $claim?->id ?: $verification->id,
+                    $claim ? 'Claim Review' : 'Item Verification',
+                    [
+                        'report_id' => $verification->report_id,
+                        'claimant_student_id' => $recipientStudentId,
+                        'message' => $validated['message'],
+                    ],
+                    $request->ip()
+                );
 
                 return response()->json([
                     'status' => 'success',
                     'message' => 'Pickup instruction sent to the claimant.',
-                    'data' => $claim?->fresh(['report', 'claimantStudent']) ?: $verification->fresh('report'),
+                    'data' => $claim?->fresh([
+                        'report',
+                        'claimantStudent',
+                    ]) ?: $verification->fresh('report'),
                 ]);
             });
         } catch (\Throwable $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ], 422);
         }
     }
 
@@ -1827,37 +2441,76 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         try {
             return DB::transaction(function () use ($request, $id, $admin) {
                 $verification = ItemVerification::where('id', $id)
-                    ->whereIn('status', ['verified', 'completed'])
+                    ->whereIn('status', [
+                        'verified',
+                        'completed',
+                    ])
                     ->lockForUpdate()
                     ->firstOrFail();
-                $report = $verification->report()->lockForUpdate()->firstOrFail();
+
+                $report = $verification
+                    ->report()
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
                 $verification->update([
                     'status' => 'completed',
-                    'notes' => trim(($verification->notes ? $verification->notes . "\n" : '') . 'Transaction completed by admin.'),
+                    'notes' => trim(
+                        ($verification->notes ? $verification->notes . "\n" : '')
+                        . 'Transaction completed by admin.'
+                    ),
                 ]);
-                $report->update(['status' => 'completed_return']);
-                $this->syncArchiveRecord($report, 'completed', 'Claim transaction completed.');
 
-                $this->recordAuditLog($admin, 'verification_transaction_completed', ItemVerification::class, $verification->id, 'Item Verification', [
-                    'report_id' => $report->id,
-                    'completed_at' => Carbon::now()->toDateTimeString(),
-                ], $request->ip());
+                $report->update([
+                    'status' => Report::STATUS_COMPLETED_RETURN,
+                    'completed_at' => Carbon::now(),
+                    'published_at' => null,
+                ]);
+
+                VisiblePostedItem::where('report_id', $report->id)->delete();
+
+                $this->syncArchiveRecord(
+                    $report,
+                    'completed',
+                    'Claim transaction completed.'
+                );
+
+                $this->recordAuditLog(
+                    $admin,
+                    'verification_transaction_completed',
+                    ItemVerification::class,
+                    $verification->id,
+                    'Item Verification',
+                    [
+                        'report_id' => $report->id,
+                        'completed_at' => Carbon::now()->toDateTimeString(),
+                    ],
+                    $request->ip()
+                );
 
                 return response()->json([
                     'status' => 'success',
                     'message' => 'Transaction completed and archived.',
-                    'data' => $verification->fresh(['report', 'verifierAdmin']),
+                    'data' => $verification->fresh([
+                        'report',
+                        'verifierAdmin',
+                    ]),
                 ]);
             });
         } catch (\Throwable $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ], 422);
         }
     }
 
@@ -1866,7 +2519,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         try {
@@ -1874,21 +2530,44 @@ class AdminWorkflowController extends Controller
                 $verification = ItemVerification::lockForUpdate()->findOrFail($id);
                 $report = $verification->report()->lockForUpdate()->firstOrFail();
 
-                $verification->update(['status' => 'archived']);
-                $this->syncArchiveRecord($report, $report->status === 'rejected' ? 'rejected' : 'completed', 'Archived from claimant verification.');
+                $verification->update([
+                    'status' => 'archived',
+                ]);
 
-                $this->recordAuditLog($admin, 'verification_archived', ItemVerification::class, $verification->id, 'Item Verification', [
-                    'report_id' => $report->id,
-                ], $request->ip());
+                $this->syncArchiveRecord(
+                    $report,
+                    $report->status === Report::STATUS_REJECTED
+                        ? 'rejected'
+                        : 'completed',
+                    'Archived from claimant verification.'
+                );
+
+                $this->recordAuditLog(
+                    $admin,
+                    'verification_archived',
+                    ItemVerification::class,
+                    $verification->id,
+                    'Item Verification',
+                    [
+                        'report_id' => $report->id,
+                    ],
+                    $request->ip()
+                );
 
                 return response()->json([
                     'status' => 'success',
                     'message' => 'Verification archived successfully.',
-                    'data' => $verification->fresh(['report', 'verifierAdmin']),
+                    'data' => $verification->fresh([
+                        'report',
+                        'verifierAdmin',
+                    ]),
                 ]);
             });
         } catch (\Throwable $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ], 422);
         }
     }
 
@@ -1897,10 +2576,16 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
-        $match = PotentialMatch::with(['lostReport', 'foundReport'])->findOrFail($id);
+        $match = PotentialMatch::with([
+            'lostReport',
+            'foundReport',
+        ])->findOrFail($id);
 
         DB::transaction(function () use ($admin, $match) {
             $match->update([
@@ -1909,6 +2594,38 @@ class AdminWorkflowController extends Controller
                 'reviewed_at' => now(),
             ]);
 
+            if (
+                $match->lostReport
+                && in_array(
+                    $match->lostReport->status,
+                    [
+                        Report::STATUS_APPROVED,
+                        Report::STATUS_POTENTIAL_MATCH_FOUND,
+                    ],
+                    true
+                )
+            ) {
+                $match->lostReport->update([
+                    'status' => Report::STATUS_POTENTIAL_MATCH_FOUND,
+                ]);
+            }
+
+            if (
+                $match->foundReport
+                && in_array(
+                    $match->foundReport->status,
+                    [
+                        Report::STATUS_VERIFIED,
+                        Report::STATUS_POTENTIAL_MATCH_FOUND,
+                    ],
+                    true
+                )
+            ) {
+                $match->foundReport->update([
+                    'status' => Report::STATUS_POTENTIAL_MATCH_FOUND,
+                ]);
+            }
+
             if ($match->lostReport?->student_id) {
                 Notification::create([
                     'student_id' => $match->lostReport->student_id,
@@ -1916,8 +2633,9 @@ class AdminWorkflowController extends Controller
                     'recipient_role' => 'student',
                     'type' => 'lost_found_match',
                     'title' => 'Possible Match Found!',
-                    'message' => 'A found item may match your lost report. Please review the details and confirm if this is your item.',
+                    'message' => 'A found item may match your lost report. Please review the details and submit a claim if it is yours.',
                     'action' => 'view_match',
+                    'status' => 'pending',
                     'subject_type' => PotentialMatch::class,
                     'subject_id' => $match->id,
                     'data' => [
@@ -1930,7 +2648,14 @@ class AdminWorkflowController extends Controller
             }
         });
 
-        return response()->json(['status' => 'success', 'message' => 'Potential match confirmed and student notified.', 'data' => $match->fresh(['lostReport', 'foundReport'])]);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Potential match confirmed and student notified.',
+            'data' => $match->fresh([
+                'lostReport',
+                'foundReport',
+            ]),
+        ]);
     }
 
     public function rejectPotentialMatch($id)
@@ -1938,24 +2663,43 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
-        $match = PotentialMatch::with('foundReport')->findOrFail($id);
+        $match = PotentialMatch::with([
+            'lostReport',
+            'foundReport',
+        ])->findOrFail($id);
 
         DB::transaction(function () use ($match) {
-            $match->update(['status' => 'rejected']);
+            $match->update([
+                'status' => 'rejected',
+            ]);
 
-            if ($match->foundReport) {
-                $this->syncArchiveRecord(
-                    $match->foundReport,
-                    'rejected',
-                    'Potential match rejected by admin review.'
-                );
+            if ($match->lostReport?->status === Report::STATUS_POTENTIAL_MATCH_FOUND) {
+                $match->lostReport->update([
+                    'status' => Report::STATUS_APPROVED,
+                ]);
+            }
+
+            if ($match->foundReport?->status === Report::STATUS_POTENTIAL_MATCH_FOUND) {
+                $match->foundReport->update([
+                    'status' => Report::STATUS_VERIFIED,
+                ]);
             }
         });
 
-        return response()->json(['status' => 'success', 'message' => 'Potential match rejected and archived.', 'data' => $match->fresh(['foundReport'])]);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Potential match rejected. Both reports remain available for future matching.',
+            'data' => $match->fresh([
+                'lostReport',
+                'foundReport',
+            ]),
+        ]);
     }
 
     public function resetPotentialMatch($id)
@@ -1963,17 +2707,25 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $match = PotentialMatch::findOrFail($id);
+
         $match->update([
             'status' => 'pending',
             'reviewed_by_admin_id' => null,
             'reviewed_at' => null,
         ]);
 
-        return response()->json(['status' => 'success', 'message' => 'Potential match returned to pending review.', 'data' => $match->fresh()]);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Potential match returned to pending review.',
+            'data' => $match->fresh(),
+        ]);
     }
 
     public function approveClaim(Request $request, $id)
@@ -1981,22 +2733,48 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         try {
             return DB::transaction(function () use ($request, $id, $admin) {
-                $claim = ClaimReview::where('id', $id)
-                    ->whereIn('review_status', ['pending', 'additional_information_required'])
+                $claim = ClaimReview::query()
+                    ->where('id', $id)
+                    ->whereIn('review_status', [
+                        'pending',
+                        'additional_information_required',
+                    ])
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $report = $claim->report()->lockForUpdate()->firstOrFail();
-                $isClaimReviewReady = ($report->type === 'found' && $report->status === 'verified')
-                    || ($report->type === 'lost' && $report->status === 'approved');
+                $report = $claim
+                    ->report()
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-                if (!$isClaimReviewReady) {
-                    return response()->json(['status' => 'error', 'message' => 'Only public approved lost reports or verified found reports can be approved for claim review.'], 422);
+                if ($report->type !== Report::TYPE_FOUND) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Only verified found items can be approved for ownership claims.',
+                    ], 422);
+                }
+
+                if (!in_array(
+                    $report->status,
+                    [
+                        Report::STATUS_VERIFIED,
+                        Report::STATUS_POTENTIAL_MATCH_FOUND,
+                        Report::STATUS_UNDER_CLAIM_REVIEW,
+                    ],
+                    true
+                )) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'This found report is not ready for claim approval.',
+                    ], 422);
                 }
 
                 $claim->update([
@@ -2005,28 +2783,31 @@ class AdminWorkflowController extends Controller
                     'reviewed_at' => Carbon::now(),
                 ]);
 
-                if ($report->type === 'found') {
-                    $report->update(['status' => 'ready_for_release']);
-                }
+                $report->update([
+                    'status' => Report::STATUS_READY_FOR_RELEASE,
+                ]);
 
                 $matchingLostReports = PotentialMatch::where('found_report_id', $report->id)
                     ->with('lostReport')
                     ->get();
 
                 foreach ($matchingLostReports as $match) {
-                    if ($match->lostReport && $match->lostReport->type === 'lost') {
-                        $match->lostReport->update(['status' => 'under_claim_review']);
+                    if ($match->lostReport && $match->lostReport->type === Report::TYPE_LOST) {
+                        $match->lostReport->update([
+                            'status' => Report::STATUS_UNDER_CLAIM_REVIEW,
+                        ]);
                     }
                 }
 
-                $release = $report->type === 'found'
-                    ? ItemRelease::where('report_id', $report->id)
-                        ->where('claimant_student_id', $claim->claimant_student_id)
-                        ->whereIn('status', ['pending', 'approved'])
-                        ->first()
-                    : null;
+                $release = ItemRelease::where('report_id', $report->id)
+                    ->where('claimant_student_id', $claim->claimant_student_id)
+                    ->whereIn('status', [
+                        'pending',
+                        'approved',
+                    ])
+                    ->first();
 
-                if ($report->type === 'found' && !$release) {
+                if (!$release) {
                     $release = ItemRelease::create([
                         'report_id' => $report->id,
                         'claimant_student_id' => $claim->claimant_student_id,
@@ -2046,28 +2827,51 @@ class AdminWorkflowController extends Controller
 
                 Notification::create([
                     'student_id' => $claim->claimant_student_id,
+                    'type' => 'claim_approved',
                     'title' => 'Claim Approved',
-                    'message' => $report->type === 'lost'
-                        ? "USC verified your ownership claim for '{$report->title}'. Please visit the USC office for claiming."
-                        : "USC approved your claim for '{$report->title}'.",
+                    'message' => "USC approved your ownership claim for '{$report->title}'. The item is ready for release at the USC office.",
                     'action' => 'claim_approved',
+                    'status' => 'pending',
                     'recipient_id' => $claim->claimant_student_id,
                     'recipient_role' => 'student',
                     'subject_type' => ClaimReview::class,
                     'subject_id' => $claim->id,
+                    'data' => [
+                        'report_id' => $report->id,
+                        'release_id' => $release->id,
+                    ],
                     'is_read' => false,
                 ]);
 
-                $this->recordAuditLog($admin, 'claim_approved', ClaimReview::class, $claim->id, 'Claim Review', [
-                    'report_id' => $report->id,
-                    'claimant_student_id' => $claim->claimant_student_id,
-                    'release_id' => $release->id,
-                ], $request->ip());
+                $this->recordAuditLog(
+                    $admin,
+                    'claim_approved',
+                    ClaimReview::class,
+                    $claim->id,
+                    'Claim Review',
+                    [
+                        'report_id' => $report->id,
+                        'claimant_student_id' => $claim->claimant_student_id,
+                        'release_id' => $release->id,
+                    ],
+                    $request->ip()
+                );
 
-                return response()->json(['status' => 'success', 'message' => 'Claim approved successfully.', 'data' => $claim->fresh(['report', 'claimantStudent', 'reviewedByAdmin'])]);
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Claim approved successfully. The item is ready for release.',
+                    'data' => $claim->fresh([
+                        'report',
+                        'claimantStudent',
+                        'reviewedByAdmin',
+                    ]),
+                ]);
             });
         } catch (\Throwable $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ], 422);
         }
     }
 
@@ -2076,7 +2880,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -2085,8 +2892,17 @@ class AdminWorkflowController extends Controller
 
         try {
             return DB::transaction(function () use ($request, $id, $admin, $validated) {
-                $claim = ClaimReview::where('id', $id)
-                    ->whereIn('review_status', ['pending', 'additional_information_required'])
+                $claim = ClaimReview::query()
+                    ->where('id', $id)
+                    ->whereIn('review_status', [
+                        'pending',
+                        'additional_information_required',
+                    ])
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $report = $claim
+                    ->report()
                     ->lockForUpdate()
                     ->firstOrFail();
 
@@ -2097,28 +2913,61 @@ class AdminWorkflowController extends Controller
                     'reviewed_at' => Carbon::now(),
                 ]);
 
+                if (
+                    $report->type === Report::TYPE_FOUND
+                    && $report->status === Report::STATUS_UNDER_CLAIM_REVIEW
+                ) {
+                    $report->update([
+                        'status' => Report::STATUS_VERIFIED,
+                    ]);
+                }
+
                 Notification::create([
                     'student_id' => $claim->claimant_student_id,
+                    'type' => 'claim_rejected',
                     'title' => 'Claim Rejected',
-                    'message' => "USC rejected your claim for '{$claim->report?->title}'.",
+                    'message' => "USC rejected your claim for '{$report->title}'.",
                     'action' => 'claim_rejected',
+                    'status' => 'pending',
                     'recipient_id' => $claim->claimant_student_id,
                     'recipient_role' => 'student',
                     'subject_type' => ClaimReview::class,
                     'subject_id' => $claim->id,
+                    'data' => [
+                        'notes' => $validated['notes'],
+                    ],
                     'is_read' => false,
                 ]);
 
-                $this->recordAuditLog($admin, 'claim_rejected', ClaimReview::class, $claim->id, 'Claim Review', [
-                    'report_id' => $claim->report_id,
-                    'claimant_student_id' => $claim->claimant_student_id,
-                    'notes' => $validated['notes'],
-                ], $request->ip());
+                $this->recordAuditLog(
+                    $admin,
+                    'claim_rejected',
+                    ClaimReview::class,
+                    $claim->id,
+                    'Claim Review',
+                    [
+                        'report_id' => $claim->report_id,
+                        'claimant_student_id' => $claim->claimant_student_id,
+                        'notes' => $validated['notes'],
+                    ],
+                    $request->ip()
+                );
 
-                return response()->json(['status' => 'success', 'message' => 'Claim rejected successfully.', 'data' => $claim->fresh(['report', 'claimantStudent', 'reviewedByAdmin'])]);
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Claim rejected successfully.',
+                    'data' => $claim->fresh([
+                        'report',
+                        'claimantStudent',
+                        'reviewedByAdmin',
+                    ]),
+                ]);
             });
         } catch (\Throwable $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ], 422);
         }
     }
 
@@ -2127,7 +2976,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -2136,8 +2988,12 @@ class AdminWorkflowController extends Controller
 
         try {
             return DB::transaction(function () use ($request, $id, $admin, $validated) {
-                $claim = ClaimReview::where('id', $id)
-                    ->whereIn('review_status', ['pending', 'additional_information_required'])
+                $claim = ClaimReview::query()
+                    ->where('id', $id)
+                    ->whereIn('review_status', [
+                        'pending',
+                        'additional_information_required',
+                    ])
                     ->lockForUpdate()
                     ->firstOrFail();
 
@@ -2150,26 +3006,50 @@ class AdminWorkflowController extends Controller
 
                 Notification::create([
                     'student_id' => $claim->claimant_student_id,
+                    'type' => 'claim_information_requested',
                     'title' => 'More Claim Information Needed',
                     'message' => "USC requested more proof for your claim on '{$claim->report?->title}'.",
                     'action' => 'claim_information_requested',
+                    'status' => 'pending',
                     'recipient_id' => $claim->claimant_student_id,
                     'recipient_role' => 'student',
                     'subject_type' => ClaimReview::class,
                     'subject_id' => $claim->id,
+                    'data' => [
+                        'notes' => $validated['notes'],
+                    ],
                     'is_read' => false,
                 ]);
 
-                $this->recordAuditLog($admin, 'claim_information_requested', ClaimReview::class, $claim->id, 'Claim Review', [
-                    'report_id' => $claim->report_id,
-                    'claimant_student_id' => $claim->claimant_student_id,
-                    'notes' => $validated['notes'],
-                ], $request->ip());
+                $this->recordAuditLog(
+                    $admin,
+                    'claim_information_requested',
+                    ClaimReview::class,
+                    $claim->id,
+                    'Claim Review',
+                    [
+                        'report_id' => $claim->report_id,
+                        'claimant_student_id' => $claim->claimant_student_id,
+                        'notes' => $validated['notes'],
+                    ],
+                    $request->ip()
+                );
 
-                return response()->json(['status' => 'success', 'message' => 'Claim information requested.', 'data' => $claim->fresh(['report', 'claimantStudent', 'reviewedByAdmin'])]);
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Claim information requested.',
+                    'data' => $claim->fresh([
+                        'report',
+                        'claimantStudent',
+                        'reviewedByAdmin',
+                    ]),
+                ]);
             });
         } catch (\Throwable $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ], 422);
         }
     }
 
@@ -2178,13 +3058,20 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         try {
             return DB::transaction(function () use ($request, $id, $admin) {
-                $release = ItemRelease::where('id', $id)
-                    ->where('status', 'pending')
+                $release = ItemRelease::query()
+                    ->where('id', $id)
+                    ->whereIn('status', [
+                        'pending',
+                        'approved',
+                    ])
                     ->lockForUpdate()
                     ->firstOrFail();
 
@@ -2197,9 +3084,13 @@ class AdminWorkflowController extends Controller
                 ];
 
                 $checklist = $release->checklist ?? [];
+
                 foreach ($requiredChecklist as $key) {
                     if (!($checklist[$key] ?? false)) {
-                        return response()->json(['status' => 'error', 'message' => 'All release checklist items must be completed before return completion.'], 422);
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => 'All release checklist items must be completed before return completion.',
+                        ], 422);
                     }
                 }
 
@@ -2209,7 +3100,11 @@ class AdminWorkflowController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $report = $release->report()->lockForUpdate()->firstOrFail();
+                $report = $release
+                    ->report()
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
                 $finder = $report->student;
 
                 $release->update([
@@ -2218,33 +3113,59 @@ class AdminWorkflowController extends Controller
                     'released_at' => Carbon::now(),
                 ]);
 
-                $claim->update(['review_status' => 'completed']);
-                $report->update(['status' => 'completed_return']);
+                $claim->update([
+                    'review_status' => 'completed',
+                ]);
+
+                $report->update([
+                    'status' => Report::STATUS_COMPLETED_RETURN,
+                    'completed_at' => Carbon::now(),
+                    'published_at' => null,
+                ]);
+
+                VisiblePostedItem::where('report_id', $report->id)->delete();
+
+                /*
+                |------------------------------------------------------------------
+                | RECOGNITION POINTS
+                |------------------------------------------------------------------
+                | Award category points only after successful completed return.
+                | Any old early-award transactions are deducted from the final award
+                | so legacy data does not receive duplicate points.
+                */
 
                 $pointRule = PointRule::query()
                     ->where(function ($query) use ($report) {
                         if ($report->category_id) {
                             $query->where('category_id', $report->category_id);
                         } else {
-                            $query->where('category_name', $report->category)
+                            $query
+                                ->where('category_name', $report->category)
                                 ->orWhere('item_category', $report->category);
                         }
-                    })
-                    ->where(function ($query) {
-                        $query->where('active', true)
-                            ->orWhere('is_active', true);
                     })
                     ->latest('id')
                     ->first();
 
-                $publishedAwardPoints = $finder ? (int) PointTransaction::where('student_id', $finder->id)
-                    ->where('reference_type', SurrenderRequest::class)
-                    ->whereIn('reference_id', SurrenderRequest::where('report_id', $report->id)->select('id'))
-                    ->where('type', 'found_item_published')
-                    ->sum('points') : 0;
+                $legacyPublishedAwardPoints = $finder
+                    ? (int) PointTransaction::where('student_id', $finder->id)
+                        ->where('reference_type', SurrenderRequest::class)
+                        ->whereIn(
+                            'reference_id',
+                            SurrenderRequest::where('report_id', $report->id)->select('id')
+                        )
+                        ->where('type', 'found_item_published')
+                        ->sum('points')
+                    : 0;
 
-                $baseReturnPoints = $pointRule ? (int) $pointRule->base_points : 5;
-                $remainingReturnPoints = max(0, $baseReturnPoints - $publishedAwardPoints);
+                $baseReturnPoints = $pointRule
+                    ? (int) $pointRule->base_points
+                    : 5;
+
+                $remainingReturnPoints = max(
+                    0,
+                    $baseReturnPoints - $legacyPublishedAwardPoints
+                );
 
                 if ($finder && $remainingReturnPoints > 0) {
                     $existingTransaction = PointTransaction::where('reference_type', ItemRelease::class)
@@ -2259,12 +3180,26 @@ class AdminWorkflowController extends Controller
                             'amount' => round($remainingReturnPoints / self::POINTS_PER_PESO, 2),
                             'points' => $remainingReturnPoints,
                             'type' => 'return_completion',
-                            'description' => 'Remaining recognition points awarded for completed return.',
+                            'direction' => 'credit',
+                            'description' => 'Recognition points awarded after successful completed return.',
                             'reference_type' => ItemRelease::class,
                             'reference_id' => $release->id,
                             'created_by_admin_id' => $admin->id,
+                            'processed_by_admin_id' => $admin->id,
                         ]);
                     }
+
+                    $totalPoints = (int) PointTransaction::where('student_id', $finder->id)->sum('points');
+
+                    StudentRecognitionRecord::updateOrCreate(
+                        ['student_id' => $finder->id],
+                        [
+                            'recognition_points' => $totalPoints,
+                            'peso_value' => round($totalPoints / self::POINTS_PER_PESO, 2),
+                            'reward_count' => (int) ($finder->reward_count ?? 0),
+                            'report_count' => $finder->reports()->count(),
+                        ]
+                    );
                 }
 
                 $matchingLostReports = PotentialMatch::where('found_report_id', $report->id)
@@ -2272,29 +3207,49 @@ class AdminWorkflowController extends Controller
                     ->get();
 
                 foreach ($matchingLostReports as $match) {
-                    if ($match->lostReport && $match->lostReport->type === 'lost') {
-                        $match->lostReport->update(['status' => 'completed_return']);
+                    if ($match->lostReport && $match->lostReport->type === Report::TYPE_LOST) {
+                        $match->lostReport->update([
+                            'status' => Report::STATUS_COMPLETED_RETURN,
+                            'completed_at' => Carbon::now(),
+                            'published_at' => null,
+                        ]);
+
+                        VisiblePostedItem::where('report_id', $match->lostReport->id)->delete();
                     }
                 }
 
+                $this->syncArchiveRecord(
+                    $report,
+                    'completed',
+                    'Item successfully returned to verified claimant.'
+                );
+
                 Notification::create([
                     'student_id' => $finder?->id,
+                    'type' => 'return_completed',
                     'title' => 'Item Return Completed',
-                    'message' => "USC completed the return of your found item '{$report->title}'.",
+                    'message' => "USC completed the return of your found item '{$report->title}'. You received {$remainingReturnPoints} recognition point(s).",
                     'action' => 'return_completed',
+                    'status' => 'pending',
                     'recipient_id' => $finder?->id,
                     'recipient_role' => 'student',
                     'subject_type' => ItemRelease::class,
                     'subject_id' => $release->id,
+                    'data' => [
+                        'points_awarded' => $remainingReturnPoints,
+                        'report_id' => $report->id,
+                    ],
                     'is_read' => false,
                 ]);
 
                 if ($claim->claimant_student_id) {
                     Notification::create([
                         'student_id' => $claim->claimant_student_id,
+                        'type' => 'claim_return_completed',
                         'title' => 'Item Return Completed',
                         'message' => "USC completed your item release for '{$report->title}'.",
                         'action' => 'claim_return_completed',
+                        'status' => 'pending',
                         'recipient_id' => $claim->claimant_student_id,
                         'recipient_role' => 'student',
                         'subject_type' => ItemRelease::class,
@@ -2303,26 +3258,65 @@ class AdminWorkflowController extends Controller
                     ]);
                 }
 
-                $this->recordAuditLog($admin, 'release_completed', ItemRelease::class, $release->id, 'Item Release', [
-                    'report_id' => $report->id,
-                    'claim_id' => $claim->id,
-                    'claimant_student_id' => $claim->claimant_student_id,
-                    'finder_student_id' => $finder?->id,
-                    'released_at' => $release->released_at?->toDateTimeString(),
-                ], $request->ip());
+                $this->recordAuditLog(
+                    $admin,
+                    'release_completed',
+                    ItemRelease::class,
+                    $release->id,
+                    'Item Release',
+                    [
+                        'report_id' => $report->id,
+                        'claim_id' => $claim->id,
+                        'claimant_student_id' => $claim->claimant_student_id,
+                        'finder_student_id' => $finder?->id,
+                        'released_at' => $release->released_at?->toDateTimeString(),
+                        'points_awarded' => $remainingReturnPoints,
+                    ],
+                    $request->ip()
+                );
 
-                return response()->json(['status' => 'success', 'message' => 'Item release completed.', 'data' => $release->fresh(['report', 'claimantStudent', 'approvedByAdmin'])]);
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Item release completed successfully.',
+                    'data' => $release->fresh([
+                        'report',
+                        'claimantStudent',
+                        'approvedByAdmin',
+                    ]),
+                ]);
             });
         } catch (\Throwable $exception) {
-            return response()->json(['status' => 'error', 'message' => $exception->getMessage()], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ], 422);
         }
     }
 
-    private function recordAuditLog($admin, string $action, string $subjectType, int $subjectId, string $subjectLabel, array $details = [], ?string $ipAddress = null): void
-    {
+    private function recordAuditLog(
+        $admin,
+        string $action,
+        string $subjectType,
+        int $subjectId,
+        string $subjectLabel,
+        array $details = [],
+        ?string $ipAddress = null
+    ): void {
         $auditDetails = array_merge($details, [
             'module' => 'workflow',
         ]);
+
+        $descriptionParts = [
+            $subjectLabel,
+            str_replace('_', ' ', $action),
+        ];
+
+        if (!empty($details['report_id'])) {
+            $descriptionParts[] = 'Report ID: ' . $details['report_id'];
+        }
+
+        $description = ucfirst(implode(' - ', array_filter($descriptionParts)));
+
         $payload = [
             'action' => $action,
             'subject_type' => $subjectType,
@@ -2332,21 +3326,26 @@ class AdminWorkflowController extends Controller
 
         if (Schema::hasColumn('audit_logs', 'actor_admin_id')) {
             $payload['actor_admin_id'] = $admin?->id;
-        } elseif (Schema::hasColumn('audit_logs', 'actor_id')) {
+        }
+
+        if (Schema::hasColumn('audit_logs', 'actor_id')) {
             $payload['actor_id'] = $admin?->id;
-            if (Schema::hasColumn('audit_logs', 'actor_type')) {
-                $payload['actor_type'] = Admin::class;
-            }
+        }
+
+        if (Schema::hasColumn('audit_logs', 'actor_type')) {
+            $payload['actor_type'] = Admin::class;
         }
 
         if (Schema::hasColumn('audit_logs', 'subject_label')) {
             $payload['subject_label'] = $subjectLabel;
         }
 
+        if (Schema::hasColumn('audit_logs', 'description')) {
+            $payload['description'] = $description;
+        }
+
         if (Schema::hasColumn('audit_logs', 'details')) {
             $payload['details'] = $auditDetails;
-        } elseif (Schema::hasColumn('audit_logs', 'description')) {
-            $payload['description'] = $subjectLabel . ': ' . json_encode($auditDetails);
         }
 
         AuditLog::create($payload);
@@ -2357,7 +3356,10 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $validated = $request->validate([
@@ -2371,7 +3373,10 @@ class AdminWorkflowController extends Controller
         $totalRemainingAmount = (float) EventFine::where('student_id', $student->id)->sum('remaining_amount');
         $availablePoints = (int) $student->pointTransactions()->sum('points');
         $requestedPoints = min((int) $validated['requested_points'], $availablePoints);
-        $pesoValueConverted = round(min((float) $totalRemainingAmount, $requestedPoints / self::POINTS_PER_PESO), 2);
+        $pesoValueConverted = round(
+            min((float) $totalRemainingAmount, $requestedPoints / self::POINTS_PER_PESO),
+            2
+        );
         $convertedPoints = (int) round($pesoValueConverted * self::POINTS_PER_PESO);
         $remainingBalance = max(0, $totalRemainingAmount - $pesoValueConverted);
 
@@ -2403,26 +3408,44 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $conversion = EventFineConversion::find($id);
 
         if (!$conversion && $student = Student::find($id)) {
-            $conversion = EventFineConversion::where('student_id', $student->id)->latest()->first();
+            $conversion = EventFineConversion::where('student_id', $student->id)
+                ->latest()
+                ->first();
         }
 
         if (!$conversion) {
             $fine = EventFine::findOrFail($id);
-            $fine->update(['status' => (float) $fine->remaining_amount <= 0 ? 'paid' : 'approved']);
 
-            return response()->json(['status' => 'success', 'message' => 'Event fine conversion approved.', 'data' => $fine]);
+            $fine->update([
+                'status' => (float) $fine->remaining_amount <= 0
+                    ? 'paid'
+                    : 'approved',
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Event fine conversion approved.',
+                'data' => $fine,
+            ]);
         }
 
         $student = $conversion->student()->firstOrFail();
         $remainingToApply = (float) $conversion->peso_value_converted;
+
         $activeFines = EventFine::where('student_id', $student->id)
-            ->whereNotIn('status', ['paid', 'rejected'])
+            ->whereNotIn('status', [
+                'paid',
+                'rejected',
+            ])
             ->orderBy('id')
             ->get();
 
@@ -2431,12 +3454,20 @@ class AdminWorkflowController extends Controller
                 break;
             }
 
-            $deduction = min((float) ($fine->remaining_amount ?? 0), $remainingToApply);
+            $deduction = min(
+                (float) ($fine->remaining_amount ?? 0),
+                $remainingToApply
+            );
+
             if ($deduction <= 0) {
                 continue;
             }
 
-            $newRemaining = max(0, (float) ($fine->remaining_amount ?? 0) - $deduction);
+            $newRemaining = max(
+                0,
+                (float) ($fine->remaining_amount ?? 0) - $deduction
+            );
+
             $fine->update([
                 'paid_amount' => (float) ($fine->paid_amount ?? 0) + $deduction,
                 'paid' => (float) ($fine->paid ?? 0) + $deduction,
@@ -2444,7 +3475,10 @@ class AdminWorkflowController extends Controller
                 'status' => $newRemaining <= 0 ? 'paid' : 'approved',
             ]);
 
-            $remainingToApply = round($remainingToApply - $deduction, 2);
+            $remainingToApply = round(
+                $remainingToApply - $deduction,
+                2
+            );
         }
 
         $student->pointTransactions()->create([
@@ -2460,13 +3494,20 @@ class AdminWorkflowController extends Controller
 
         $conversion->update([
             'status' => 'approved',
-            'remaining_balance' => max(0, (float) $conversion->remaining_balance - (float) $conversion->peso_value_converted),
+            'remaining_balance' => max(
+                0,
+                (float) $conversion->remaining_balance - (float) $conversion->peso_value_converted
+            ),
             'reviewed_by_admin_id' => $admin->id,
             'reviewed_at' => now(),
             'review_notes' => $conversion->review_notes ?? 'Approved by admin.',
         ]);
 
-        return response()->json(['status' => 'success', 'message' => 'Event fine conversion approved.', 'data' => $conversion->fresh()]);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Event fine conversion approved.',
+            'data' => $conversion->fresh(),
+        ]);
     }
 
     public function rejectEventFineConversion($id)
@@ -2474,20 +3515,31 @@ class AdminWorkflowController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
         $conversion = EventFineConversion::find($id);
 
         if (!$conversion && $student = Student::find($id)) {
-            $conversion = EventFineConversion::where('student_id', $student->id)->latest()->first();
+            $conversion = EventFineConversion::where('student_id', $student->id)
+                ->latest()
+                ->first();
         }
 
         if (!$conversion) {
             $fine = EventFine::findOrFail($id);
-            $fine->update(['status' => 'rejected']);
+            $fine->update([
+                'status' => 'rejected',
+            ]);
 
-            return response()->json(['status' => 'success', 'message' => 'Event fine conversion rejected.', 'data' => $fine]);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Event fine conversion rejected.',
+                'data' => $fine,
+            ]);
         }
 
         $conversion->update([
@@ -2497,16 +3549,26 @@ class AdminWorkflowController extends Controller
             'review_notes' => $conversion->review_notes ?? 'Rejected by admin.',
         ]);
 
-        return response()->json(['status' => 'success', 'message' => 'Event fine conversion rejected.', 'data' => $conversion->fresh()]);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Event fine conversion rejected.',
+            'data' => $conversion->fresh(),
+        ]);
     }
 
     public function recordEventFinePayment(Request $request, $id)
     {
         if (!Auth::guard('admin')->user()) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized.',
+            ], 401);
         }
 
-        $validated = $request->validate(['amount' => 'required|numeric|min:0.01']);
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:0.01',
+        ]);
+
         $fine = EventFine::findOrFail($id);
         $payment = min((float) $validated['amount'], (float) $fine->remaining_amount);
         $paidAmount = (float) $fine->paid_amount + $payment;
@@ -2538,6 +3600,10 @@ class AdminWorkflowController extends Controller
             );
         }
 
-        return response()->json(['status' => 'success', 'message' => 'Payment recorded.', 'data' => $fine->fresh()]);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Payment recorded.',
+            'data' => $fine->fresh(),
+        ]);
     }
 }

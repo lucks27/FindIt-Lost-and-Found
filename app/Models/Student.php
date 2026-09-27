@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\Hash;
-use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
+ * Student Model
+ *
  * @property int $id
  * @property string|null $student_id
  * @property string|null $student_id_number
@@ -22,8 +23,21 @@ class Student extends Authenticatable
 {
     use HasFactory, HasApiTokens;
 
+    /*
+    |--------------------------------------------------------------------------
+    | TABLE CONFIGURATION
+    |--------------------------------------------------------------------------
+    */
+
     protected $table = 'students';
+
     protected $primaryKey = 'id';
+
+    /*
+    |--------------------------------------------------------------------------
+    | MASS ASSIGNABLE FIELDS
+    |--------------------------------------------------------------------------
+    */
 
     protected $fillable = [
         'student_id_number',
@@ -41,114 +55,243 @@ class Student extends Authenticatable
         'reward_count',
     ];
 
+    /*
+    |--------------------------------------------------------------------------
+    | HIDDEN FIELDS
+    |--------------------------------------------------------------------------
+    */
+
     protected $hidden = [
         'password',
         'remember_token',
     ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | APPENDED ATTRIBUTES
+    |--------------------------------------------------------------------------
+    */
 
     protected $appends = [
         'full_name',
         'name',
     ];
 
-    // --- ADD THIS SECTION HERE ---
+    /*
+    |--------------------------------------------------------------------------
+    | ATTRIBUTE CASTS
+    |--------------------------------------------------------------------------
+    |
+    | Laravel automatically hashes the password when a plain-text password
+    | is assigned.
+    |
+    */
+
     protected $casts = [
         'password' => 'hashed',
         'reward_count' => 'integer',
     ];
-    // -----------------------------
+
+    /*
+    |--------------------------------------------------------------------------
+    | BOOKINGS
+    |--------------------------------------------------------------------------
+    */
 
     public function bookings()
     {
-        return $this->hasMany(Booking::class);
+        return $this->hasMany(
+            Booking::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | NOTIFICATIONS
+    |--------------------------------------------------------------------------
+    */
 
     public function notifications(): HasMany
     {
-        return $this->hasMany(Notification::class, 'recipient_id')
-            ->where('recipient_role', 'student');
+        return $this
+            ->hasMany(
+                Notification::class,
+                'recipient_id'
+            )
+            ->where(
+                'recipient_role',
+                'student'
+            );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | REPORTS
+    |--------------------------------------------------------------------------
+    */
 
     public function reports()
     {
-        return $this->hasMany(Report::class);
+        return $this->hasMany(
+            Report::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | REWARDS
+    |--------------------------------------------------------------------------
+    */
 
     public function rewards()
     {
-        return $this->hasMany(Reward::class);
+        return $this->hasMany(
+            Reward::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | POINT TRANSACTIONS
+    |--------------------------------------------------------------------------
+    */
 
     public function pointTransactions(): HasMany
     {
-        return $this->hasMany(PointTransaction::class);
+        return $this->hasMany(
+            PointTransaction::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | EVENT FINES
+    |--------------------------------------------------------------------------
+    */
 
     public function eventFines(): HasMany
     {
-        return $this->hasMany(EventFine::class);
+        return $this->hasMany(
+            EventFine::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | FINE CONVERSIONS
+    |--------------------------------------------------------------------------
+    */
 
     public function fineConversions(): HasMany
     {
-        return $this->hasMany(EventFineConversion::class);
+        return $this->hasMany(
+            EventFineConversion::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | RECOGNITION RECORD
+    |--------------------------------------------------------------------------
+    */
 
     public function recognitionRecord(): HasOne
     {
-        return $this->hasOne(StudentRecognitionRecord::class);
+        return $this->hasOne(
+            StudentRecognitionRecord::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | DEVICE TOKENS
+    |--------------------------------------------------------------------------
+    */
 
     public function deviceTokens()
     {
-        return $this->hasMany(DeviceToken::class);
+        return $this->hasMany(
+            DeviceToken::class
+        );
     }
 
-    /**
-     * Automatically hash passwords when set.
-     */
-    public function setPasswordAttribute($value)
-    {
-        if (!$value) {
-            return;
-        }
-
-        $this->attributes['password'] = Hash::needsRehash($value) ? Hash::make($value) : $value;
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | DEPARTMENT RELATIONSHIP
+    |--------------------------------------------------------------------------
+    */
 
     public function department()
     {
-        return $this->belongsTo(Department::class);
+        return $this->belongsTo(
+            Department::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | EMAIL NORMALIZATION
+    |--------------------------------------------------------------------------
+    |
+    | All student emails are automatically saved in lowercase.
+    |
+    */
 
     public function setEmailAttribute($value)
     {
-        $normalized = strtolower(trim((string) $value));
-        $this->attributes['email'] = $normalized;
+        $this->attributes['email'] =
+            strtolower(
+                trim(
+                    (string) $value
+                )
+            );
     }
 
-    /**
-     * Get the student's full name (first name to last name).
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | FULL NAME
+    |--------------------------------------------------------------------------
+    */
+
     public function getFullNameAttribute(): string
     {
-        $names = [$this->first_name];
+        $names = [];
 
-        if ($this->middle_name) {
-            $names[] = $this->middle_name;
+        if (!empty($this->first_name)) {
+            $names[] =
+                trim(
+                    $this->first_name
+                );
         }
 
-        $names[] = $this->last_name;
+        if (!empty($this->middle_name)) {
+            $names[] =
+                trim(
+                    $this->middle_name
+                );
+        }
 
-        return implode(' ', $names);
+        if (!empty($this->last_name)) {
+            $names[] =
+                trim(
+                    $this->last_name
+                );
+        }
+
+        return implode(
+            ' ',
+            $names
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | NAME
+    |--------------------------------------------------------------------------
+    */
 
     public function getNameAttribute(): string
     {
-        return $this->full_name ?? trim(implode(' ', array_filter([
-            $this->first_name,
-            $this->middle_name,
-            $this->last_name,
-        ], fn($value) => $value !== null && $value !== '')));
+        return $this->full_name;
     }
 }

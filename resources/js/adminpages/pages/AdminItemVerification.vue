@@ -2,53 +2,62 @@
     <main class="admin-page-body">
         <header class="page-header">
             <div class="page-heading-copy">
-                <p class="page-kicker">Claimant Verification</p>
-                <h1>Item Ownership Claim Queue</h1>
+                <p class="page-kicker">Item Verification</p>
+                <h1>Found Item Verification Queue</h1>
                 <p class="page-copy">
-                    Review students claiming ownership of found items, compare their proof,
-                    request more information, approve valid claims, and complete item handovers.
+                    Review surrendered found items, compare the physical item with the submitted report and photos,
+                    request missing details, then verify or reject the item.
                 </p>
             </div>
 
-            <div class="queue-count" aria-label="Claim count">
+            <div class="queue-count" aria-label="Verification count">
                 <strong>{{ filteredVerifications.length }}</strong>
-                <span>Claims</span>
+                <span>Records</span>
             </div>
         </header>
 
-        <section class="filter-toolbar" aria-label="Claim filters">
+        <section class="filter-toolbar" aria-label="Verification filters">
             <label class="search-field">
-                <span class="sr-only">Search claimant verification records</span>
-
-                <input v-model.trim="query" type="search" placeholder="Search claimant, item, location, or status"
-                    aria-label="Search claimant verification records" />
+                <span class="sr-only">Search item verification records</span>
+                <input
+                    v-model.trim="query"
+                    type="search"
+                    placeholder="Search item, finder, location, category, or status"
+                    aria-label="Search item verification records"
+                />
             </label>
 
             <label class="category-field">
                 <span class="field-label">Category</span>
-
-                <select v-model="selectedCategory" aria-label="Filter claims by category">
-                    <option value="">
-                        All categories
-                    </option>
-
-                    <option v-for="category in categoryOptions" :key="category.value" :value="category.value">
+                <select v-model="selectedCategory" aria-label="Filter by category">
+                    <option value="">All categories</option>
+                    <option
+                        v-for="category in categoryOptions"
+                        :key="category.value"
+                        :value="category.value"
+                    >
                         {{ category.label }}
                     </option>
                 </select>
             </label>
 
-            <div class="sort-control" aria-label="Claim order">
+            <div class="sort-control" aria-label="Verification order">
                 <span class="field-label">Order</span>
-
                 <div class="sort-buttons">
-                    <button type="button" class="sort-button" :class="{ active: sortOrder === 'newest' }"
-                        @click="sortOrder = 'newest'">
+                    <button
+                        type="button"
+                        class="sort-button"
+                        :class="{ active: sortOrder === 'newest' }"
+                        @click="sortOrder = 'newest'"
+                    >
                         Newest
                     </button>
-
-                    <button type="button" class="sort-button" :class="{ active: sortOrder === 'oldest' }"
-                        @click="sortOrder = 'oldest'">
+                    <button
+                        type="button"
+                        class="sort-button"
+                        :class="{ active: sortOrder === 'oldest' }"
+                        @click="sortOrder = 'oldest'"
+                    >
                         Oldest
                     </button>
                 </div>
@@ -59,18 +68,24 @@
             {{ errorMessage }}
         </div>
 
-        <section v-if="loading" class="verification-grid" aria-label="Loading claimant verification records">
-            <article v-for="i in ITEMS_PER_PAGE" :key="`skeleton-${i}`" class="verification-card skeleton-card">
+        <section
+            v-if="loading"
+            class="verification-grid"
+            aria-label="Loading item verification records"
+        >
+            <article
+                v-for="i in ITEMS_PER_PAGE"
+                :key="`skeleton-${i}`"
+                class="verification-card skeleton-card"
+            >
                 <div class="skeleton-card-top">
                     <div class="skeleton skeleton-image"></div>
-
                     <div class="skeleton-heading">
                         <div class="skeleton skeleton-badge"></div>
                         <div class="skeleton skeleton-title"></div>
                         <div class="skeleton skeleton-small"></div>
                     </div>
                 </div>
-
                 <div class="skeleton skeleton-line"></div>
                 <div class="skeleton skeleton-line short"></div>
                 <div class="skeleton skeleton-proof"></div>
@@ -82,36 +97,35 @@
             <section v-if="!filteredVerifications.length" class="empty-state-card" role="status">
                 <div class="empty-icon">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <circle cx="12" cy="8" r="4" />
-                        <path d="M5 21a7 7 0 0 1 14 0" />
-                        <path d="m16 15 2 2 4-5" />
+                        <path d="M5 5h14v14H5zM8 9h8M8 13h8M8 17h5" />
+                        <path d="m16 6 2 2 3-4" />
                     </svg>
                 </div>
-
-                <h2>
-                    No claimant verification records
-                </h2>
-
+                <h2>No item verification records</h2>
                 <p>
-                    There are no ownership claims matching the current filters.
-                    New student claims will appear here.
+                    Surrendered found items that are waiting for USC verification will appear here.
                 </p>
             </section>
 
             <template v-else>
-                <section class="verification-grid" aria-label="Claimant verification records">
-                    <article v-for="item in paginatedVerifications" :key="item.id" class="verification-card">
+                <section class="verification-grid" aria-label="Item verification records">
+                    <article
+                        v-for="item in paginatedVerifications"
+                        :key="item.id"
+                        class="verification-card"
+                    >
                         <div class="verification-card-top">
-                            <button type="button" class="verification-image" :aria-label="`Open details for ${item.report?.title ||
-                                'ownership claim'
-                                }`
-                                " @click="openDetailModal(item)">
-                                <img :src="getReportImage(item.report)" :alt="item.report?.title ||
-                                    'Found item'
-                                    " :class="{
-                                        'fallback-image':
-                                            !hasReportImages(item.report)
-                                    }" />
+                            <button
+                                type="button"
+                                class="verification-image"
+                                :aria-label="`Open details for ${item.report?.title || 'found item'}`"
+                                @click="openDetailModal(item)"
+                            >
+                                <img
+                                    :src="getReportImage(item.report)"
+                                    :alt="item.report?.title || 'Found item'"
+                                    :class="{ 'fallback-image': !hasReportImages(item.report) }"
+                                />
                             </button>
 
                             <div class="card-heading">
@@ -119,205 +133,137 @@
                                     <span class="status-badge" :class="statusClass(item.status)">
                                         {{ formatStatus(item.status) }}
                                     </span>
-
                                     <span class="verification-id">
-                                        Claim #{{ item.id }}
+                                        Verification #{{ item.id }}
                                     </span>
                                 </div>
 
                                 <h2 class="card-title">
-                                    {{
-                                        item.report?.title ||
-                                        `Report #${item.report_id}`
-                                    }}
+                                    {{ item.report?.title || `Report #${item.report_id}` }}
                                 </h2>
 
                                 <div class="claimant-name">
-                                    <span>
-                                        Claimant
-                                    </span>
-
-                                    <strong>
-                                        {{ getClaimantName(item) }}
-                                    </strong>
+                                    <span>Finder</span>
+                                    <strong>{{ getFinderName(item) }}</strong>
                                 </div>
                             </div>
                         </div>
 
                         <dl class="card-information">
                             <div>
-                                <dt>
-                                    Category
-                                </dt>
-
-                                <dd>
-                                    {{ getCategoryName(item) }}
-                                </dd>
+                                <dt>Category</dt>
+                                <dd>{{ getCategoryName(item) }}</dd>
                             </div>
-
                             <div>
-                                <dt>
-                                    Location
-                                </dt>
-
-                                <dd>
-                                    {{ item.report?.location || '—' }}
-                                </dd>
+                                <dt>Location</dt>
+                                <dd>{{ item.report?.location || '—' }}</dd>
                             </div>
-
                             <div>
-                                <dt>
-                                    Submitted
-                                </dt>
-
-                                <dd>
-                                    {{ formatDate(item.created_at) }}
-                                </dd>
+                                <dt>Received</dt>
+                                <dd>{{ formatDate(item.created_at) }}</dd>
                             </div>
                         </dl>
 
                         <div class="ownership-preview">
-                            <div class="preview-heading">
-                                Ownership proof
-                            </div>
-
+                            <div class="preview-heading">Verification notes</div>
                             <p>
                                 {{
-                                    item.report?.ownership_proof ||
-                                    item.ownership_proof ||
-                                    'No ownership proof provided.'
+                                    item.notes ||
+                                    'Physical item is waiting for comparison with the submitted report.'
                                 }}
                             </p>
                         </div>
 
                         <div class="card-actions">
-                            <button type="button" class="
-                                    action-btn
-                                    view-btn
-                                " @click="openDetailModal(item)">
+                            <button
+                                type="button"
+                                class="action-btn view-btn"
+                                @click="openDetailModal(item)"
+                            >
                                 View Details
                             </button>
 
-                            <template v-if="isPending(item)">
-                                <button type="button" class="
-                                        action-btn
-                                        request-btn
-                                    " @click="openRequestFromCard(item)">
+                            <template v-if="isActionable(item)">
+                                <button
+                                    type="button"
+                                    class="action-btn request-btn"
+                                    @click="openRequestFromCard(item)"
+                                >
                                     Request Details
                                 </button>
 
-                                <button type="button" class="
-                                        action-btn
-                                        approve-btn
-                                    " @click="approveClaimFromCard(item)">
-                                    Approve Claim
+                                <button
+                                    type="button"
+                                    class="action-btn approve-btn"
+                                    @click="verifyItem(item.id)"
+                                >
+                                    Verify Item
                                 </button>
 
-                                <button type="button" class="
-                                        action-btn
-                                        reject-btn
-                                    " @click="rejectClaim(item.id)">
-                                    Reject Claim
+                                <button
+                                    type="button"
+                                    class="action-btn reject-btn"
+                                    @click="rejectItem(item.id)"
+                                >
+                                    Reject
                                 </button>
                             </template>
 
-                            <template v-else-if="isApproved(item)">
-                                <div class="
-                                        card-state-message
-                                        approved
-                                    ">
-                                    Approved · waiting for USC Office pickup
+                            <template v-else-if="isVerified(item)">
+                                <div class="card-state-message approved">
+                                    Verified · visible on mobile
                                 </div>
                             </template>
 
                             <template v-else-if="isCompleted(item)">
-                                <div class="
-                                        card-state-message
-                                        completed
-                                    ">
-                                    Transaction completed
-                                </div>
-
-                                <button type="button" class="
-                                        action-btn
-                                        archive-btn
-                                    " @click="archiveClaim(item)">
-                                    Archive
-                                </button>
-                            </template>
-
-                            <template v-else-if="isDetailsRequested(item)">
-                                <div class="
-                                        card-state-message
-                                        details
-                                    ">
-                                    Waiting for claimant details
-                                </div>
-                            </template>
-
-                            <template v-else-if="isRejected(item)">
-                                <div class="
-                                        card-state-message
-                                        rejected
-                                    ">
-                                    Ownership claim rejected
+                                <div class="card-state-message completed">
+                                    Verification completed
                                 </div>
                             </template>
                         </div>
                     </article>
                 </section>
 
-                <nav class="pagination-bar" aria-label="Claim verification pages">
+                <nav class="pagination-bar" aria-label="Verification pages">
                     <p class="pagination-info">
-                        Showing
-
-                        <strong>
-                            {{ pageStart }}
-                        </strong>
-
-                        <span>
-                            –
-                        </span>
-
-                        <strong>
-                            {{ pageEnd }}
-                        </strong>
-
-                        of
-
-                        <strong>
-                            {{ filteredVerifications.length }}
-                        </strong>
+                        Showing <strong>{{ pageStart }}</strong>
+                        <span>–</span>
+                        <strong>{{ pageEnd }}</strong>
+                        of <strong>{{ filteredVerifications.length }}</strong>
                     </p>
 
                     <div class="pagination-controls">
-                        <button type="button" class="
-                                pagination-button
-                                pagination-arrow
-                            " :disabled="currentPage === 1" aria-label="Previous page" @click="goPrevious">
+                        <button
+                            type="button"
+                            class="pagination-button pagination-arrow"
+                            :disabled="currentPage === 1"
+                            aria-label="Previous page"
+                            @click="goPrevious"
+                        >
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="m15 6-6 6 6 6" />
                             </svg>
                         </button>
 
-                        <button v-for="page in visiblePageNumbers" :key="page" type="button" class="
-                                pagination-button
-                                page-number
-                            " :class="{
-                                active:
-                                    page === currentPage
-                            }" :aria-current="page === currentPage
-                                ? 'page'
-                                : undefined
-                                " @click="goToPage(page)">
+                        <button
+                            v-for="page in visiblePageNumbers"
+                            :key="page"
+                            type="button"
+                            class="pagination-button page-number"
+                            :class="{ active: page === currentPage }"
+                            :aria-current="page === currentPage ? 'page' : undefined"
+                            @click="goToPage(page)"
+                        >
                             {{ page }}
                         </button>
 
-                        <button type="button" class="
-                                pagination-button
-                                pagination-arrow
-                            " :disabled="currentPage === totalPages
-                                " aria-label="Next page" @click="goNext">
+                        <button
+                            type="button"
+                            class="pagination-button pagination-arrow"
+                            :disabled="currentPage === totalPages"
+                            aria-label="Next page"
+                            @click="goNext"
+                        >
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="m9 6 6 6-6 6" />
                             </svg>
@@ -328,40 +274,39 @@
         </template>
 
         <transition name="modal-fade">
-            <div v-if="selectedVerification" class="modal-overlay" @click.self="closeDetailModal">
-                <section class="modal-content" role="dialog" aria-modal="true"
-                    aria-labelledby="verification-modal-title">
+            <div
+                v-if="selectedVerification"
+                class="modal-overlay"
+                @click.self="closeDetailModal"
+            >
+                <section
+                    class="modal-content"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="verification-modal-title"
+                >
                     <header class="modal-header">
                         <div class="modal-title-area">
-                            <p class="modal-kicker">
-                                Ownership Claim
-                            </p>
-
+                            <p class="modal-kicker">Physical Item Verification</p>
                             <h2 id="verification-modal-title">
-                                {{
-                                    selectedVerification.report?.title ||
-                                    'Claim Verification Details'
-                                }}
+                                {{ selectedVerification.report?.title || 'Item Verification Details' }}
                             </h2>
                         </div>
 
                         <div class="modal-header-right">
-                            <span class="
-                                    status-badge
-                                    modal-status
-                                " :class="statusClass(
-                                    selectedVerification.status
-                                )
-                                    ">
-                                {{
-                                    formatStatus(
-                                        selectedVerification.status
-                                    )
-                                }}
+                            <span
+                                class="status-badge modal-status"
+                                :class="statusClass(selectedVerification.status)"
+                            >
+                                {{ formatStatus(selectedVerification.status) }}
                             </span>
 
-                            <button type="button" class="modal-close" aria-label="Close details"
-                                @click="closeDetailModal">
+                            <button
+                                type="button"
+                                class="modal-close"
+                                aria-label="Close details"
+                                @click="closeDetailModal"
+                            >
                                 <svg viewBox="0 0 24 24" aria-hidden="true">
                                     <path d="m6 6 12 12M18 6 6 18" />
                                 </svg>
@@ -370,91 +315,32 @@
                     </header>
 
                     <div class="modal-scroll">
-                        <div v-if="modalActionNotice" class="
-                                modal-inline-alert
-                                modal-success-alert
-                            ">
+                        <div
+                            v-if="modalActionNotice"
+                            class="modal-inline-alert modal-success-alert"
+                        >
                             {{ modalActionNotice }}
                         </div>
 
-                        <div v-if="modalActionError" class="
-                                modal-inline-alert
-                                modal-error-alert
-                            ">
+                        <div
+                            v-if="modalActionError"
+                            class="modal-inline-alert modal-error-alert"
+                        >
                             {{ modalActionError }}
                         </div>
 
-                        <!-- =================================================
-                             CLAIM APPROVED
-                        ================================================== -->
-                        <section v-if="
-                            isApproved(
-                                selectedVerification
-                            )
-                        " class="pickup-message-card">
+                        <section v-if="isVerified(selectedVerification)" class="pickup-message-card">
                             <div class="pickup-message-icon">
                                 <svg viewBox="0 0 24 24" aria-hidden="true">
                                     <path d="m5 12 4 4L19 6" />
-
                                     <circle cx="12" cy="12" r="9" />
                                 </svg>
                             </div>
-
                             <div class="pickup-message-copy">
-                                <span class="pickup-label">
-                                    Claim Approved
-                                </span>
-
-                                <h3>
-                                    Please visit the USC Office to claim your item.
-                                </h3>
-
+                                <span class="pickup-label">Item Verified</span>
+                                <h3>The found item passed USC verification.</h3>
                                 <p>
-                                    Send this pickup instruction to the
-                                    approved claimant before completing
-                                    the transaction.
-                                </p>
-                            </div>
-
-                            <button type="button" class="send-claim-message-button" :disabled="sendingClaimMessage"
-                                @click="sendClaimInstructions">
-                                {{
-                                    sendingClaimMessage
-                                        ? 'Sending...'
-                                        : 'Send to Claimant'
-                                }}
-                            </button>
-                        </section>
-
-                        <!-- =================================================
-                             TRANSACTION COMPLETE
-                        ================================================== -->
-                        <section v-if="
-                            isCompleted(
-                                selectedVerification
-                            )
-                        " class="transaction-complete-card">
-                            <div class="transaction-complete-icon">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="m5 12 4 4L19 6" />
-
-                                    <circle cx="12" cy="12" r="9" />
-                                </svg>
-                            </div>
-
-                            <div>
-                                <span>
-                                    Transaction Complete
-                                </span>
-
-                                <h3>
-                                    The claimant has received the item.
-                                </h3>
-
-                                <p>
-                                    This claim can now be archived and
-                                    removed from the active claimant
-                                    verification queue.
+                                    This item is now eligible to appear in the public student feed.
                                 </p>
                             </div>
                         </section>
@@ -462,119 +348,77 @@
                         <section class="modal-overview">
                             <div class="modal-media">
                                 <div class="modal-image-container">
-                                    <button type="button" class="modal-image-button"
-                                        @click="openImagePreview(getReportImages(selectedVerification.report), currentImageIndex)"
-                                        aria-label="View full-size item image">
-                                        <img :src="getReportImage(
-                                            selectedVerification.report,
+                                    <button
+                                        type="button"
+                                        class="modal-image-button"
+                                        aria-label="View full-size item image"
+                                        @click="openImagePreview(
+                                            getReportImages(selectedVerification.report),
                                             currentImageIndex
-                                        )
-                                            " :alt="selectedVerification
-                                                .report?.title ||
-                                                'Found item'
-                                                " class="modal-image" :class="{
-                                                    'fallback-image':
-                                                        !hasReportImages(
-                                                            selectedVerification.report
-                                                        )
-                                                }" />
+                                        )"
+                                    >
+                                        <img
+                                            :src="getReportImage(
+                                                selectedVerification.report,
+                                                currentImageIndex
+                                            )"
+                                            :alt="selectedVerification.report?.title || 'Found item'"
+                                            class="modal-image"
+                                            :class="{
+                                                'fallback-image':
+                                                    !hasReportImages(selectedVerification.report)
+                                            }"
+                                        />
                                     </button>
                                 </div>
 
-                                <div v-if="
-                                    getReportImages(
-                                        selectedVerification.report
-                                    ).length > 1
-                                " class="image-thumbnails">
-                                    <button v-for="(
-image,
-    index
-                                        ) in getReportImages(
-        selectedVerification.report
-    )" :key="index" type="button" class="thumbnail-button" :class="{
-        active:
-            currentImageIndex === index
-    }" @click="
-        currentImageIndex = index
-        ">
-                                        <img :src="getImageUrl(
-                                            image.file_path ||
-                                            image.path ||
-                                            image.url
-                                        )
-                                            " :alt="`Item image ${index + 1}`
-                                                " />
+                                <div
+                                    v-if="getReportImages(selectedVerification.report).length > 1"
+                                    class="image-thumbnails"
+                                >
+                                    <button
+                                        v-for="(image, index) in getReportImages(selectedVerification.report)"
+                                        :key="index"
+                                        type="button"
+                                        class="thumbnail-button"
+                                        :class="{ active: currentImageIndex === index }"
+                                        @click="currentImageIndex = index"
+                                    >
+                                        <img
+                                            :src="getImageUrl(
+                                                image.file_path ||
+                                                image.path ||
+                                                image.url
+                                            )"
+                                            :alt="`Item image ${index + 1}`"
+                                        />
                                     </button>
                                 </div>
-                            </div>
-
-                            <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
-                                <button type="button" class="image-preview-close" aria-label="Close image preview"
-                                    @click="closeImagePreview">×</button>
-                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev"
-                                    aria-label="Previous image" @click="showPreviousImage">‹</button>
-                                <img :src="previewImageUrl" alt="Full-size item preview" class="image-preview-image" />
-                                <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next"
-                                    aria-label="Next image" @click="showNextImage">›</button>
                             </div>
 
                             <div class="overview-information">
                                 <div class="overview-field">
-                                    <span>
-                                        Claimant
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            getClaimantName(
-                                                selectedVerification
-                                            )
-                                        }}
-                                    </strong>
+                                    <span>Finder</span>
+                                    <strong>{{ getFinderName(selectedVerification) }}</strong>
                                 </div>
-
                                 <div class="overview-field">
-                                    <span>
-                                        Claimant ID
-                                    </span>
-
+                                    <span>Finder ID</span>
                                     <strong>
                                         {{
-                                            getClaimantField(
+                                            getFinderField(
                                                 selectedVerification,
                                                 'student_id_number'
                                             )
                                         }}
                                     </strong>
                                 </div>
-
                                 <div class="overview-field">
-                                    <span>
-                                        Category
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            getCategoryName(
-                                                selectedVerification
-                                            )
-                                        }}
-                                    </strong>
+                                    <span>Category</span>
+                                    <strong>{{ getCategoryName(selectedVerification) }}</strong>
                                 </div>
-
                                 <div class="overview-field">
-                                    <span>
-                                        Submitted
-                                    </span>
-
-                                    <strong>
-                                        {{
-                                            formatDateTime(
-                                                selectedVerification
-                                                    .created_at
-                                            )
-                                        }}
-                                    </strong>
+                                    <span>Received for Verification</span>
+                                    <strong>{{ formatDateTime(selectedVerification.created_at) }}</strong>
                                 </div>
                             </div>
                         </section>
@@ -585,103 +429,46 @@ image,
                                     <span class="detail-icon">
                                         <svg viewBox="0 0 24 24" aria-hidden="true">
                                             <circle cx="12" cy="8" r="4" />
-
                                             <path d="M5 21a7 7 0 0 1 14 0" />
                                         </svg>
                                     </span>
-
-                                    <h3>
-                                        Claimant Information
-                                    </h3>
+                                    <h3>Finder Information</h3>
                                 </div>
 
                                 <dl class="detail-list">
                                     <div>
-                                        <dt>
-                                            Name
-                                        </dt>
-
-                                        <dd>
-                                            {{
-                                                getClaimantName(
-                                                    selectedVerification
-                                                )
-                                            }}
-                                        </dd>
+                                        <dt>Name</dt>
+                                        <dd>{{ getFinderName(selectedVerification) }}</dd>
                                     </div>
-
                                     <div>
-                                        <dt>
-                                            Student No.
-                                        </dt>
-
+                                        <dt>Student No.</dt>
                                         <dd>
                                             {{
-                                                getClaimantField(
+                                                getFinderField(
                                                     selectedVerification,
                                                     'student_id_number'
                                                 )
                                             }}
                                         </dd>
                                     </div>
-
                                     <div>
-                                        <dt>
-                                            Email
-                                        </dt>
-
+                                        <dt>Email</dt>
+                                        <dd>{{ getFinderField(selectedVerification, 'email') }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Department</dt>
                                         <dd>
-                                            {{
-                                                getClaimantField(
-                                                    selectedVerification,
-                                                    'email'
-                                                )
-                                            }}
+                                            {{ getFinderField(selectedVerification, 'department') }}
                                         </dd>
                                     </div>
-
                                     <div>
-                                        <dt>
-                                            Department
-                                        </dt>
-
-                                        <dd>
-                                            {{
-                                                getClaimantField(
-                                                    selectedVerification,
-                                                    'department'
-                                                )
-                                            }}
-                                        </dd>
+                                        <dt>Course</dt>
+                                        <dd>{{ getFinderField(selectedVerification, 'course') }}</dd>
                                     </div>
-
                                     <div>
-                                        <dt>
-                                            Course
-                                        </dt>
-
+                                        <dt>Year Level</dt>
                                         <dd>
-                                            {{
-                                                getClaimantField(
-                                                    selectedVerification,
-                                                    'course'
-                                                )
-                                            }}
-                                        </dd>
-                                    </div>
-
-                                    <div>
-                                        <dt>
-                                            Year Level
-                                        </dt>
-
-                                        <dd>
-                                            {{
-                                                getClaimantField(
-                                                    selectedVerification,
-                                                    'year_level'
-                                                )
-                                            }}
+                                            {{ getFinderField(selectedVerification, 'year_level') }}
                                         </dd>
                                     </div>
                                 </dl>
@@ -694,125 +481,54 @@ image,
                                             <path d="M5 5h14v14H5zM8 9h8M8 13h8M8 17h5" />
                                         </svg>
                                     </span>
-
-                                    <h3>
-                                        Found Item Information
-                                    </h3>
+                                    <h3>Found Item Information</h3>
                                 </div>
 
                                 <dl class="detail-list">
                                     <div>
-                                        <dt>
-                                            Report ID
-                                        </dt>
-
+                                        <dt>Report ID</dt>
                                         <dd>
-                                            #{{
-                                                selectedVerification
-                                                    .report_id ||
-                                                selectedVerification
-                                                    .report?.id ||
-                                                '—'
-                                            }}
+                                            #{{ selectedVerification.report_id ||
+                                                selectedVerification.report?.id ||
+                                                '—' }}
                                         </dd>
                                     </div>
-
                                     <div>
-                                        <dt>
-                                            Item
-                                        </dt>
-
-                                        <dd>
-                                            {{
-                                                selectedVerification
-                                                    .report?.title ||
-                                                '—'
-                                            }}
-                                        </dd>
+                                        <dt>Item</dt>
+                                        <dd>{{ selectedVerification.report?.title || '—' }}</dd>
                                     </div>
-
                                     <div>
-                                        <dt>
-                                            Category
-                                        </dt>
-
-                                        <dd>
-                                            {{
-                                                getCategoryName(
-                                                    selectedVerification
-                                                )
-                                            }}
-                                        </dd>
+                                        <dt>Category</dt>
+                                        <dd>{{ getCategoryName(selectedVerification) }}</dd>
                                     </div>
-
                                     <div>
-                                        <dt>
-                                            Color
-                                        </dt>
-
-                                        <dd>
-                                            {{
-                                                selectedVerification
-                                                    .report?.color ||
-                                                'N/A'
-                                            }}
-                                        </dd>
+                                        <dt>Color</dt>
+                                        <dd>{{ selectedVerification.report?.color || 'N/A' }}</dd>
                                     </div>
-
                                     <div>
-                                        <dt>
-                                            Location
-                                        </dt>
-
-                                        <dd>
-                                            {{
-                                                selectedVerification
-                                                    .report?.location ||
-                                                '—'
-                                            }}
-                                        </dd>
+                                        <dt>Location</dt>
+                                        <dd>{{ selectedVerification.report?.location || '—' }}</dd>
                                     </div>
-
                                     <div>
-                                        <dt>
-                                            Date Found
-                                        </dt>
-
+                                        <dt>Date Found</dt>
                                         <dd>
                                             {{
                                                 formatDate(
-                                                    selectedVerification
-                                                        .report
-                                                        ?.date_occurred
+                                                    selectedVerification.report?.date_occurred
                                                 )
                                             }}
                                         </dd>
                                     </div>
-
                                     <div>
-                                        <dt>
-                                            Report Type
-                                        </dt>
-
-                                        <dd>
-                                            {{
-                                                selectedVerification
-                                                    .report?.type ||
-                                                'Found'
-                                            }}
-                                        </dd>
+                                        <dt>Report Type</dt>
+                                        <dd>{{ selectedVerification.report?.type || 'Found' }}</dd>
                                     </div>
-
                                     <div>
-                                        <dt>
-                                            Description
-                                        </dt>
-
+                                        <dt>Description</dt>
                                         <dd>
                                             {{
-                                                selectedVerification
-                                                    .report?.description ||
-                                                'No report description provided.'
+                                                selectedVerification.report?.description ||
+                                                'No description provided.'
                                             }}
                                         </dd>
                                     </div>
@@ -822,93 +538,86 @@ image,
 
                         <section class="evidence-panel">
                             <div class="evidence-heading">
-                                <span class="
-                                        detail-icon
-                                        evidence-icon
-                                    ">
+                                <span class="detail-icon evidence-icon">
                                     <svg viewBox="0 0 24 24" aria-hidden="true">
                                         <path d="m5 12 4 4L19 6" />
-
                                         <circle cx="12" cy="12" r="9" />
                                     </svg>
                                 </span>
-
                                 <div>
-                                    <h3>
-                                        Claimant Ownership Evidence
-                                    </h3>
-
+                                    <h3>Physical Comparison Details</h3>
                                     <p>
-                                        Compare the claimant's private
-                                        proof with the actual found item.
+                                        Compare the surrendered physical item with the finder&apos;s
+                                        submitted photos and report information.
                                     </p>
                                 </div>
                             </div>
 
                             <div class="evidence-grid">
-                                <div class="
-                                        evidence-block
-                                        primary-evidence
-                                    ">
-                                    <span>
-                                        Ownership Proof
-                                    </span>
-
+                                <div class="evidence-block primary-evidence">
+                                    <span>Submitted Description</span>
                                     <p>
                                         {{
-                                            selectedVerification
-                                                .report?.ownership_proof ||
-                                            selectedVerification
-                                                .ownership_proof ||
-                                            'No ownership proof provided.'
+                                            selectedVerification.report?.description ||
+                                            'No description provided.'
                                         }}
                                     </p>
                                 </div>
 
                                 <div class="evidence-block private-evidence">
-                                    <span>
-                                        Private Identifying Details
-                                    </span>
-
+                                    <span>Private Identifying Details</span>
                                     <p>
                                         {{
-                                            selectedVerification
-                                                .report?.private_identifying_details ||
-                                            selectedVerification
-                                                .report?.ownership_proof ||
+                                            selectedVerification.report?.private_identifying_details ||
                                             'No private identifying details provided.'
                                         }}
                                     </p>
-
-                                    <small>
-                                        Visible only to admins and the item owner.
-                                    </small>
+                                    <small>Admin-only verification information.</small>
                                 </div>
                             </div>
                         </section>
 
+                        <label
+                            v-if="isActionable(selectedVerification)"
+                            class="request-note-field"
+                        >
+                            <div class="request-note-heading">
+                                <span>Verification Notes</span>
+                                <small>Optional</small>
+                            </div>
+                            <textarea
+                                v-model="verificationNote"
+                                rows="3"
+                                maxlength="1000"
+                                placeholder="Add notes about the physical item inspection..."
+                            ></textarea>
+                            <span class="character-count">
+                                {{ verificationNote.length }}/1000
+                            </span>
+                        </label>
+
                         <transition name="request-panel">
-                            <section v-if="showRequestDetailsForm" ref="requestDetailsPanel"
-                                class="request-details-panel">
+                            <section
+                                v-if="showRequestDetailsForm"
+                                ref="requestDetailsPanel"
+                                class="request-details-panel"
+                            >
                                 <div class="request-details-header">
                                     <div>
-                                        <p class="request-kicker">
-                                            Claim Clarification
-                                        </p>
-
-                                        <h3>
-                                            Request Additional Claim Details
-                                        </h3>
-
+                                        <p class="request-kicker">Finder Clarification</p>
+                                        <h3>Request Additional Item Details</h3>
                                         <p>
-                                            Select which ownership
-                                            information the claimant
-                                            needs to provide.
+                                            Select the information the finder needs to provide before
+                                            USC completes verification.
                                         </p>
                                     </div>
 
-                                    <button type="button" class="request-panel-close" aria-label="Close request details"
-                                        @click="closeRequestDetails">
+                                    <button
+                                        type="button"
+                                        class="request-panel-close"
+                                        aria-label="Close request details"
+                                        @click="closeRequestDetails"
+                                    >
                                         <svg viewBox="0 0 24 24" aria-hidden="true">
                                             <path d="m6 6 12 12M18 6 6 18" />
                                         </svg>
@@ -916,48 +625,42 @@ image,
                                 </div>
 
                                 <div class="request-options">
-                                    <label v-for="option in requestDetailOptions" :key="option.value"
-                                        class="request-option" :class="{
-                                            selected:
-                                                selectedRequestDetails
-                                                    .includes(
-                                                        option.value
-                                                    )
-                                        }">
-                                        <input v-model="selectedRequestDetails" type="checkbox" :value="option.value" />
-
+                                    <label
+                                        v-for="option in requestDetailOptions"
+                                        :key="option.value"
+                                        class="request-option"
+                                        :class="{
+                                            selected: selectedRequestDetails.includes(option.value)
+                                        }"
+                                    >
+                                        <input
+                                            v-model="selectedRequestDetails"
+                                            type="checkbox"
+                                            :value="option.value"
+                                        />
                                         <span class="custom-checkbox">
                                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                                 <path d="m5 12 4 4L19 6" />
                                             </svg>
                                         </span>
-
                                         <span class="request-option-copy">
-                                            <strong>
-                                                {{ option.label }}
-                                            </strong>
-
-                                            <small>
-                                                {{ option.description }}
-                                            </small>
+                                            <strong>{{ option.label }}</strong>
+                                            <small>{{ option.description }}</small>
                                         </span>
                                     </label>
                                 </div>
 
                                 <label class="request-note-field">
                                     <div class="request-note-heading">
-                                        <span>
-                                            Note to Claimant
-                                        </span>
-
-                                        <small>
-                                            Optional
-                                        </small>
+                                        <span>Note to Finder</span>
+                                        <small>Optional</small>
                                     </div>
-
-                                    <textarea v-model="requestNote" rows="4" maxlength="500"
-                                        placeholder="Explain what additional ownership information is needed..."></textarea>
-
+                                    <textarea
+                                        v-model="requestNote"
+                                        rows="4"
+                                        maxlength="500"
+                                        placeholder="Explain what additional item information is needed..."
+                                    ></textarea>
                                     <span class="character-count">
                                         {{ requestNote.length }}/500
                                     </span>
@@ -968,17 +671,19 @@ image,
                                 </div>
 
                                 <div class="request-form-actions">
-                                    <button type="button" class="
-                                            request-form-button
-                                            cancel-request-button
-                                        " @click="closeRequestDetails">
+                                    <button
+                                        type="button"
+                                        class="request-form-button cancel-request-button"
+                                        @click="closeRequestDetails"
+                                    >
                                         Cancel
                                     </button>
-
-                                    <button type="button" class="
-                                            request-form-button
-                                            send-request-button
-                                        " :disabled="sendingRequestDetails" @click="submitRequestDetails">
+                                    <button
+                                        type="button"
+                                        class="request-form-button send-request-button"
+                                        :disabled="sendingRequestDetails"
+                                        @click="submitRequestDetails"
+                                    >
                                         {{
                                             sendingRequestDetails
                                                 ? 'Sending...'
@@ -990,177 +695,97 @@ image,
                         </transition>
                     </div>
 
-                    <!-- =================================================
-                         PENDING
-                    ================================================== -->
-                    <footer v-if="
-                        isPending(
-                            selectedVerification
-                        )
-                    " class="modal-actions">
-                        <button type="button" class="
-                                modal-action-button
-                                modal-request-button
-                            " :class="{
-                                active:
-                                    showRequestDetailsForm
-                            }" @click="toggleRequestDetails">
+                    <footer
+                        v-if="isActionable(selectedVerification)"
+                        class="modal-actions"
+                    >
+                        <button
+                            type="button"
+                            class="modal-action-button modal-request-button"
+                            :class="{ active: showRequestDetailsForm }"
+                            @click="toggleRequestDetails"
+                        >
                             Request Details
                         </button>
 
-                        <button type="button" class="
-                                modal-action-button
-                                modal-reject-button
-                            " @click="
-                                rejectClaim(
-                                    selectedVerification.id
-                                )
-                                ">
-                            Reject Claim
+                        <button
+                            type="button"
+                            class="modal-action-button modal-reject-button"
+                            :disabled="rejectingItem"
+                            @click="rejectItem(selectedVerification.id)"
+                        >
+                            {{ rejectingItem ? 'Rejecting...' : 'Reject Item' }}
                         </button>
 
-                        <button type="button" class="
-                                modal-action-button
-                                modal-approve-button
-                            " :disabled="approvingClaim" @click="
-                                approveClaim(
-                                    selectedVerification.id
-                                )
-                                ">
-                            {{
-                                approvingClaim
-                                    ? 'Approving...'
-                                    : 'Approve Claim'
-                            }}
+                        <button
+                            type="button"
+                            class="modal-action-button modal-approve-button"
+                            :disabled="verifyingItem"
+                            @click="verifyItem(selectedVerification.id)"
+                        >
+                            {{ verifyingItem ? 'Verifying...' : 'Verify Item' }}
                         </button>
                     </footer>
 
-                    <!-- =================================================
-                         APPROVED / WAITING FOR PICKUP
-                    ================================================== -->
-                    <footer v-else-if="
-                        isApproved(
-                            selectedVerification
-                        )
-                    " class="
-                            modal-actions
-                            approved-actions
-                        ">
+                    <footer
+                        v-else-if="isVerified(selectedVerification)"
+                        class="modal-actions approved-actions"
+                    >
                         <div class="approved-footer-copy">
-                            <span>
-                                Approved · Awaiting Item Pickup
-                            </span>
-
+                            <span>Verified · Public Feed Eligible</span>
                             <small>
-                                Complete only after the claimant
-                                physically receives the item.
+                                Ownership claims are handled separately in the Claim Review workflow.
                             </small>
                         </div>
-
-                        <button type="button" class="
-                                modal-action-button
-                                complete-transaction-button
-                            " :disabled="completingClaim" @click="completeClaim">
-                            {{
-                                completingClaim
-                                    ? 'Completing...'
-                                    : 'Complete Transaction'
-                            }}
-                        </button>
                     </footer>
 
-                    <!-- =================================================
-                         TRANSACTION COMPLETE / ARCHIVE
-                    ================================================== -->
-                    <footer v-else-if="
-                        isCompleted(
-                            selectedVerification
-                        )
-                    " class="
-                            modal-actions
-                            completed-actions
-                        ">
-                        <div class="approved-footer-copy">
-                            <span>
-                                Transaction Completed
-                            </span>
-
-                            <small>
-                                Archive this record to remove it
-                                from the active claimant queue.
-                            </small>
-                        </div>
-
-                        <button type="button" class="
-                                modal-action-button
-                                archive-modal-button
-                            " :disabled="archivingClaim" @click="
-                                archiveClaim(
-                                    selectedVerification
-                                )
-                                ">
-                            {{
-                                archivingClaim
-                                    ? 'Archiving...'
-                                    : 'Archive'
-                            }}
-                        </button>
-                    </footer>
-
-                    <footer v-else-if="
-                        isRejected(
-                            selectedVerification
-                        )
-                    " class="
-                            modal-actions
-                            completed-actions
-                        ">
-                        <div class="approved-footer-copy">
-                            <span>
-                                Claim Rejected
-                            </span>
-
-                            <small>
-                                Archive this rejected record to remove it
-                                from the active claimant queue.
-                            </small>
-                        </div>
-
-                        <button type="button" class="
-                                modal-action-button
-                                archive-modal-button
-                            " :disabled="archivingClaim" @click="
-                                archiveClaim(
-                                    selectedVerification
-                                )
-                                ">
-                            {{
-                                archivingClaim
-                                    ? 'Archiving...'
-                                    : 'Archive'
-                            }}
-                        </button>
-                    </footer>
-
-                    <footer v-else class="
-                            modal-actions
-                            completed-status-footer
-                        ">
+                    <footer v-else class="modal-actions completed-status-footer">
                         <span class="completed-message">
-                            Claim status
-
-                            <strong>
-                                {{
-                                    formatStatus(
-                                        selectedVerification.status
-                                    )
-                                }}
-                            </strong>
+                            Verification status
+                            <strong>{{ formatStatus(selectedVerification.status) }}</strong>
                         </span>
                     </footer>
                 </section>
             </div>
         </transition>
+
+        <div
+            v-if="previewImageUrl"
+            class="image-preview-overlay"
+            @click.self="closeImagePreview"
+        >
+            <button
+                type="button"
+                class="image-preview-close"
+                aria-label="Close image preview"
+                @click="closeImagePreview"
+            >
+                ×
+            </button>
+            <button
+                v-if="previewImages.length > 1"
+                type="button"
+                class="image-preview-nav prev"
+                aria-label="Previous image"
+                @click="showPreviousImage"
+            >
+                ‹
+            </button>
+            <img
+                :src="previewImageUrl"
+                alt="Full-size item preview"
+                class="image-preview-image"
+            />
+            <button
+                v-if="previewImages.length > 1"
+                type="button"
+                class="image-preview-nav next"
+                aria-label="Next image"
+                @click="showNextImage"
+            >
+                ›
+            </button>
+        </div>
     </main>
 </template>
 
@@ -1176,445 +801,199 @@ import {
 import api from '@/bootstrap'
 
 const ITEMS_PER_PAGE = 6
+const fallbackImage = '/images/snsu-logo.png'
 
-const fallbackImage =
-    '/images/snsu-logo.png'
+const query = ref('')
+const selectedCategory = ref('')
+const sortOrder = ref('newest')
+const currentPage = ref(1)
 
-const CLAIM_PICKUP_MESSAGE =
-    'Please visit the USC Office to claim your item.'
+const verifications = ref([])
+const loading = ref(false)
+const errorMessage = ref('')
 
-/* =====================================================
-   MAIN STATE
-===================================================== */
+const selectedVerification = ref(null)
+const currentImageIndex = ref(0)
 
-const query =
-    ref('')
+const previewImages = ref([])
+const previewImageIndex = ref(0)
+const previewImageUrl = computed(
+    () => previewImages.value[previewImageIndex.value] || null
+)
 
-const selectedCategory =
-    ref('')
+const showRequestDetailsForm = ref(false)
+const selectedRequestDetails = ref([])
+const requestNote = ref('')
+const requestDetailsError = ref('')
+const sendingRequestDetails = ref(false)
+const requestDetailsPanel = ref(null)
 
-const sortOrder =
-    ref('newest')
+const verificationNote = ref('')
+const verifyingItem = ref(false)
+const rejectingItem = ref(false)
 
-const currentPage =
-    ref(1)
-
-const verifications =
-    ref([])
-
-const loading =
-    ref(false)
-
-const errorMessage =
-    ref('')
-
-const selectedVerification =
-    ref(null)
-
-const currentImageIndex =
-    ref(0)
-
-const previewImages =
-    ref([])
-
-const previewImageIndex =
-    ref(0)
-
-const previewImageUrl =
-    computed(() => previewImages.value[previewImageIndex.value] || null)
-
-/* =====================================================
-   REQUEST DETAILS
-===================================================== */
-
-const showRequestDetailsForm =
-    ref(false)
-
-const selectedRequestDetails =
-    ref([])
-
-const requestNote =
-    ref('')
-
-const requestDetailsError =
-    ref('')
-
-const sendingRequestDetails =
-    ref(false)
-
-const requestDetailsPanel =
-    ref(null)
-
-/* =====================================================
-   ACTION STATES
-===================================================== */
-
-const approvingClaim =
-    ref(false)
-
-const sendingClaimMessage =
-    ref(false)
-
-const completingClaim =
-    ref(false)
-
-const archivingClaim =
-    ref(false)
-
-const modalActionNotice =
-    ref('')
-
-const modalActionError =
-    ref('')
-
-/* =====================================================
-   REQUEST OPTIONS
-===================================================== */
+const modalActionNotice = ref('')
+const modalActionError = ref('')
 
 const requestDetailOptions = [
     {
-        value:
-            'ownership_proof',
-
-        label:
-            'Ownership Proof',
-
-        description:
-            'Request stronger proof showing why the item belongs to the claimant.'
+        value: 'clearer_photo',
+        label: 'Clearer Photo',
+        description: 'Request a clearer or additional photo of the item.'
     },
-
     {
-        value:
-            'additional_proof',
-
-        label:
-            'Additional Proof',
-
-        description:
-            'Request another private detail that can be compared with the item.'
+        value: 'item_description',
+        label: 'Item Description',
+        description: 'Request a more complete physical description of the item.'
     },
-
     {
-        value:
-            'unique_identifiers',
-
-        label:
-            'Unique Identifiers',
-
-        description:
-            'Ask for marks, scratches, serial numbers, contents, or other unique details.'
+        value: 'exact_location',
+        label: 'Exact Location',
+        description: 'Request the exact place where the item was found.'
     },
-
     {
-        value:
-            'item_contents',
-
-        label:
-            'Item Contents',
-
-        description:
-            'Request information about what was inside or attached to the item.'
+        value: 'date_time_found',
+        label: 'Date / Time Found',
+        description: 'Request a more accurate date or time when the item was found.'
     },
-
     {
-        value:
-            'unlock_or_access_proof',
-
-        label:
-            'Unlock / Access Proof',
-
-        description:
-            'Request information that can demonstrate access to the item.'
+        value: 'identifying_details',
+        label: 'Identifying Details',
+        description: 'Request marks, contents, serial numbers, or other identifiers.'
     },
-
     {
-        value:
-            'claimant_information',
-
-        label:
-            'Claimant Information',
-
-        description:
-            'Request missing student or contact information from the claimant.'
+        value: 'color_or_category',
+        label: 'Color / Category',
+        description: 'Request clarification of the item color or category.'
     },
-
     {
-        value:
-            'claim_explanation',
-
-        label:
-            'Claim Explanation',
-
-        description:
-            'Ask the claimant to explain when or how the item was lost.'
-    },
-
-    {
-        value:
-            'other',
-
-        label:
-            'Other Information',
-
-        description:
-            'Use the note field to explain another required verification detail.'
+        value: 'other',
+        label: 'Other Information',
+        description: 'Use the note field to explain another required detail.'
     }
 ]
 
-/* =====================================================
-   NORMALIZE API LIST
-===================================================== */
+function normalizeListPayload(payload) {
+    if (!payload) {
+        return []
+    }
 
-function normalizeListPayload(
-    payload
-) {
-    if (
-        Array.isArray(payload)
-    ) {
+    if (Array.isArray(payload)) {
         return payload
     }
 
-    if (
-        Array.isArray(
-            payload?.data
-        )
-    ) {
+    if (Array.isArray(payload?.data)) {
         return payload.data
     }
 
-    if (
-        Array.isArray(
-            payload?.items
-        )
-    ) {
+    if (Array.isArray(payload?.data?.data)) {
+        return payload.data.data
+    }
+
+    if (Array.isArray(payload?.items)) {
         return payload.items
     }
 
-    if (
-        Array.isArray(
-            payload?.records
-        )
-    ) {
+    if (Array.isArray(payload?.data?.items)) {
+        return payload.data.items
+    }
+
+    if (Array.isArray(payload?.records)) {
         return payload.records
+    }
+
+    if (Array.isArray(payload?.data?.records)) {
+        return payload.data.records
     }
 
     return []
 }
 
-/* =====================================================
-   STATUS HELPERS
-===================================================== */
-
-function normalizeStatus(
-    value
-) {
-    return String(
-        value ||
-        'pending'
-    )
+function normalizeStatus(value) {
+    return String(value || 'pending')
         .trim()
         .toLowerCase()
-        .replace(
-            /\s+/g,
-            '_'
-        )
+        .replace(/\s+/g, '_')
 }
 
-function statusClass(
-    value
-) {
-    const status =
-        normalizeStatus(
-            value
-        )
+function statusClass(value) {
+    const status = normalizeStatus(value)
 
-    if (
-        status === 'verified'
-    ) {
+    if (status === 'verified') {
         return 'approved'
     }
 
-    if (
-        status ===
-        'needs_more_information'
-    ) {
+    if (status === 'needs_more_information') {
         return 'details_requested'
-    }
-
-    if (
-        status === 'claimed'
-    ) {
-        return 'completed'
     }
 
     return status
 }
 
-function formatStatus(
-    value
-) {
-    const status =
-        statusClass(
-            value
-        )
+function formatStatus(value) {
+    const status = normalizeStatus(value)
 
     const labels = {
-        pending:
-            'Pending Review',
-
-        approved:
-            'Approved',
-
-        rejected:
-            'Rejected',
-
-        details_requested:
-            'Details Requested',
-
-        completed:
-            'Completed',
-
-        archived:
-            'Archived'
+        pending: 'Pending Verification',
+        needs_more_information: 'More Details Requested',
+        verified: 'Verified',
+        completed: 'Completed',
+        archived: 'Archived',
+        rejected: 'Rejected'
     }
 
-    return (
-        labels[status] ||
+    return labels[status] ||
         status
-            .replace(
-                /_/g,
-                ' '
-            )
-            .replace(
-                /\b\w/g,
-                character =>
-                    character
-                        .toUpperCase()
-            )
-    )
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, character => character.toUpperCase())
 }
 
-function isPending(
-    item
-) {
-    return (
-        statusClass(
-            item?.status
-        ) === 'pending'
-    )
+function isActionable(item) {
+    return [
+        'pending',
+        'needs_more_information'
+    ].includes(normalizeStatus(item?.status))
 }
 
-function isApproved(
-    item
-) {
-    return (
-        statusClass(
-            item?.status
-        ) === 'approved'
-    )
+function isVerified(item) {
+    return normalizeStatus(item?.status) === 'verified'
 }
 
-function isCompleted(
-    item
-) {
-    return (
-        statusClass(
-            item?.status
-        ) === 'completed'
-    )
+function isCompleted(item) {
+    return normalizeStatus(item?.status) === 'completed'
 }
 
-function isRejected(
-    item
-) {
-    return (
-        statusClass(
-            item?.status
-        ) === 'rejected'
-    )
+function isArchived(item) {
+    return normalizeStatus(item?.status) === 'archived' ||
+        Boolean(item?.deleted_at)
 }
 
-function isDetailsRequested(
-    item
-) {
+function getFinder(item) {
     return (
-        statusClass(
-            item?.status
-        ) ===
-        'details_requested'
-    )
-}
-
-function isArchived(
-    item
-) {
-    return (
-        statusClass(
-            item?.status
-        ) === 'archived' ||
-        Boolean(
-            item?.deleted_at
-        )
-    )
-}
-
-/* =====================================================
-   CLAIMANT HELPERS
-===================================================== */
-
-function getClaimant(
-    item
-) {
-    return (
-        item?.claimant_student ||
-        item?.claimant ||
-        item?.student ||
         item?.report?.student ||
+        item?.student ||
         null
     )
 }
 
-function getClaimantName(
-    item
-) {
-    const claimant =
-        getClaimant(
-            item
-        )
-    const reportStudent =
-        item?.report?.student
+function getFinderName(item) {
+    const finder = getFinder(item)
 
     return (
-        claimant?.name ||
-        claimant?.full_name ||
-        item?.claimant_name ||
-        item?.claimant_student_name ||
-        reportStudent?.name ||
-        reportStudent?.full_name ||
+        finder?.name ||
+        finder?.full_name ||
+        item?.report?.student_full_name ||
         (
-            item?.claimant_student_id
-                ? `Student #${item.claimant_student_id}`
-                : item?.report?.student_id
-                    ? `Student #${item.report.student_id}`
-                    : 'Unknown claimant'
+            item?.report?.student_id
+                ? `Student #${item.report.student_id}`
+                : 'Unknown finder'
         )
     )
 }
 
-function getClaimantField(
-    item,
-    field
-) {
-    const claimant =
-        getClaimant(
-            item
-        )
-    const reportStudent =
-        item?.report?.student
-
-    const value =
-        claimant?.[field] ??
-        reportStudent?.[field]
+function getFinderField(item, field) {
+    const finder = getFinder(item)
+    const value = finder?.[field]
 
     return (
         value !== undefined &&
@@ -1625,344 +1004,168 @@ function getClaimantField(
         : 'N/A'
 }
 
-/* =====================================================
-   CATEGORY
-===================================================== */
-
-function getCategoryKey(
-    item
-) {
-    const category =
-        item?.report
-            ?.category
-
-    if (
-        category?.id
-    ) {
-        return String(
-            category.id
-        )
+function getCategoryObject(report) {
+    if (!report) {
+        return null
     }
 
     if (
-        item?.report
-            ?.category_id
+        report.category_relation &&
+        typeof report.category_relation === 'object'
     ) {
-        return String(
-            item.report.category_id
-        )
+        return report.category_relation
     }
 
     if (
-        typeof category ===
-        'string' &&
-        category.trim()
+        report.categoryRelation &&
+        typeof report.categoryRelation === 'object'
     ) {
-        return (
-            `name:${category
-                .trim()
-                .toLowerCase()
-            }`
-        )
+        return report.categoryRelation
+    }
+
+    if (
+        report.category &&
+        typeof report.category === 'object'
+    ) {
+        return report.category
+    }
+
+    return null
+}
+
+function getCategoryKey(item) {
+    const report = item?.report
+    const categoryObject = getCategoryObject(report)
+
+    if (categoryObject?.id) {
+        return String(categoryObject.id)
+    }
+
+    if (report?.category_id) {
+        return String(report.category_id)
+    }
+
+    const categoryName =
+        typeof report?.category === 'string'
+            ? report.category
+            : (
+                report?.category_name ||
+                categoryObject?.name ||
+                report?.metadata?.category
+            )
+
+    if (categoryName) {
+        return `name:${String(categoryName).trim().toLowerCase()}`
     }
 
     return ''
 }
 
-function getCategoryName(
-    item
-) {
-    const category =
-        item?.report
-            ?.category
+function getCategoryName(item) {
+    const report = item?.report
+    const categoryObject = getCategoryObject(report)
 
     if (
-        typeof category ===
-        'string'
+        typeof report?.category === 'string' &&
+        report.category.trim()
     ) {
-        return (
-            category ||
-            'N/A'
+        return report.category
+    }
+
+    return (
+        categoryObject?.name ||
+        report?.category_name ||
+        report?.metadata?.category ||
+        (
+            report?.category_id
+                ? `Category #${report.category_id}`
+                : 'N/A'
         )
-    }
-
-    if (
-        category?.name
-    ) {
-        return category.name
-    }
-
-    if (
-        item?.report
-            ?.category_name
-    ) {
-        return (
-            item.report
-                .category_name
-        )
-    }
-
-    if (
-        item?.report
-            ?.category_id
-    ) {
-        return (
-            `Category #${item.report
-                .category_id
-            }`
-        )
-    }
-
-    return 'N/A'
+    )
 }
 
-const categoryOptions =
-    computed(() => {
-        const categories =
-            new Map()
+const categoryOptions = computed(() => {
+    const categories = new Map()
 
-        verifications.value
-            .forEach(
-                item => {
-                    if (
-                        isArchived(
-                            item
-                        )
-                    ) {
-                        return
-                    }
+    verifications.value.forEach(item => {
+        if (isArchived(item)) {
+            return
+        }
 
-                    const value =
-                        getCategoryKey(
-                            item
-                        )
+        const value = getCategoryKey(item)
+        const label = getCategoryName(item)
 
-                    const label =
-                        getCategoryName(
-                            item
-                        )
-
-                    if (
-                        value &&
-                        !categories
-                            .has(
-                                value
-                            )
-                    ) {
-                        categories
-                            .set(
-                                value,
-                                label
-                            )
-                    }
-                }
-            )
-
-        return Array
-            .from(
-                categories
-                    .entries()
-            )
-            .map(
-                (
-                    [
-                        value,
-                        label
-                    ]
-                ) => ({
-                    value,
-                    label
-                })
-            )
-            .sort(
-                (
-                    a,
-                    b
-                ) =>
-                    a.label
-                        .localeCompare(
-                            b.label
-                        )
-            )
+        if (value && !categories.has(value)) {
+            categories.set(value, label)
+        }
     })
 
-/* =====================================================
-   REVIEW DETAILS
-===================================================== */
+    return Array
+        .from(categories.entries())
+        .map(([value, label]) => ({
+            value,
+            label
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label))
+})
 
-function getReviewNotes(
-    item
-) {
-    return (
-        item?.review_notes ||
-        item?.notes ||
-        'No review notes.'
-    )
-}
-
-function getReviewedByAdmin(
-    item
-) {
-    return (
-        item
-            ?.reviewed_by_admin
-            ?.name ||
-
-        item
-            ?.reviewer_admin
-            ?.name ||
-
-        item
-            ?.verifier_admin
-            ?.name ||
-
-        (
-            item?.reviewed_by_admin_id
-                ? `Admin #${item.reviewed_by_admin_id}`
-                : 'Not reviewed'
-        )
-    )
-}
-
-function getDetailsRequestAdmin(
-    item
-) {
-    return (
-        item
-            ?.details_requested_by_admin
-            ?.name ||
-
-        item
-            ?.details_request_admin
-            ?.name ||
-
-        (
-            item?.details_requested_by_admin_id
-                ? `Admin #${item.details_requested_by_admin_id}`
-                : '—'
-        )
-    )
-}
-
-/* =====================================================
-   IMAGES
-===================================================== */
-
-function getImageUrl(
-    imagePath
-) {
-    if (
-        !imagePath ||
-        typeof imagePath !==
-        'string'
-    ) {
+function getImageUrl(imagePath) {
+    if (!imagePath || typeof imagePath !== 'string') {
         return fallbackImage
     }
 
-    const normalized =
-        imagePath.trim()
+    const normalized = imagePath.trim()
 
     if (!normalized) {
         return fallbackImage
     }
 
     if (
-        /^https?:\/\//i.test(
-            normalized
-        ) ||
-        /^data:|^blob:/i.test(
-            normalized
-        ) ||
-        normalized
-            .startsWith(
-                '/'
-            )
+        /^https?:\/\//i.test(normalized) ||
+        /^data:|^blob:/i.test(normalized) ||
+        normalized.startsWith('/')
     ) {
         return normalized
     }
 
-    if (
-        normalized
-            .startsWith(
-                'public/assets/'
-            )
-    ) {
+    if (normalized.startsWith('public/assets/')) {
         return `/${normalized.replace(/^public\//, '')}`
     }
 
-    if (
-        normalized
-            .startsWith(
-                'assets/'
-            )
-    ) {
+    if (normalized.startsWith('assets/')) {
         return `/${normalized}`
     }
 
-    if (
-        normalized
-            .startsWith(
-                'storage/'
-            )
-    ) {
-        return (
-            `/${normalized}`
-        )
+    if (normalized.startsWith('storage/')) {
+        return `/${normalized}`
     }
 
-    return (
-        `/storage/${normalized}`
-    )
+    return `/storage/${normalized}`
 }
 
-function getReportImages(
-    report
-) {
-    if (
-        Array.isArray(
-            report?.images
-        )
-    ) {
+function getReportImages(report) {
+    if (Array.isArray(report?.images)) {
         return report.images
     }
 
-    if (
-        Array.isArray(
-            report?.report_images
-        )
-    ) {
-        return (
-            report.report_images
-        )
+    if (Array.isArray(report?.report_images)) {
+        return report.report_images
     }
 
     return []
 }
 
-function hasReportImages(
-    report
-) {
+function hasReportImages(report) {
     return Boolean(
-        getReportImages(
-            report
-        ).length ||
+        getReportImages(report).length ||
         report?.image_url ||
         report?.image
     )
 }
 
-function getReportImage(
-    report,
-    index = 0
-) {
-    const images =
-        getReportImages(
-            report
-        )
-
-    const image =
-        images[index] ||
-        images[0]
+function getReportImage(report, index = 0) {
+    const images = getReportImages(report)
+    const image = images[index] || images[0]
 
     return getImageUrl(
         image?.file_path ||
@@ -1973,274 +1176,137 @@ function getReportImage(
     )
 }
 
-/* =====================================================
-   SORT
-===================================================== */
-
-function getSortableTime(
-    item
-) {
+function getSortableTime(item) {
     const values = [
         item?.created_at,
         item?.updated_at,
-        item?.reviewed_at,
-        item?.report
-            ?.created_at
+        item?.verified_at,
+        item?.report?.created_at
     ]
 
-    for (
-        const value of
-        values
-    ) {
+    for (const value of values) {
         if (!value) {
             continue
         }
 
-        const timestamp =
-            new Date(
-                value
-            ).getTime()
+        const timestamp = new Date(value).getTime()
 
-        if (
-            !Number.isNaN(
-                timestamp
-            )
-        ) {
+        if (!Number.isNaN(timestamp)) {
             return timestamp
         }
     }
 
-    return (
-        Number(item?.id) ||
-        0
-    )
+    return Number(item?.id) || 0
 }
 
-/* =====================================================
-   FILTER
-===================================================== */
+const filteredVerifications = computed(() => {
+    const search = query.value.trim().toLowerCase()
 
-const filteredVerifications =
-    computed(() => {
-        const search =
-            query.value
-                .trim()
+    let records = verifications.value.filter(
+        item => !isArchived(item)
+    )
+
+    if (search) {
+        records = records.filter(item => {
+            const text = [
+                item?.id,
+                item?.report_id,
+                getFinderName(item),
+                item?.report?.title,
+                item?.report?.location,
+                item?.report?.color,
+                getCategoryName(item),
+                item?.notes,
+                formatStatus(item?.status)
+            ]
+                .filter(Boolean)
+                .join(' ')
                 .toLowerCase()
 
-        /*
-            Archived records disappear
-            from this active queue.
+            return text.includes(search)
+        })
+    }
 
-            Completed records stay visible
-            until Archive is clicked.
-        */
-
-        let records =
-            verifications.value
-                .filter(
-                    item =>
-                        !isArchived(
-                            item
-                        )
-                )
-
-        if (search) {
-            records =
-                records.filter(
-                    item => {
-                        const text = [
-                            item?.id,
-                            item?.report_id,
-                            item?.claimant_student_id,
-                            getClaimantName(
-                                item
-                            ),
-                            item?.report?.title,
-                            item?.report?.location,
-                            getCategoryName(
-                                item
-                            ),
-                            item?.ownership_proof,
-                            item?.additional_proof,
-                            item?.review_notes,
-                            item?.notes,
-                            formatStatus(
-                                item?.status
-                            )
-                        ]
-                            .filter(
-                                Boolean
-                            )
-                            .join(' ')
-                            .toLowerCase()
-
-                        return (
-                            text.includes(
-                                search
-                            )
-                        )
-                    }
-                )
-        }
-
-        if (
-            selectedCategory.value
-        ) {
-            records =
-                records.filter(
-                    item =>
-                        getCategoryKey(
-                            item
-                        ) ===
-                        selectedCategory
-                            .value
-                )
-        }
-
-        return [
-            ...records
-        ].sort(
-            (
-                a,
-                b
-            ) => {
-                const aTime =
-                    getSortableTime(
-                        a
-                    )
-
-                const bTime =
-                    getSortableTime(
-                        b
-                    )
-
-                return (
-                    sortOrder.value ===
-                    'oldest'
-                )
-                    ? aTime - bTime
-                    : bTime - aTime
-            }
+    if (selectedCategory.value) {
+        records = records.filter(
+            item => getCategoryKey(item) === selectedCategory.value
         )
+    }
+
+    return [...records].sort((a, b) => {
+        const aTime = getSortableTime(a)
+        const bTime = getSortableTime(b)
+
+        return sortOrder.value === 'oldest'
+            ? aTime - bTime
+            : bTime - aTime
     })
+})
 
-/* =====================================================
-   PAGINATION
-===================================================== */
-
-const totalPages =
-    computed(() =>
-        Math.max(
-            1,
-
-            Math.ceil(
-                filteredVerifications
-                    .value
-                    .length /
-                ITEMS_PER_PAGE
-            )
-        )
-    )
-
-const paginatedVerifications =
-    computed(() => {
-        const start =
-            (
-                currentPage.value -
-                1
-            ) *
+const totalPages = computed(() =>
+    Math.max(
+        1,
+        Math.ceil(
+            filteredVerifications.value.length /
             ITEMS_PER_PAGE
-
-        return (
-            filteredVerifications
-                .value
-                .slice(
-                    start,
-                    start +
-                    ITEMS_PER_PAGE
-                )
-        )
-    })
-
-const pageStart =
-    computed(() => {
-        if (
-            !filteredVerifications
-                .value.length
-        ) {
-            return 0
-        }
-
-        return (
-            (
-                currentPage.value -
-                1
-            ) *
-            ITEMS_PER_PAGE +
-            1
-        )
-    })
-
-const pageEnd =
-    computed(() =>
-        Math.min(
-            currentPage.value *
-            ITEMS_PER_PAGE,
-
-            filteredVerifications
-                .value.length
         )
     )
+)
 
-const visiblePageNumbers =
-    computed(() => {
-        const total =
-            totalPages.value
+const paginatedVerifications = computed(() => {
+    const start =
+        (currentPage.value - 1) *
+        ITEMS_PER_PAGE
 
-        const current =
-            currentPage.value
+    return filteredVerifications.value.slice(
+        start,
+        start + ITEMS_PER_PAGE
+    )
+})
 
-        const maxVisible =
-            5
+const pageStart = computed(() => {
+    if (!filteredVerifications.value.length) {
+        return 0
+    }
 
-        let start =
-            Math.max(
-                1,
-                current - 2
-            )
+    return (
+        (currentPage.value - 1) *
+        ITEMS_PER_PAGE +
+        1
+    )
+})
 
-        let end =
-            Math.min(
-                total,
-                start +
-                maxVisible -
-                1
-            )
+const pageEnd = computed(() =>
+    Math.min(
+        currentPage.value *
+        ITEMS_PER_PAGE,
+        filteredVerifications.value.length
+    )
+)
 
-        start =
-            Math.max(
-                1,
-                end -
-                maxVisible +
-                1
-            )
+const visiblePageNumbers = computed(() => {
+    const total = totalPages.value
+    const current = currentPage.value
+    const maxVisible = 5
 
-        return Array.from(
-            {
-                length:
-                    end -
-                    start +
-                    1
-            },
+    let start = Math.max(1, current - 2)
+    let end = Math.min(
+        total,
+        start + maxVisible - 1
+    )
 
-            (
-                _,
-                index
-            ) =>
-                start +
-                index
-        )
-    })
+    start = Math.max(
+        1,
+        end - maxVisible + 1
+    )
+
+    return Array.from(
+        {
+            length: end - start + 1
+        },
+        (_, index) => start + index
+    )
+})
 
 watch(
     [
@@ -2248,220 +1314,175 @@ watch(
         selectedCategory,
         sortOrder
     ],
-
     () => {
-        currentPage.value =
-            1
+        currentPage.value = 1
     }
 )
 
 watch(
     totalPages,
-
     pages => {
-        if (
-            currentPage.value >
-            pages
-        ) {
-            currentPage.value =
-                pages
+        if (currentPage.value > pages) {
+            currentPage.value = pages
         }
     }
 )
 
-function goToPage(
-    page
-) {
-    currentPage.value =
-        Math.min(
-            Math.max(
-                1,
-                page
-            ),
-
-            totalPages.value
-        )
+function goToPage(page) {
+    currentPage.value = Math.min(
+        Math.max(1, page),
+        totalPages.value
+    )
 }
 
 function goPrevious() {
-    goToPage(
-        currentPage.value -
-        1
-    )
+    goToPage(currentPage.value - 1)
 }
 
 function goNext() {
-    goToPage(
-        currentPage.value +
-        1
-    )
+    goToPage(currentPage.value + 1)
 }
 
-/* =====================================================
-   DATES
-===================================================== */
-
-function formatDate(
-    value
-) {
+function formatDate(value) {
     if (!value) {
         return '—'
     }
 
-    const date =
-        new Date(
-            value
-        )
+    const date = new Date(value)
 
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
+    if (Number.isNaN(date.getTime())) {
         return '—'
     }
 
-    return (
-        date.toLocaleDateString(
-            'en-US',
-            {
-                month:
-                    'short',
-
-                day:
-                    'numeric',
-
-                year:
-                    'numeric'
-            }
-        )
+    return date.toLocaleDateString(
+        'en-US',
+        {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        }
     )
 }
 
-function formatDateTime(
-    value
-) {
+function formatDateTime(value) {
     if (!value) {
         return '—'
     }
 
-    const date =
-        new Date(
-            value
-        )
+    const date = new Date(value)
 
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
+    if (Number.isNaN(date.getTime())) {
         return '—'
     }
 
-    return (
-        date.toLocaleString(
-            'en-US',
-            {
-                month:
-                    'short',
-
-                day:
-                    'numeric',
-
-                year:
-                    'numeric',
-
-                hour:
-                    '2-digit',
-
-                minute:
-                    '2-digit'
-            }
-        )
+    return date.toLocaleString(
+        'en-US',
+        {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }
     )
 }
-
-/* =====================================================
-   MODAL
-===================================================== */
 
 function resetModalMessages() {
-    modalActionNotice.value =
-        ''
-
-    modalActionError.value =
-        ''
+    modalActionNotice.value = ''
+    modalActionError.value = ''
 }
 
-function openDetailModal(
-    item
-) {
-    selectedVerification.value =
-        item
-
-    currentImageIndex.value =
-        0
-
+function openDetailModal(item) {
+    selectedVerification.value = item
+    currentImageIndex.value = 0
+    verificationNote.value = item?.notes || ''
     resetRequestDetails()
-
     resetModalMessages()
 }
 
-async function openRequestFromCard(
-    item
-) {
-    openDetailModal(
-        item
-    )
-
-    showRequestDetailsForm.value =
-        true
-
+async function openRequestFromCard(item) {
+    openDetailModal(item)
+    showRequestDetailsForm.value = true
     await scrollToRequestPanel()
 }
 
 function closeDetailModal() {
-    selectedVerification.value =
-        null
-
-    currentImageIndex.value =
-        0
-
+    selectedVerification.value = null
+    currentImageIndex.value = 0
+    verificationNote.value = ''
     previewImages.value = []
     previewImageIndex.value = 0
-
     resetRequestDetails()
-
     resetModalMessages()
 }
 
 function normalizePreviewImage(item) {
-    if (!item) return null
-    if (typeof item === 'string') return getImageUrl(item)
-    if (typeof item === 'object') return getImageUrl(item.file_path || item.path || item.url || item.image)
+    if (!item) {
+        return null
+    }
+
+    if (typeof item === 'string') {
+        return getImageUrl(item)
+    }
+
+    if (typeof item === 'object') {
+        return getImageUrl(
+            item.file_path ||
+            item.path ||
+            item.url ||
+            item.image
+        )
+    }
+
     return null
 }
 
 function openImagePreview(imageList, index = 0) {
-    const rawList = Array.isArray(imageList) ? imageList : [imageList]
-    const list = rawList.map(normalizePreviewImage).filter(Boolean)
+    const rawList =
+        Array.isArray(imageList)
+            ? imageList
+            : [imageList]
 
-    if (!list.length) return
+    const list = rawList
+        .map(normalizePreviewImage)
+        .filter(Boolean)
+
+    if (!list.length) {
+        return
+    }
 
     previewImages.value = list
-    previewImageIndex.value = Math.min(index, list.length - 1)
+    previewImageIndex.value = Math.min(
+        index,
+        list.length - 1
+    )
 }
 
 function showPreviousImage() {
-    if (!previewImages.value.length) return
+    if (!previewImages.value.length) {
+        return
+    }
 
-    previewImageIndex.value = (previewImageIndex.value - 1 + previewImages.value.length) % previewImages.value.length
+    previewImageIndex.value =
+        (
+            previewImageIndex.value -
+            1 +
+            previewImages.value.length
+        ) %
+        previewImages.value.length
 }
 
 function showNextImage() {
-    if (!previewImages.value.length) return
+    if (!previewImages.value.length) {
+        return
+    }
 
-    previewImageIndex.value = (previewImageIndex.value + 1) % previewImages.value.length
+    previewImageIndex.value =
+        (
+            previewImageIndex.value +
+            1
+        ) %
+        previewImages.value.length
 }
 
 function closeImagePreview() {
@@ -2469,20 +1490,13 @@ function closeImagePreview() {
     previewImageIndex.value = 0
 }
 
-/* =====================================================
-   REQUEST DETAILS
-===================================================== */
-
 async function toggleRequestDetails() {
     showRequestDetailsForm.value =
         !showRequestDetailsForm.value
 
-    requestDetailsError.value =
-        ''
+    requestDetailsError.value = ''
 
-    if (
-        showRequestDetailsForm.value
-    ) {
+    if (showRequestDetailsForm.value) {
         await scrollToRequestPanel()
     }
 }
@@ -2490,14 +1504,10 @@ async function toggleRequestDetails() {
 async function scrollToRequestPanel() {
     await nextTick()
 
-    requestDetailsPanel.value
-        ?.scrollIntoView({
-            behavior:
-                'smooth',
-
-            block:
-                'nearest'
-        })
+    requestDetailsPanel.value?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+    })
 }
 
 function closeRequestDetails() {
@@ -2505,137 +1515,89 @@ function closeRequestDetails() {
 }
 
 function resetRequestDetails() {
-    showRequestDetailsForm.value =
-        false
-
-    selectedRequestDetails.value =
-        []
-
-    requestNote.value =
-        ''
-
-    requestDetailsError.value =
-        ''
-
-    sendingRequestDetails.value =
-        false
+    showRequestDetailsForm.value = false
+    selectedRequestDetails.value = []
+    requestNote.value = ''
+    requestDetailsError.value = ''
+    sendingRequestDetails.value = false
 }
 
 function buildRequestNotes() {
-    const selectedLabels =
-        requestDetailOptions
-            .filter(
-                option =>
-                    selectedRequestDetails
-                        .value
-                        .includes(
-                            option.value
-                        )
-            )
-            .map(
-                option =>
-                    option.label
-            )
+    const selectedLabels = requestDetailOptions
+        .filter(
+            option =>
+                selectedRequestDetails.value.includes(
+                    option.value
+                )
+        )
+        .map(option => option.label)
 
     const lines = [
-        'Please provide the following ownership verification details:'
+        'Please provide the following found-item verification details:'
     ]
 
-    selectedLabels
-        .forEach(
-            label => {
-                lines.push(
-                    `- ${label}`
-                )
-            }
-        )
+    selectedLabels.forEach(
+        label => {
+            lines.push(`- ${label}`)
+        }
+    )
 
-    if (
-        requestNote.value
-            .trim()
-    ) {
+    if (requestNote.value.trim()) {
         lines.push('')
-
         lines.push(
-            `Admin note: ${requestNote.value
-                .trim()
-            }`
+            `Admin note: ${requestNote.value.trim()}`
         )
     }
 
-    return lines.join(
-        '\n'
-    )
+    return lines.join('\n')
 }
 
 async function submitRequestDetails() {
-    requestDetailsError.value =
-        ''
+    requestDetailsError.value = ''
 
-    if (
-        !selectedRequestDetails
-            .value.length
-    ) {
+    if (!selectedRequestDetails.value.length) {
         requestDetailsError.value =
             'Select at least one detail to request.'
 
         return
     }
 
-    if (
-        !selectedVerification
-            .value?.id
-    ) {
+    if (!selectedVerification.value?.id) {
         requestDetailsError.value =
-            'Unable to identify this claim.'
+            'Unable to identify this verification record.'
 
         return
     }
 
-    sendingRequestDetails.value =
-        true
+    sendingRequestDetails.value = true
 
     try {
         await api.post(
             `/api/admin/verifications/${selectedVerification.value.id}/request-details`,
-
             {
-                notes:
-                    buildRequestNotes()
+                notes: buildRequestNotes()
             }
         )
 
-        await loadVerifications()
-
         closeDetailModal()
+        await loadVerifications()
     } catch (error) {
         requestDetailsError.value =
-            error.response
-                ?.data
-                ?.message ||
-            'Unable to request additional claim details.'
+            error.response?.data?.message ||
+            'Unable to request additional item details.'
     } finally {
-        sendingRequestDetails.value =
-            false
+        sendingRequestDetails.value = false
     }
 }
 
-/* =====================================================
-   LOAD
-===================================================== */
-
 async function loadVerifications() {
-    loading.value =
-        true
-
-    errorMessage.value =
-        ''
+    loading.value = true
+    errorMessage.value = ''
 
     try {
-        const response =
-            await api.get(
-                '/api/admin/verifications'
-            )
+        const response = await api.get(
+            '/api/admin/verifications'
+        )
 
         verifications.value =
             normalizeListPayload(
@@ -2643,511 +1605,106 @@ async function loadVerifications() {
             )
     } catch (error) {
         errorMessage.value =
-            error.response
-                ?.data
-                ?.message ||
-            'Failed to load ownership claim records.'
+            error.response?.data?.message ||
+            'Failed to load item verification records.'
 
-        verifications.value =
-            []
+        verifications.value = []
     } finally {
-        loading.value =
-            false
+        loading.value = false
     }
 }
 
-/* =====================================================
-   LOCAL STATE UPDATE
-===================================================== */
-
-function replaceRecordLocally(
-    id,
-    changes = {}
-) {
-    const index =
-        verifications.value
-            .findIndex(
-                item =>
-                    Number(
-                        item.id
-                    ) ===
-                    Number(
-                        id
-                    )
-            )
-
-    if (
-        index !== -1
-    ) {
-        verifications.value[
-            index
-        ] = {
-            ...verifications.value[
-            index
-            ],
-
-            ...changes
-        }
-    }
-
-    if (
-        selectedVerification.value &&
-        Number(
-            selectedVerification
-                .value.id
-        ) ===
-        Number(id)
-    ) {
-        selectedVerification.value = {
-            ...selectedVerification.value,
-            ...changes
-        }
-    }
-}
-
-function applyResponseRecord(
-    response,
-    id,
-    fallbackChanges = {}
-) {
-    const payload =
-        response?.data?.data ||
-        response?.data?.item ||
-        response?.data
-
-    if (
-        payload &&
-        typeof payload ===
-        'object' &&
-        !Array.isArray(
-            payload
-        ) &&
-        payload.id
-    ) {
-        const index =
-            verifications.value
-                .findIndex(
-                    item =>
-                        Number(
-                            item.id
-                        ) ===
-                        Number(
-                            payload.id
-                        )
-                )
-
-        const previous =
-            index !== -1
-                ? verifications
-                    .value[
-                index
-                ]
-                : {}
-
-        const merged = {
-            ...previous,
-            ...payload
-        }
-
-        if (
-            index !== -1
-        ) {
-            verifications.value[
-                index
-            ] = merged
-        }
-
-        if (
-            selectedVerification.value &&
-            Number(
-                selectedVerification
-                    .value.id
-            ) ===
-            Number(
-                payload.id
-            )
-        ) {
-            selectedVerification.value =
-                merged
-        }
-
+async function verifyItem(id) {
+    if (!id || verifyingItem.value) {
         return
     }
 
-    replaceRecordLocally(
-        id,
-        fallbackChanges
+    const confirmed = window.confirm(
+        'Confirm that USC physically inspected this found item and that it matches the submitted report and photos?'
     )
-}
-
-/* =====================================================
-   APPROVE CLAIM
-===================================================== */
-
-async function approveClaimFromCard(
-    item
-) {
-    /*
-        Open modal first.
-
-        This means when approval succeeds,
-        Claim Approved immediately appears
-        inside the same popup.
-    */
-
-    openDetailModal(
-        item
-    )
-
-    await approveClaim(
-        item.id
-    )
-}
-
-async function approveClaim(
-    id
-) {
-    approvingClaim.value =
-        true
-
-    errorMessage.value =
-        ''
-
-    modalActionError.value =
-        ''
-
-    modalActionNotice.value =
-        ''
-
-    try {
-        const response =
-            await api.post(
-                `/api/admin/verifications/${id}/verify`
-            )
-
-        applyResponseRecord(
-            response,
-            id,
-            {
-                status:
-                    'approved',
-
-                reviewed_at:
-                    new Date()
-                        .toISOString()
-            }
-        )
-
-        /*
-            Modal remains open.
-
-            Since status is now approved,
-            the Claim Approved panel appears.
-        */
-
-        modalActionNotice.value =
-            'Claim approved. Send the USC Office pickup instruction to the claimant.'
-    } catch (error) {
-        const message =
-            error.response
-                ?.data
-                ?.message ||
-            'Unable to approve this ownership claim.'
-
-        if (
-            selectedVerification.value
-        ) {
-            modalActionError.value =
-                message
-        } else {
-            errorMessage.value =
-                message
-        }
-    } finally {
-        approvingClaim.value =
-            false
-    }
-}
-
-/* =====================================================
-   REJECT
-===================================================== */
-
-async function rejectClaim(
-    id
-) {
-    const confirmed =
-        window.confirm(
-            'Reject this ownership claim?'
-        )
 
     if (!confirmed) {
         return
     }
 
-    errorMessage.value =
-        ''
-
-    modalActionError.value =
-        ''
+    verifyingItem.value = true
+    errorMessage.value = ''
+    modalActionError.value = ''
+    modalActionNotice.value = ''
 
     try {
         await api.post(
-            `/api/admin/verifications/${id}/reject`,
-
+            `/api/admin/verifications/${id}/verify`,
             {
-                notes:
-                    'Ownership claim rejected by admin.'
+                notes: verificationNote.value.trim() || null
             }
         )
 
         closeDetailModal()
-
-        await loadVerifications()
-    } catch (error) {
-        errorMessage.value =
-            error.response
-                ?.data
-                ?.message ||
-            'Unable to reject this ownership claim.'
-    }
-}
-
-/* =====================================================
-   SEND CLAIMANT PICKUP MESSAGE
-===================================================== */
-
-async function sendClaimInstructions() {
-    if (
-        !selectedVerification
-            .value?.id
-    ) {
-        return
-    }
-
-    sendingClaimMessage.value =
-        true
-
-    modalActionError.value =
-        ''
-
-    modalActionNotice.value =
-        ''
-
-    try {
-        await api.post(
-            `/api/admin/verifications/${selectedVerification.value.id}/claim-instructions`,
-
-            {
-                message:
-                    CLAIM_PICKUP_MESSAGE
-            }
-        )
-
-        modalActionNotice.value =
-            'Pickup instruction sent to the approved claimant.'
-    } catch (error) {
-        modalActionError.value =
-            error.response
-                ?.data
-                ?.message ||
-            'Unable to send the USC Office pickup instruction.'
-    } finally {
-        sendingClaimMessage.value =
-            false
-    }
-}
-
-/* =====================================================
-   COMPLETE TRANSACTION
-===================================================== */
-
-async function completeClaim() {
-    if (
-        !selectedVerification
-            .value?.id
-    ) {
-        return
-    }
-
-    const confirmed =
-        window.confirm(
-            'Confirm that the claimant has physically received the item. This will complete the transaction.'
-        )
-
-    if (!confirmed) {
-        return
-    }
-
-    completingClaim.value =
-        true
-
-    modalActionError.value =
-        ''
-
-    modalActionNotice.value =
-        ''
-
-    try {
-        const id =
-            selectedVerification
-                .value.id
-
-        const response =
-            await api.post(
-                `/api/admin/verifications/${id}/complete`,
-
-                {
-                    status:
-                        'completed'
-                }
-            )
-
-        applyResponseRecord(
-            response,
-            id,
-            {
-                status:
-                    'completed',
-
-                reviewed_at:
-                    selectedVerification
-                        .value
-                        ?.reviewed_at ||
-                    new Date()
-                        .toISOString(),
-
-                updated_at:
-                    new Date()
-                        .toISOString()
-            }
-        )
-
-        /*
-            IMPORTANT:
-
-            Modal does NOT close here.
-
-            After Complete Transaction:
-            - status becomes completed
-            - pickup panel disappears
-            - Transaction Complete panel appears
-            - Archive action appears
-        */
-
-        modalActionNotice.value =
-            'Transaction complete. The claimant has received the item. You may now archive this record.'
-    } catch (error) {
-        modalActionError.value =
-            error.response
-                ?.data
-                ?.message ||
-            'Unable to complete this claim transaction.'
-    } finally {
-        completingClaim.value =
-            false
-    }
-}
-
-/* =====================================================
-   ARCHIVE
-===================================================== */
-
-async function archiveClaim(
-    item
-) {
-    const id =
-        item?.id ||
-        selectedVerification
-            .value?.id
-
-    if (!id) {
-        return
-    }
-
-    const confirmed =
-        window.confirm(
-            'Archive this completed ownership claim? It will be removed from the active claimant verification queue.'
-        )
-
-    if (!confirmed) {
-        return
-    }
-
-    archivingClaim.value =
-        true
-
-    errorMessage.value =
-        ''
-
-    modalActionError.value =
-        ''
-
-    try {
-        const response =
-            await api.post(
-                `/api/admin/verifications/${id}/archive`
-            )
-
-        applyResponseRecord(
-            response,
-            id,
-            {
-                status:
-                    'archived',
-
-                deleted_at:
-                    new Date()
-                        .toISOString(),
-
-                updated_at:
-                    new Date()
-                        .toISOString()
-            }
-        )
-
-        /*
-            Archived records are filtered
-            out of this active queue.
-        */
-
-        if (
-            selectedVerification.value &&
-            Number(
-                selectedVerification
-                    .value.id
-            ) ===
-            Number(id)
-        ) {
-            closeDetailModal()
-        }
-
         await loadVerifications()
     } catch (error) {
         const message =
-            error.response
-                ?.data
-                ?.message ||
-            'Unable to archive this ownership claim.'
+            error.response?.data?.message ||
+            'Unable to verify this found item.'
 
-        if (
-            selectedVerification.value
-        ) {
-            modalActionError.value =
-                message
+        if (selectedVerification.value) {
+            modalActionError.value = message
         } else {
-            errorMessage.value =
-                message
+            errorMessage.value = message
         }
     } finally {
-        archivingClaim.value =
-            false
+        verifyingItem.value = false
     }
 }
 
-/* =====================================================
-   INIT
-===================================================== */
+async function rejectItem(id) {
+    if (!id || rejectingItem.value) {
+        return
+    }
+
+    const reason = window.prompt(
+        'Enter the reason for rejecting this item verification:'
+    )
+
+    if (reason === null) {
+        return
+    }
+
+    if (!reason.trim()) {
+        window.alert(
+            'A rejection reason is required.'
+        )
+        return
+    }
+
+    rejectingItem.value = true
+    errorMessage.value = ''
+    modalActionError.value = ''
+
+    try {
+        await api.post(
+            `/api/admin/verifications/${id}/reject`,
+            {
+                notes: reason.trim()
+            }
+        )
+
+        closeDetailModal()
+        await loadVerifications()
+    } catch (error) {
+        const message =
+            error.response?.data?.message ||
+            'Unable to reject this item verification.'
+
+        if (selectedVerification.value) {
+            modalActionError.value = message
+        } else {
+            errorMessage.value = message
+        }
+    } finally {
+        rejectingItem.value = false
+    }
+}
 
 onMounted(
     loadVerifications
@@ -3186,11 +1743,18 @@ onMounted(
         #0f2112;
 
     font-family:
-        Inter,
-        -apple-system,
-        BlinkMacSystemFont,
         "Segoe UI",
+        Inter,
+        Roboto,
+        Helvetica,
+        Arial,
         sans-serif;
+
+    -webkit-font-smoothing:
+        antialiased;
+
+    text-rendering:
+        optimizeLegibility;
 }
 
 /* =====================================================
@@ -3226,7 +1790,7 @@ onMounted(
         0 0 4px;
 
     color:
-        #d2bb6c;
+        #e1c875;
 
     font-size:
         0.66rem;
@@ -3288,24 +1852,24 @@ onMounted(
         center;
 
     border:
-        1px solid rgba(196,
-            157,
-            59,
+        1px solid rgba(225,
+            200,
+            117,
             0.3);
 
     border-radius:
         10px;
 
     background:
-        rgba(196,
-            157,
-            59,
+        rgba(225,
+            200,
+            117,
             0.12);
 }
 
 .queue-count strong {
     color:
-        #f0d270;
+        #f0d98f;
 
     font-size:
         1.1rem;
@@ -3405,10 +1969,10 @@ onMounted(
         8px;
 
     background:
-        #e5f8f8;
+        #eef8f0;
 
     color:
-        #0c7894;
+        #174b35;
 
     font:
         inherit;
@@ -3430,12 +1994,12 @@ onMounted(
         none;
 
     border-color:
-        #c49d3b;
+        #e1c875;
 
     box-shadow:
-        0 0 0 3px rgba(196,
-            157,
-            59,
+        0 0 0 3px rgba(225,
+            200,
+            117,
             0.14);
 }
 
@@ -3511,7 +2075,7 @@ onMounted(
         #123c2d;
 
     -webkit-text-fill-color:
-        #123c2d;
+        #173d2e;
 
     font:
         inherit;
@@ -3567,7 +2131,7 @@ onMounted(
         #123c2d;
 
     -webkit-text-fill-color:
-        #123c2d;
+        #173d2e;
 }
 
 /* =====================================================
@@ -3599,10 +2163,10 @@ onMounted(
         8px;
 
     background:
-        #e5f8f8;
+        #eef8f0;
 
     color:
-        #0c7894;
+        #174b35;
 
     font:
         inherit;
@@ -3620,10 +2184,10 @@ onMounted(
 .sort-button:hover,
 .sort-button.active {
     background:
-        linear-gradient(135deg, #398ba3 0%, #0c7894 100%);
+        linear-gradient(135deg, #3f9363 0%, #174b35 100%);
 
     border-color:
-        #0c7894;
+        #174b35;
 
     color:
         #ffffff;
@@ -3724,9 +2288,9 @@ onMounted(
         28px;
 
     border:
-        1px solid rgba(196,
-            157,
-            59,
+        1px solid rgba(225,
+            200,
+            117,
             0.3);
 
     border-radius:
@@ -4133,13 +2697,13 @@ onMounted(
 
 .status-badge.details_requested {
     background:
-        rgba(96,
-            165,
-            250,
-            0.18);
+        rgba(225,
+            200,
+            117,
+            0.16);
 
     color:
-        #c5dcff;
+        #f3df9c;
 }
 
 .status-badge.completed {
@@ -4544,19 +3108,19 @@ onMounted(
 
 .card-state-message.details {
     border:
-        1px solid rgba(147,
-            197,
-            253,
-            0.35);
+        1px solid rgba(225,
+            200,
+            117,
+            0.30);
 
     background:
-        rgba(59,
-            130,
-            246,
-            0.12);
+        rgba(225,
+            200,
+            117,
+            0.10);
 
     color:
-        #d4e5ff;
+        #f1dd9a;
 }
 
 .card-state-message.rejected {
@@ -4705,7 +3269,7 @@ onMounted(
 
 .pagination-button:hover:not( :disabled) {
     border-color:
-        #c49d3b;
+        #e1c875;
 
     background:
         #f9f5e8;
@@ -7130,7 +5694,7 @@ onMounted(
 }
 
 .queue-count strong {
-    color: #e6c765;
+    color: #e1c875;
 }
 
 .filter-toolbar {
@@ -7142,8 +5706,8 @@ onMounted(
 .category-field select,
 .sort-button {
     border-color: rgba(18, 60, 45, 0.2);
-    background: #e5f8f8;
-    color: #0c7894;
+    background: #f3faf4;
+    color: #173d2e;
 }
 
 .search-field input::placeholder,
@@ -7264,4 +5828,691 @@ onMounted(
 .modal-actions {
     border-color: rgba(255, 255, 255, 0.07);
 }
+
+
+/* =========================================================
+   LARGE & READABLE ITEM VERIFICATION MODAL
+   Keeps the existing dark-green admin theme.
+   This block intentionally uses !important because the
+   global admin theme also styles admin modals.
+   ========================================================= */
+
+/* Make the popup itself much larger and easier to inspect */
+.modal-overlay {
+    padding: 18px !important;
+    background: rgba(4, 20, 13, 0.78) !important;
+    backdrop-filter: blur(7px) !important;
+}
+
+.modal-content {
+    width: min(1220px, 94vw) !important;
+    max-width: 1220px !important;
+    height: auto !important;
+    max-height: 92vh !important;
+
+    border: 1px solid rgba(209, 231, 218, 0.20) !important;
+    border-radius: 18px !important;
+
+    background:
+        linear-gradient(
+            180deg,
+            #276647 0%,
+            #1f5a3e 100%
+        ) !important;
+
+    box-shadow:
+        0 30px 90px rgba(0, 0, 0, 0.48),
+        0 0 0 1px rgba(255, 255, 255, 0.025) !important;
+}
+
+/* Bigger modal header */
+.modal-header {
+    min-height: 82px !important;
+    padding: 16px 20px !important;
+
+    border-bottom:
+        1px solid rgba(255, 255, 255, 0.12) !important;
+
+    background:
+        linear-gradient(
+            135deg,
+            #246b49 0%,
+            #155033 55%,
+            #103c29 100%
+        ) !important;
+}
+
+.modal-kicker {
+    margin-bottom: 5px !important;
+    color: #ead58b !important;
+
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.13em !important;
+}
+
+.modal-header h2 {
+    max-width: 760px !important;
+
+    color: #ffffff !important;
+
+    font-size: 21px !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+    letter-spacing: -0.01em !important;
+}
+
+.modal-header-right {
+    gap: 10px !important;
+}
+
+.modal-status {
+    min-height: 30px !important;
+    padding: 0 12px !important;
+
+    font-size: 11px !important;
+    font-weight: 800 !important;
+}
+
+.modal-close {
+    width: 38px !important;
+    height: 38px !important;
+
+    border-radius: 10px !important;
+
+    background:
+        rgba(255, 255, 255, 0.08) !important;
+}
+
+.modal-close svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+/* More breathing room inside popup */
+.modal-scroll {
+    padding: 18px 20px 22px !important;
+    color: #eef6f0 !important;
+}
+
+/* Verified box */
+.pickup-message-card {
+    grid-template-columns: 46px minmax(0, 1fr) !important;
+    gap: 14px !important;
+
+    margin-bottom: 16px !important;
+    padding: 15px 17px !important;
+
+    border:
+        1px solid rgba(225, 200, 117, 0.32) !important;
+
+    border-radius: 12px !important;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(13, 70, 45, 0.96),
+            rgba(15, 83, 52, 0.88)
+        ) !important;
+}
+
+.pickup-message-icon {
+    width: 42px !important;
+    height: 42px !important;
+
+    border-radius: 10px !important;
+
+    background:
+        rgba(49, 195, 103, 0.13) !important;
+
+    color: #46df7b !important;
+}
+
+.pickup-message-icon svg {
+    width: 21px !important;
+    height: 21px !important;
+}
+
+.pickup-label {
+    margin-bottom: 4px !important;
+
+    color: #e8ce70 !important;
+
+    font-size: 10px !important;
+    font-weight: 850 !important;
+}
+
+.pickup-message-card h3 {
+    color: #ffffff !important;
+
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    line-height: 1.35 !important;
+}
+
+.pickup-message-card p {
+    margin-top: 5px !important;
+
+    color: #d9e9df !important;
+
+    font-size: 12.5px !important;
+    line-height: 1.5 !important;
+}
+
+/* Main item + quick information area */
+.modal-overview {
+    grid-template-columns: 260px minmax(0, 1fr) !important;
+    gap: 16px !important;
+
+    margin-bottom: 15px !important;
+}
+
+.modal-image-container {
+    width: 100% !important;
+    height: 230px !important;
+
+    border:
+        1px solid rgba(255, 255, 255, 0.18) !important;
+
+    border-radius: 12px !important;
+
+    background: #eef6f0 !important;
+
+    box-shadow:
+        0 8px 20px rgba(0, 0, 0, 0.14) !important;
+}
+
+.modal-image {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+}
+
+.image-thumbnails {
+    gap: 7px !important;
+    margin-top: 8px !important;
+}
+
+.thumbnail-button {
+    width: 52px !important;
+    height: 52px !important;
+
+    border-radius: 8px !important;
+}
+
+.overview-information {
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr)) !important;
+
+    gap: 10px !important;
+}
+
+.overview-field {
+    min-height: 78px !important;
+    padding: 12px 14px !important;
+
+    border:
+        1px solid rgba(255, 255, 255, 0.13) !important;
+
+    border-radius: 10px !important;
+
+    background:
+        rgba(255, 255, 255, 0.075) !important;
+}
+
+.overview-field span {
+    margin-bottom: 5px !important;
+
+    color: #bcd0c3 !important;
+
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+
+    letter-spacing: 0.02em !important;
+}
+
+.overview-field strong {
+    color: #ffffff !important;
+
+    font-size: 13.5px !important;
+    font-weight: 750 !important;
+    line-height: 1.45 !important;
+
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+}
+
+/* Two large information boxes */
+.detail-columns {
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr)) !important;
+
+    gap: 14px !important;
+    margin-bottom: 14px !important;
+}
+
+.detail-panel,
+.evidence-panel {
+    padding: 15px 16px !important;
+
+    border:
+        1px solid rgba(255, 255, 255, 0.13) !important;
+
+    border-radius: 12px !important;
+
+    background:
+        rgba(8, 54, 34, 0.33) !important;
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
+}
+
+.detail-panel-header {
+    gap: 9px !important;
+    margin-bottom: 10px !important;
+
+    padding-bottom: 9px !important;
+
+    border-bottom:
+        1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.detail-icon {
+    width: 31px !important;
+    height: 31px !important;
+
+    border-radius: 8px !important;
+
+    background:
+        rgba(225, 200, 117, 0.13) !important;
+
+    color: #ead174 !important;
+}
+
+.detail-icon svg {
+    width: 15px !important;
+    height: 15px !important;
+}
+
+.detail-panel-header h3,
+.evidence-heading h3 {
+    color: #ffffff !important;
+
+    font-size: 13.5px !important;
+    font-weight: 800 !important;
+    line-height: 1.3 !important;
+}
+
+/* Make each label/value row visibly larger */
+.detail-list > div {
+    grid-template-columns:
+        120px minmax(0, 1fr) !important;
+
+    gap: 12px !important;
+
+    padding: 8px 0 !important;
+
+    border-top:
+        1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.detail-list dt {
+    color: #b8cbbf !important;
+
+    font-size: 11px !important;
+    font-weight: 650 !important;
+    line-height: 1.45 !important;
+}
+
+.detail-list dd {
+    color: #ffffff !important;
+
+    font-size: 12.5px !important;
+    font-weight: 650 !important;
+    line-height: 1.5 !important;
+}
+
+/* Physical comparison box */
+.evidence-panel {
+    margin-bottom: 14px !important;
+}
+
+.evidence-heading {
+    gap: 10px !important;
+    margin-bottom: 12px !important;
+}
+
+.evidence-heading p {
+    margin-top: 4px !important;
+
+    color: #bed0c4 !important;
+
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+}
+
+.evidence-grid {
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr)) !important;
+
+    gap: 10px !important;
+}
+
+.evidence-block {
+    min-height: 110px !important;
+    padding: 13px 14px !important;
+
+    border:
+        1px solid rgba(255, 255, 255, 0.11) !important;
+
+    border-radius: 10px !important;
+
+    background:
+        rgba(4, 44, 27, 0.28) !important;
+}
+
+.primary-evidence {
+    border-color:
+        rgba(225, 200, 117, 0.25) !important;
+}
+
+.evidence-block span,
+.description-panel > span {
+    margin-bottom: 7px !important;
+
+    color: #ead176 !important;
+
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+}
+
+.evidence-block p,
+.description-panel p {
+    color: #f2f7f3 !important;
+
+    font-size: 12.5px !important;
+    line-height: 1.6 !important;
+}
+
+.private-evidence {
+    border-color:
+        rgba(245, 148, 142, 0.22) !important;
+
+    background:
+        rgba(77, 32, 30, 0.18) !important;
+}
+
+.private-evidence span,
+.private-evidence p,
+.private-evidence small {
+    color: #ffc1bc !important;
+}
+
+.private-evidence small {
+    margin-top: 8px !important;
+    font-size: 10px !important;
+}
+
+/* Notes textarea */
+.request-note-field {
+    margin-top: 13px !important;
+}
+
+.request-note-heading {
+    margin-bottom: 7px !important;
+}
+
+.request-note-heading span {
+    color: #ffffff !important;
+
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+}
+
+.request-note-heading small,
+.character-count {
+    color: #bacbc1 !important;
+
+    font-size: 10px !important;
+}
+
+.request-note-field textarea {
+    min-height: 95px !important;
+
+    padding: 11px 12px !important;
+
+    border:
+        1px solid rgba(255, 255, 255, 0.18) !important;
+
+    border-radius: 9px !important;
+
+    background: #f5faf6 !important;
+    color: #173d29 !important;
+
+    font-size: 12.5px !important;
+    line-height: 1.55 !important;
+}
+
+/* Request-details panel */
+.request-details-panel {
+    margin-top: 14px !important;
+    padding: 15px !important;
+
+    border:
+        1px solid rgba(225, 200, 117, 0.32) !important;
+
+    border-radius: 12px !important;
+
+    background:
+        rgba(225, 200, 117, 0.075) !important;
+}
+
+.request-details-header h3 {
+    color: #ffffff !important;
+
+    font-size: 14px !important;
+    font-weight: 800 !important;
+}
+
+.request-details-header p:not(.request-kicker) {
+    color: #c7d5cc !important;
+
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+}
+
+.request-options {
+    gap: 9px !important;
+}
+
+.request-option {
+    min-height: 64px !important;
+
+    gap: 10px !important;
+    padding: 10px 11px !important;
+
+    border:
+        1px solid rgba(255, 255, 255, 0.12) !important;
+
+    border-radius: 9px !important;
+
+    background:
+        rgba(255, 255, 255, 0.055) !important;
+}
+
+.request-option-copy strong {
+    color: #ffffff !important;
+
+    font-size: 11.5px !important;
+    font-weight: 750 !important;
+}
+
+.request-option-copy small {
+    margin-top: 3px !important;
+
+    color: #c1d0c7 !important;
+
+    font-size: 10.5px !important;
+    line-height: 1.4 !important;
+}
+
+/* Larger footer and action buttons */
+.modal-actions {
+    min-height: 70px !important;
+    padding: 13px 20px !important;
+
+    border-top:
+        1px solid rgba(255, 255, 255, 0.10) !important;
+
+    background:
+        linear-gradient(
+            135deg,
+            #155033,
+            #103c29
+        ) !important;
+}
+
+.modal-action-button {
+    min-width: 145px !important;
+    height: 42px !important;
+
+    padding: 0 16px !important;
+
+    border-radius: 9px !important;
+
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+}
+
+.approved-footer-copy span {
+    color: #ffffff !important;
+
+    font-size: 12.5px !important;
+    font-weight: 800 !important;
+}
+
+.approved-footer-copy small {
+    margin-top: 4px !important;
+
+    color: #c6d6cc !important;
+
+    font-size: 10.5px !important;
+    line-height: 1.45 !important;
+}
+
+/* Improve popup scrollbar */
+.modal-scroll::-webkit-scrollbar {
+    width: 9px !important;
+}
+
+.modal-scroll::-webkit-scrollbar-thumb {
+    border-radius: 999px !important;
+    background:
+        rgba(225, 200, 117, 0.30) !important;
+}
+
+/* Desktop layouts */
+@media (min-width: 1400px) {
+    .modal-content {
+        width: min(1280px, 92vw) !important;
+        max-width: 1280px !important;
+    }
+
+    .modal-overview {
+        grid-template-columns:
+            285px minmax(0, 1fr) !important;
+    }
+
+    .modal-image-container {
+        height: 245px !important;
+    }
+
+    .detail-list dt {
+        font-size: 11.5px !important;
+    }
+
+    .detail-list dd,
+    .evidence-block p {
+        font-size: 13px !important;
+    }
+}
+
+/* Tablet */
+@media (max-width: 900px) {
+    .modal-content {
+        width: 95vw !important;
+        max-height: 94vh !important;
+    }
+
+    .modal-overview {
+        grid-template-columns:
+            220px minmax(0, 1fr) !important;
+    }
+
+    .overview-information {
+        grid-template-columns: 1fr !important;
+    }
+
+    .detail-columns {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* Mobile */
+@media (max-width: 620px) {
+    .modal-overlay {
+        padding: 8px !important;
+    }
+
+    .modal-content {
+        width: 98vw !important;
+        max-height: 96vh !important;
+
+        border-radius: 13px !important;
+    }
+
+    .modal-header {
+        min-height: 70px !important;
+        padding: 13px 14px !important;
+    }
+
+    .modal-header h2 {
+        font-size: 16px !important;
+    }
+
+    .modal-scroll {
+        padding: 12px !important;
+    }
+
+    .modal-overview {
+        grid-template-columns: 1fr !important;
+    }
+
+    .modal-image-container {
+        width: min(320px, 100%) !important;
+        height: 220px !important;
+    }
+
+    .overview-information,
+    .evidence-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .detail-list > div {
+        grid-template-columns: 1fr !important;
+        gap: 3px !important;
+    }
+
+    .modal-actions {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+    }
+
+    .modal-action-button {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+}
+
 </style>

@@ -515,11 +515,9 @@ img,
 
                                     <strong>
                                         {{
-                                            selectedSurrender
-                                                .report
-                                                ?.category
-                                                ?.name ||
-                                            '—'
+                                            getCategoryName(
+                                                selectedSurrender.report
+                                            )
                                         }}
                                     </strong>
                                 </div>
@@ -695,11 +693,9 @@ img,
 
                                         <dd>
                                             {{
-                                                selectedSurrender
-                                                    .report
-                                                    ?.category
-                                                    ?.name ||
-                                                'N/A'
+                                                getCategoryName(
+                                                    selectedSurrender.report
+                                                )
                                             }}
                                         </dd>
                                     </div>
@@ -1142,40 +1138,91 @@ const requestDetailOptions = [
    NORMALIZE RESPONSE
 ===================================================== */
 
-function normalizeListPayload(
-    payload
-) {
-    if (
-        Array.isArray(payload)
-    ) {
+function normalizeListPayload(payload) {
+    if (!payload) {
+        return []
+    }
+
+    // Direct array
+    if (Array.isArray(payload)) {
         return payload
     }
 
-    if (
-        Array.isArray(
-            payload?.data
-        )
-    ) {
+    // Standard API response: { data: [...] }
+    if (Array.isArray(payload?.data)) {
         return payload.data
     }
 
-    if (
-        Array.isArray(
-            payload?.items
-        )
-    ) {
+    // Laravel paginator: { data: { data: [...] } }
+    if (Array.isArray(payload?.data?.data)) {
+        return payload.data.data
+    }
+
+    // Named collection keys
+    if (Array.isArray(payload?.surrenders)) {
+        return payload.surrenders
+    }
+
+    if (Array.isArray(payload?.data?.surrenders)) {
+        return payload.data.surrenders
+    }
+
+    if (Array.isArray(payload?.items)) {
         return payload.items
     }
 
-    if (
-        Array.isArray(
-            payload?.records
-        )
-    ) {
+    if (Array.isArray(payload?.data?.items)) {
+        return payload.data.items
+    }
+
+    if (Array.isArray(payload?.records)) {
         return payload.records
     }
 
+    if (Array.isArray(payload?.data?.records)) {
+        return payload.data.records
+    }
+
+    if (Array.isArray(payload?.results)) {
+        return payload.results
+    }
+
+    if (Array.isArray(payload?.data?.results)) {
+        return payload.data.results
+    }
+
+    console.warn(
+        'Unable to find surrender array in API response:',
+        payload
+    )
+
     return []
+}
+
+function getCategoryName(report) {
+    if (!report) {
+        return '—'
+    }
+
+    const category = report.category
+
+    if (typeof category === 'string') {
+        return category
+    }
+
+    if (category && typeof category === 'object') {
+        return (
+            category.name ||
+            category.title ||
+            '—'
+        )
+    }
+
+    return (
+        report.category_name ||
+        report.metadata?.category ||
+        '—'
+    )
 }
 
 /* =====================================================
@@ -1319,33 +1366,43 @@ function actionIdentifier(
         : `report:${item.report_id || item.id}`
 }
 
-function isPending(
-    item
-) {
-    const itemStatus =
-        statusOf(item)
-
-    const reportStatus =
-        String(
-            item?.report
-                ?.status ||
-            ''
-        ).toLowerCase()
-
-    return (
-        itemStatus ===
-        'pending' ||
-        itemStatus ===
-        'overdue' ||
-        reportStatus ===
-        'pending' ||
-        reportStatus ===
-        'pending_surrender' ||
-        reportStatus ===
-        'published' ||
-        reportStatus ===
-        'approved'
+function isPending(item) {
+    const itemStatus = String(
+        item?.status || ''
     )
+        .trim()
+        .toLowerCase()
+
+    const reportStatus = String(
+        item?.report?.status || ''
+    )
+        .trim()
+        .toLowerCase()
+
+    const pendingSurrenderStatuses = [
+        'pending',
+        'pending_surrender',
+        'overdue',
+        'details_requested',
+        'additional_details_requested'
+    ]
+
+    if (
+        pendingSurrenderStatuses.includes(
+            itemStatus
+        )
+    ) {
+        return true
+    }
+
+    if (
+        reportStatus ===
+        'pending_surrender'
+    ) {
+        return true
+    }
+
+    return false
 }
 
 /* =====================================================
@@ -1718,34 +1775,60 @@ function formatDateTime(
 ===================================================== */
 
 async function loadSurrenders() {
-    loading.value =
-        true
-
-    errorMessage.value =
-        ''
+    loading.value = true
+    errorMessage.value = ''
 
     try {
-        const response =
-            await api.get(
-                '/api/admin/surrenders'
-            )
+        const response = await api.get(
+            '/api/admin/surrenders'
+        )
 
-        surrenders.value =
+        console.log(
+            'PENDING SURRENDER API RESPONSE:',
+            response.data
+        )
+
+        const records =
             normalizeListPayload(
                 response.data
             )
+
+        console.log(
+            'NORMALIZED SURRENDER RECORDS:',
+            records
+        )
+
+        surrenders.value = records
+
+        console.log(
+            'TOTAL SURRENDERS:',
+            surrenders.value.length
+        )
+
+        console.log(
+            'PENDING SURRENDERS:',
+            surrenders.value.filter(
+                item => isPending(item)
+            ).length
+        )
     } catch (error) {
+        console.error(
+            'FAILED TO LOAD SURRENDERS:',
+            error
+        )
+
+        console.error(
+            'SERVER RESPONSE:',
+            error.response?.data
+        )
+
         errorMessage.value =
-            error.response
-                ?.data
-                ?.message ||
+            error.response?.data?.message ||
             'Failed to load surrender records.'
 
-        surrenders.value =
-            []
+        surrenders.value = []
     } finally {
-        loading.value =
-            false
+        loading.value = false
     }
 }
 
@@ -2244,10 +2327,10 @@ onMounted(() => {
         8px;
 
     background:
-        #e5f8f8;
+        #eef8f0;
 
     color:
-        #0c7894;
+        #174b35;
 
     font:
         inherit;
@@ -2528,7 +2611,7 @@ onMounted(() => {
             0.18);
 
     background:
-        linear-gradient(135deg, #398ba3 0%, #0c7894 100%);
+        linear-gradient(135deg, #3f9363 0%, #174b35 100%);
 
     color:
         #ffffff;
@@ -5049,4 +5132,948 @@ onMounted(() => {
             none !important;
     }
 }
+
+
+/* =========================================================
+   PROFESSIONAL PENDING SURRENDER UI OVERRIDE
+   Green / Light Green theme + larger readable modal
+   ========================================================= */
+
+.admin-page-body {
+    --ps-green-950: #0b2d1e;
+    --ps-green-900: #123f2b;
+    --ps-green-800: #195338;
+    --ps-green-700: #246b49;
+    --ps-green-600: #31845b;
+    --ps-green-500: #4e9d72;
+    --ps-green-100: #e7f4eb;
+    --ps-green-50: #f5fbf7;
+    --ps-gold: #d8bb63;
+    --ps-gold-dark: #8f7425;
+    --ps-ink: #173d2e;
+    --ps-muted: #65786c;
+    --ps-line: #d6e5da;
+
+    color: var(--ps-ink) !important;
+    background:
+        radial-gradient(circle at 10% 0%, rgba(78, 157, 114, 0.14), transparent 28%),
+        linear-gradient(180deg, #f4faf6 0%, #eaf5ed 50%, #e0efe5 100%) !important;
+
+    font-family:
+        "Segoe UI",
+        Inter,
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif !important;
+
+    font-size: 14px !important;
+    line-height: 1.55 !important;
+
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* =========================================================
+   PAGE HEADER
+   ========================================================= */
+
+.page-header {
+    margin-bottom: 20px !important;
+    padding: 2px 2px 0 !important;
+}
+
+.page-kicker,
+.modal-kicker {
+    color: var(--ps-gold-dark) !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.14em !important;
+}
+
+.page-header h1 {
+    color: var(--ps-green-950) !important;
+    font-size: clamp(1.75rem, 2.15vw, 2.25rem) !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.02em !important;
+}
+
+.page-copy {
+    max-width: 760px !important;
+    margin-top: 8px !important;
+    color: #607468 !important;
+    font-size: 13.5px !important;
+    line-height: 1.65 !important;
+}
+
+.queue-count {
+    min-width: 92px !important;
+    padding: 12px 15px !important;
+
+    border: 1px solid #d9e6dc !important;
+    border-radius: 14px !important;
+
+    background: #ffffff !important;
+
+    box-shadow:
+        0 8px 22px rgba(20, 71, 48, 0.08) !important;
+}
+
+.queue-count strong {
+    color: var(--ps-green-800) !important;
+    font-size: 1.4rem !important;
+    font-weight: 800 !important;
+}
+
+.queue-count span {
+    color: #6d8074 !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+}
+
+/* =========================================================
+   FILTER TOOLBAR
+   ========================================================= */
+
+.filter-toolbar {
+    gap: 12px !important;
+    margin-bottom: 20px !important;
+    padding: 14px !important;
+
+    border: 1px solid #d6e5da !important;
+    border-radius: 16px !important;
+
+    background: rgba(255, 255, 255, 0.94) !important;
+
+    box-shadow:
+        0 10px 28px rgba(20, 71, 48, 0.07) !important;
+}
+
+.search-field input,
+.category-field select,
+.sort-button {
+    height: 44px !important;
+
+    border: 1px solid #cbded1 !important;
+    border-radius: 10px !important;
+
+    background: #ffffff !important;
+    color: var(--ps-ink) !important;
+
+    font-size: 13px !important;
+    font-weight: 650 !important;
+}
+
+.search-field input {
+    padding: 0 14px !important;
+}
+
+.search-field input::placeholder {
+    color: #89998f !important;
+}
+
+.search-field input:focus,
+.category-field select:focus,
+.sort-button:focus-visible {
+    outline: none !important;
+
+    border-color: var(--ps-green-500) !important;
+
+    box-shadow:
+        0 0 0 3px rgba(78, 157, 114, 0.14) !important;
+}
+
+.category-field > span,
+.sort-label {
+    color: #4f6658 !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+}
+
+.sort-button:hover {
+    border-color: var(--ps-green-500) !important;
+    background: #f0f8f3 !important;
+    color: var(--ps-green-800) !important;
+}
+
+.sort-button.active {
+    border-color: var(--ps-green-800) !important;
+
+    background:
+        linear-gradient(135deg, #3f9363 0%, #174b35 100%) !important;
+
+    color: #ffffff !important;
+
+    box-shadow:
+        0 6px 14px rgba(23, 75, 53, 0.16) !important;
+}
+
+/* =========================================================
+   EMPTY / ALERT
+   ========================================================= */
+
+.empty-state-card {
+    padding: 52px 24px !important;
+
+    border: 1px solid #d5e5d9 !important;
+    border-radius: 17px !important;
+
+    background: #ffffff !important;
+
+    box-shadow:
+        0 12px 30px rgba(20, 71, 48, 0.08) !important;
+}
+
+.empty-state-card h2 {
+    color: var(--ps-green-950) !important;
+    font-size: 1.2rem !important;
+    font-weight: 800 !important;
+}
+
+.empty-state-card p {
+    color: var(--ps-muted) !important;
+    font-size: 13px !important;
+    line-height: 1.6 !important;
+}
+
+.inline-alert {
+    font-size: 12.5px !important;
+    line-height: 1.5 !important;
+}
+
+/* =========================================================
+   SURRENDER CARDS
+   ========================================================= */
+
+.surrender-grid {
+    grid-template-columns:
+        repeat(auto-fill, minmax(280px, 1fr)) !important;
+
+    gap: 18px !important;
+}
+
+.report-card {
+    position: relative;
+
+    overflow: hidden !important;
+
+    border: 1px solid #d4e4d8 !important;
+    border-radius: 17px !important;
+
+    background: #ffffff !important;
+
+    box-shadow:
+        0 12px 30px rgba(20, 71, 48, 0.08),
+        0 2px 7px rgba(20, 71, 48, 0.04) !important;
+
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease !important;
+}
+
+.report-card::before {
+    content: "";
+    position: absolute;
+    z-index: 2;
+    inset: 0 0 auto 0;
+    height: 4px;
+
+    background:
+        linear-gradient(
+            90deg,
+            var(--ps-green-700),
+            var(--ps-green-500),
+            var(--ps-gold)
+        );
+}
+
+.report-card:hover {
+    transform: translateY(-4px) !important;
+
+    border-color: #b9d3c1 !important;
+
+    box-shadow:
+        0 20px 42px rgba(20, 71, 48, 0.13),
+        0 4px 10px rgba(20, 71, 48, 0.05) !important;
+}
+
+.card-image-button {
+    height: 160px !important;
+    background: #eef6f0 !important;
+}
+
+.card-image {
+    transition: transform 0.25s ease !important;
+}
+
+.card-image-button:hover .card-image {
+    transform: scale(1.025);
+}
+
+.image-view-chip {
+    right: 10px !important;
+    bottom: 10px !important;
+
+    height: 30px !important;
+    padding: 0 10px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    border-radius: 8px !important;
+
+    background: rgba(11, 45, 30, 0.88) !important;
+
+    color: #ffffff !important;
+
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+}
+
+.card-content {
+    padding: 15px !important;
+}
+
+.report-type-badge,
+.status-badge {
+    min-height: 26px !important;
+    padding: 0 9px !important;
+
+    font-size: 9.5px !important;
+    font-weight: 800 !important;
+}
+
+.report-type-badge.found {
+    border: 1px solid #b8dfc4 !important;
+    background: #eaf8ee !important;
+    color: #257145 !important;
+}
+
+.status-badge.pending,
+.status-badge.overdue {
+    border: 1px solid #ead598 !important;
+    background: #fff7dc !important;
+    color: #7d6419 !important;
+}
+
+.card-title {
+    margin: 2px 0 6px !important;
+
+    color: var(--ps-green-950) !important;
+
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    line-height: 1.35 !important;
+}
+
+.card-student {
+    margin-bottom: 12px !important;
+
+    color: #62766a !important;
+
+    font-size: 12.5px !important;
+    font-weight: 650 !important;
+}
+
+.card-meta {
+    gap: 0 !important;
+    margin-bottom: 13px !important;
+
+    padding: 10px 11px !important;
+
+    border: 1px solid #dce9df !important;
+    border-radius: 11px !important;
+
+    background: #f8fbf9 !important;
+}
+
+.card-meta > div {
+    grid-template-columns: 78px minmax(0, 1fr) !important;
+
+    gap: 10px !important;
+    padding: 6px 0 !important;
+
+    border-bottom: 1px solid #e7efe9;
+}
+
+.card-meta > div:last-child {
+    border-bottom: 0;
+}
+
+.card-meta dt {
+    color: #718378 !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+}
+
+.card-meta dd {
+    color: #244c37 !important;
+
+    font-size: 12px !important;
+    font-weight: 700 !important;
+}
+
+/* Card action buttons */
+.card-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+
+    gap: 8px !important;
+    margin-top: 12px !important;
+}
+
+.action-btn {
+    min-width: 0 !important;
+    height: 40px !important;
+
+    border-radius: 9px !important;
+
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+}
+
+.approve-btn {
+    border-color: #31845b !important;
+    background: #31845b !important;
+    color: #ffffff !important;
+}
+
+.approve-btn:hover:not(:disabled) {
+    border-color: #246b49 !important;
+    background: #246b49 !important;
+}
+
+.reject-btn {
+    border-color: #d94c47 !important;
+    background: #d94c47 !important;
+    color: #ffffff !important;
+}
+
+.reject-btn:hover:not(:disabled) {
+    border-color: #c33f3b !important;
+    background: #c33f3b !important;
+}
+
+.neutral-btn {
+    border-color: #d8bb63 !important;
+    background: #d8bb63 !important;
+    color: #3f3414 !important;
+}
+
+.neutral-btn:hover:not(:disabled) {
+    border-color: #caaa4f !important;
+    background: #caaa4f !important;
+}
+
+/* =========================================================
+   PAGINATION
+   ========================================================= */
+
+.pagination-bar {
+    margin-top: 20px !important;
+    padding: 12px 14px !important;
+
+    border: 1px solid #d5e5d9 !important;
+    border-radius: 13px !important;
+
+    background: #ffffff !important;
+
+    box-shadow:
+        0 8px 22px rgba(20, 71, 48, 0.06) !important;
+}
+
+.pagination-info,
+.pagination-info strong,
+.page-status {
+    color: var(--ps-ink) !important;
+    font-size: 12px !important;
+}
+
+.page-button {
+    height: 34px !important;
+
+    border: 1px solid #cddfd2 !important;
+    border-radius: 8px !important;
+
+    background: #ffffff !important;
+    color: var(--ps-green-800) !important;
+
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+}
+
+.page-button:hover:not(:disabled) {
+    border-color: var(--ps-green-500) !important;
+    background: #eef7f1 !important;
+}
+
+/* =========================================================
+   LARGE, READABLE SURRENDER MODAL
+   ========================================================= */
+
+.modal-overlay {
+    padding: 18px !important;
+
+    background: rgba(4, 20, 13, 0.78) !important;
+
+    backdrop-filter: blur(7px) !important;
+}
+
+.modal-content {
+    width: min(1220px, 94vw) !important;
+    max-width: 1220px !important;
+    max-height: 92vh !important;
+
+    border: 1px solid rgba(212, 230, 219, 0.20) !important;
+    border-radius: 18px !important;
+
+    background:
+        linear-gradient(
+            180deg,
+            #276647 0%,
+            #1f5a3e 100%
+        ) !important;
+
+    box-shadow:
+        0 30px 90px rgba(0, 0, 0, 0.48),
+        0 0 0 1px rgba(255, 255, 255, 0.025) !important;
+}
+
+.modal-header {
+    min-height: 82px !important;
+    padding: 16px 20px !important;
+
+    border-bottom:
+        1px solid rgba(255, 255, 255, 0.12) !important;
+
+    background:
+        linear-gradient(
+            135deg,
+            #246b49 0%,
+            #155033 55%,
+            #103c29 100%
+        ) !important;
+}
+
+.modal-header h2 {
+    max-width: 760px !important;
+
+    color: #ffffff !important;
+
+    font-size: 21px !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+}
+
+.modal-kicker {
+    color: #ead58b !important;
+    font-size: 11px !important;
+}
+
+.modal-badges {
+    gap: 7px !important;
+}
+
+.modal-close {
+    width: 38px !important;
+    height: 38px !important;
+
+    border-radius: 10px !important;
+
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.modal-scroll {
+    padding: 18px 20px 22px !important;
+
+    color: #eef6f0 !important;
+}
+
+/* Image + summary */
+.modal-overview {
+    grid-template-columns:
+        285px minmax(0, 1fr) !important;
+
+    gap: 16px !important;
+    margin-bottom: 15px !important;
+}
+
+.modal-image-container {
+    width: 100% !important;
+    height: 245px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    border-radius: 12px !important;
+
+    background: #edf5ef !important;
+
+    box-shadow:
+        0 8px 20px rgba(0, 0, 0, 0.14) !important;
+}
+
+.thumbnail {
+    width: 52px !important;
+    height: 52px !important;
+
+    border-radius: 8px !important;
+}
+
+.thumbnail.active {
+    border-color: var(--ps-gold) !important;
+}
+
+.overview-details {
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr)) !important;
+
+    gap: 10px !important;
+}
+
+.summary-field {
+    min-height: 78px !important;
+    padding: 12px 14px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
+    border-radius: 10px !important;
+
+    background: rgba(255, 255, 255, 0.075) !important;
+}
+
+.summary-field span {
+    margin-bottom: 5px !important;
+
+    color: #bed0c4 !important;
+
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+}
+
+.summary-field strong {
+    color: #ffffff !important;
+
+    font-size: 13.5px !important;
+    font-weight: 750 !important;
+    line-height: 1.45 !important;
+
+    overflow: visible !important;
+    white-space: normal !important;
+    text-overflow: clip !important;
+}
+
+/* Student / Item info boxes */
+.detail-grid {
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr)) !important;
+
+    gap: 14px !important;
+    margin-bottom: 14px !important;
+}
+
+.detail-panel {
+    padding: 15px 16px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
+    border-radius: 12px !important;
+
+    background: rgba(8, 54, 34, 0.33) !important;
+}
+
+.detail-panel-heading {
+    gap: 9px !important;
+    margin-bottom: 10px !important;
+
+    padding-bottom: 9px !important;
+
+    border-bottom:
+        1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.detail-icon {
+    width: 31px !important;
+    height: 31px !important;
+
+    border-radius: 8px !important;
+
+    background:
+        rgba(225, 200, 117, 0.13) !important;
+
+    color: #ead174 !important;
+}
+
+.detail-icon svg {
+    width: 15px !important;
+    height: 15px !important;
+}
+
+.detail-panel-heading h3 {
+    color: #ffffff !important;
+
+    font-size: 13.5px !important;
+    font-weight: 800 !important;
+}
+
+.info-list > div,
+.timeline-summary > div {
+    grid-template-columns:
+        120px minmax(0, 1fr) !important;
+
+    gap: 12px !important;
+    padding: 8px 0 !important;
+
+    border-top:
+        1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.info-list dt,
+.timeline-summary dt {
+    color: #b8cbbf !important;
+
+    font-size: 11px !important;
+    font-weight: 650 !important;
+}
+
+.info-list dd,
+.timeline-summary dd {
+    color: #ffffff !important;
+
+    font-size: 12.5px !important;
+    font-weight: 650 !important;
+    line-height: 1.5 !important;
+}
+
+.detail-text {
+    color: #f2f7f3 !important;
+
+    font-size: 12.5px !important;
+    line-height: 1.6 !important;
+}
+
+/* Private details */
+.private-section {
+    border-color:
+        rgba(245, 148, 142, 0.25) !important;
+
+    background:
+        rgba(77, 32, 30, 0.18) !important;
+}
+
+.private-section h3,
+.private-section small,
+.private-section .detail-text {
+    color: #ffc1bc !important;
+}
+
+.private-icon {
+    background:
+        rgba(245, 148, 142, 0.10) !important;
+
+    color: #ffaaa4 !important;
+}
+
+/* Request details */
+.request-details-panel {
+    margin-top: 14px !important;
+    padding: 15px !important;
+
+    border:
+        1px solid rgba(225, 200, 117, 0.32) !important;
+
+    border-radius: 12px !important;
+
+    background:
+        rgba(225, 200, 117, 0.075) !important;
+}
+
+.request-details-header h3 {
+    color: #ffffff !important;
+
+    font-size: 14px !important;
+    font-weight: 800 !important;
+}
+
+.request-details-header p {
+    color: #c8d6cd !important;
+
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+}
+
+.request-options {
+    gap: 9px !important;
+}
+
+.request-option {
+    min-height: 64px !important;
+
+    gap: 10px !important;
+    padding: 10px 11px !important;
+
+    border:
+        1px solid rgba(255, 255, 255, 0.12) !important;
+
+    border-radius: 9px !important;
+
+    background:
+        rgba(255, 255, 255, 0.055) !important;
+}
+
+.request-option:hover {
+    border-color:
+        rgba(225, 200, 117, 0.24) !important;
+}
+
+.request-option.selected {
+    border-color:
+        rgba(225, 200, 117, 0.55) !important;
+
+    background:
+        rgba(225, 200, 117, 0.12) !important;
+}
+
+.request-option-text strong {
+    color: #ffffff !important;
+
+    font-size: 11.5px !important;
+    font-weight: 750 !important;
+}
+
+.request-option-text small {
+    color: #c1d0c7 !important;
+
+    font-size: 10.5px !important;
+    line-height: 1.4 !important;
+}
+
+.request-note-label {
+    color: #ffffff !important;
+
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+}
+
+.request-note-field textarea {
+    min-height: 95px !important;
+
+    padding: 11px 12px !important;
+
+    border:
+        1px solid rgba(255, 255, 255, 0.18) !important;
+
+    border-radius: 9px !important;
+
+    background: #f5faf6 !important;
+    color: #173d29 !important;
+
+    font-size: 12.5px !important;
+    line-height: 1.55 !important;
+}
+
+.note-counter {
+    color: #bacbc1 !important;
+    font-size: 10px !important;
+}
+
+/* Modal footer */
+.modal-actions {
+    min-height: 70px !important;
+
+    padding: 13px 20px !important;
+
+    border-top:
+        1px solid rgba(255, 255, 255, 0.10) !important;
+
+    background:
+        linear-gradient(
+            135deg,
+            #155033,
+            #103c29
+        ) !important;
+}
+
+.modal-action {
+    min-width: 145px !important;
+    height: 42px !important;
+
+    border-radius: 9px !important;
+
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .modal-content {
+        width: 95vw !important;
+    }
+
+    .modal-overview {
+        grid-template-columns:
+            220px minmax(0, 1fr) !important;
+    }
+}
+
+@media (max-width: 760px) {
+    .admin-page-body {
+        padding: 16px !important;
+    }
+
+    .filter-toolbar {
+        grid-template-columns: 1fr !important;
+    }
+
+    .surrender-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .modal-content {
+        width: 97vw !important;
+        max-height: 95vh !important;
+    }
+
+    .modal-overview,
+    .detail-grid,
+    .request-options {
+        grid-template-columns: 1fr !important;
+    }
+
+    .modal-image-container {
+        width: min(320px, 100%) !important;
+        height: 220px !important;
+    }
+
+    .overview-details {
+        grid-template-columns: 1fr !important;
+    }
+
+    .modal-actions {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+    }
+
+    .modal-action {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .page-header h1 {
+        font-size: 1.45rem !important;
+    }
+
+    .card-image-button {
+        height: 145px !important;
+    }
+
+    .card-actions {
+        grid-template-columns: 1fr !important;
+    }
+
+    .info-list > div,
+    .timeline-summary > div {
+        grid-template-columns: 1fr !important;
+        gap: 3px !important;
+    }
+}
+
 </style>
