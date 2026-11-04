@@ -1,58 +1,100 @@
 <template>
-    <div class="admin-profile-page">
-        <main class="profile-shell">
-
+    <div class="profile-page">
+        <main class="profile-container">
             <!-- =====================================================
-                 PAGE HEADER
+                 HERO
             ====================================================== -->
-            <section class="profile-hero">
-                <div>
-                    <p class="profile-kicker">
-                        Account Management
-                    </p>
+            <section class="profile-hero-card">
+                <div class="hero-copy">
+                    <div class="hero-kicker">
+                        <span class="hero-kicker-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" />
+                            </svg>
+                        </span>
+
+                        <span>Account Management</span>
+                    </div>
 
                     <h1>Super Admin Profile</h1>
 
-                    <p class="profile-intro">
-                        Manage your profile information, profile picture,
-                        and account security.
+                    <p>
+                        Manage your administrator identity, profile photo,
+                        personal information, and account security settings.
                     </p>
+
+                    <div class="hero-chips">
+                        <span class="hero-chip">
+                            <span class="status-dot"></span>
+                            Active Administrator
+                        </span>
+
+                        <span class="hero-chip gold">
+                            Protected Account
+                        </span>
+                    </div>
                 </div>
 
-                <div class="account-status">
-                    <span class="status-dot"></span>
+                <div class="hero-account-card">
+                    <span class="hero-account-label">Signed in as</span>
 
-                    <div>
-                        <small>Account Status</small>
-                        <strong>Active Administrator</strong>
+                    <div class="hero-account-row">
+                        <div class="hero-avatar">
+                            <img
+                                :src="
+                                    imagePreview ||
+                                    normalizeImage(admin?.profile_picture) ||
+                                    '/assets/logo.png'
+                                "
+                                alt="Administrator profile"
+                            />
+
+                            <span class="hero-online-dot"></span>
+                        </div>
+
+                        <div>
+                            <strong>{{ admin?.name || 'Admin User' }}</strong>
+                            <span>
+                                {{ admin?.email || 'Email unavailable' }}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </section>
 
             <!-- =====================================================
-                 SUCCESS / ERROR MESSAGE
+                 MESSAGE
             ====================================================== -->
             <Transition name="fade">
                 <div
                     v-if="message.text"
-                    class="profile-message"
-                    :class="
+                    :class="[
+                        'profile-alert',
                         message.kind === 'error'
-                            ? 'is-error'
-                            : 'is-success'
-                    "
+                            ? 'profile-alert-error'
+                            : 'profile-alert-success',
+                    ]"
                 >
-                    <span class="message-icon">
+                    <span class="alert-icon">
                         {{ message.kind === 'error' ? '!' : '✓' }}
                     </span>
 
-                    <span>
-                        {{ message.text }}
-                    </span>
+                    <div class="alert-copy">
+                        <strong>
+                            {{
+                                message.kind === 'error'
+                                    ? 'Something needs attention'
+                                    : 'Account updated'
+                            }}
+                        </strong>
+
+                        <span>{{ message.text }}</span>
+                    </div>
 
                     <button
                         type="button"
-                        class="message-close"
+                        class="alert-close"
+                        aria-label="Close message"
                         @click="message.text = ''"
                     >
                         ×
@@ -61,17 +103,13 @@
             </Transition>
 
             <!-- =====================================================
-                 MAIN PROFILE LAYOUT
+                 MAIN LAYOUT
             ====================================================== -->
             <section class="profile-layout">
-
-                <!-- =================================================
-                     LEFT SIDE - PROFILE
-                ================================================== -->
-                <aside class="profile-sidebar">
-                    <div class="glass-card profile-card">
-
-                        <div class="profile-card-header">
+                <!-- LEFT PROFILE CARD -->
+                <aside class="identity-column">
+                    <article class="identity-card">
+                        <div class="identity-card-top">
                             <span>Account Identity</span>
 
                             <span class="verified-badge">
@@ -79,62 +117,55 @@
                             </span>
                         </div>
 
-                        <!-- PROFILE PICTURE -->
-                        <div class="profile-avatar-wrap">
+                        <div class="avatar-section">
                             <div class="avatar-ring">
                                 <img
                                     :src="
                                         imagePreview ||
-                                        normalizeImage(
-                                            admin?.profile_picture
-                                        ) ||
+                                        normalizeImage(admin?.profile_picture) ||
                                         '/assets/logo.png'
                                     "
                                     alt="Admin profile"
                                     class="profile-avatar"
                                 />
 
-                                <span class="online-dot"></span>
+                                <span class="avatar-online"></span>
                             </div>
                         </div>
 
-                        <!-- NAME / EMAIL -->
-                        <div class="profile-identity">
-                            <h2>
-                                {{ admin?.name || 'Admin User' }}
-                            </h2>
+                        <div class="identity-copy">
+                            <h2>{{ admin?.name || 'Admin User' }}</h2>
 
                             <p>
-                                {{
-                                    admin?.email ||
-                                    'Email unavailable'
-                                }}
+                                {{ admin?.email || 'Email unavailable' }}
                             </p>
 
                             <span class="role-badge">
-                                Super Admin
+                                Super Administrator
                             </span>
                         </div>
 
-                        <div class="divider"></div>
+                        <div class="identity-divider"></div>
 
-                        <!-- PHOTO SECTION -->
-                        <div class="photo-section">
-                            <div class="photo-label">
-                                <strong>Profile Photo</strong>
-
-                                <small>
-                                    JPG, PNG or WEBP
-                                </small>
+                        <section class="photo-manager">
+                            <div class="photo-heading">
+                                <div>
+                                    <strong>Profile Photo</strong>
+                                    <span>JPG, PNG, or WEBP</span>
+                                </div>
                             </div>
 
                             <label
-                                class="ghost-button upload-button"
-                                :class="{
-                                    disabled: loading.picture
-                                }"
+                                :class="[
+                                    'photo-select-button',
+                                    { disabled: loading.picture },
+                                ]"
                             >
-                                Choose New Photo
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12 16V4M8 8l4-4 4 4M5 20h14" />
+                                </svg>
+
+                                <span>Choose New Photo</span>
 
                                 <input
                                     type="file"
@@ -148,16 +179,11 @@
 
                             <div
                                 v-if="pictureFile"
-                                class="selected-file"
+                                class="selected-photo-file"
                             >
                                 <div>
-                                    <small>
-                                        Selected file
-                                    </small>
-
-                                    <strong>
-                                        {{ pictureFile.name }}
-                                    </strong>
+                                    <span>Selected file</span>
+                                    <strong>{{ pictureFile.name }}</strong>
                                 </div>
 
                                 <button
@@ -175,7 +201,7 @@
                             >
                                 <button
                                     type="button"
-                                    class="ghost-button"
+                                    class="secondary-button"
                                     :disabled="loading.picture"
                                     @click="clearSelectedPicture"
                                 >
@@ -184,7 +210,7 @@
 
                                 <button
                                     type="button"
-                                    class="action-button primary"
+                                    class="primary-button"
                                     :disabled="loading.picture"
                                     @click="submitPicture"
                                 >
@@ -195,40 +221,36 @@
                                     }}
                                 </button>
                             </div>
-                        </div>
+                        </section>
 
                         <div class="account-note">
-                            <span>✓</span>
+                            <span class="note-icon">✓</span>
 
-                            <p>
-                                Authorized FindIt administrator account.
-                            </p>
+                            <div>
+                                <strong>Authorized account</strong>
+                                <p>
+                                    This profile has administrator access to
+                                    FindIt management tools.
+                                </p>
+                            </div>
                         </div>
-                    </div>
+                    </article>
                 </aside>
 
-                <!-- =================================================
-                     RIGHT SIDE
-                ================================================== -->
-                <div class="profile-details">
-
-                    <!-- =============================================
-                         PERSONAL INFORMATION
-                    ============================================== -->
-                    <div class="glass-card info-card">
-
-                        <div class="card-header">
+                <!-- RIGHT CONTENT -->
+                <div class="profile-content">
+                    <!-- PERSONAL INFORMATION -->
+                    <article class="content-card">
+                        <header class="card-header">
                             <div>
                                 <p class="card-kicker">
                                     Account Details
                                 </p>
 
-                                <h3>
-                                    Personal Information
-                                </h3>
+                                <h2>Personal Information</h2>
 
-                                <p class="card-description">
-                                    Review and update your administrator
+                                <p>
+                                    Review and update your administrator profile
                                     information.
                                 </p>
                             </div>
@@ -236,72 +258,56 @@
                             <button
                                 v-if="!isEditingProfile"
                                 type="button"
-                                class="edit-toggle-btn"
+                                class="secondary-button"
                                 @click="toggleEditProfile"
                             >
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4L16.5 3.5z" />
+                                </svg>
+
                                 Edit Details
                             </button>
-                        </div>
+                        </header>
 
-                        <!-- VIEW MODE -->
                         <div
                             v-if="!isEditingProfile"
-                            class="info-display"
+                            class="info-grid"
                         >
-                            <div class="info-group">
-                                <span class="info-label">
-                                    Full Name
-                                </span>
-
-                                <span class="info-value">
-                                    {{
-                                        admin?.name ||
-                                        'Not set'
-                                    }}
-                                </span>
+                            <div class="info-card">
+                                <span>Full Name</span>
+                                <strong>
+                                    {{ admin?.name || 'Not set' }}
+                                </strong>
                             </div>
 
-                            <div class="info-group">
-                                <span class="info-label">
-                                    Email Address
-                                </span>
+                            <div class="info-card">
+                                <span>Email Address</span>
 
-                                <div class="info-email-row">
-                                    <span class="info-value">
-                                        {{
-                                            admin?.email ||
-                                            'Not set'
-                                        }}
-                                    </span>
+                                <div class="info-value-row">
+                                    <strong>
+                                        {{ admin?.email || 'Not set' }}
+                                    </strong>
 
-                                    <span class="small-badge">
+                                    <span class="verified-small">
                                         Verified
                                     </span>
                                 </div>
                             </div>
 
-                            <div class="info-group">
-                                <span class="info-label">
-                                    Account Role
-                                </span>
-
-                                <span class="info-value">
-                                    Super Administrator
-                                </span>
+                            <div class="info-card full-width">
+                                <span>Account Role</span>
+                                <strong>Super Administrator</strong>
                             </div>
                         </div>
 
-                        <!-- EDIT MODE -->
                         <form
                             v-else
-                            class="info-edit-form"
+                            class="profile-form"
                             @submit.prevent="submitProfile"
                         >
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="admin-name">
-                                        Full Name
-                                    </label>
+                            <div class="form-grid">
+                                <label class="form-group">
+                                    <span>Full Name</span>
 
                                     <input
                                         id="admin-name"
@@ -313,12 +319,10 @@
                                         :disabled="loading.profile"
                                         required
                                     />
-                                </div>
+                                </label>
 
-                                <div class="form-group">
-                                    <label for="admin-email">
-                                        Email Address
-                                    </label>
+                                <label class="form-group">
+                                    <span>Email Address</span>
 
                                     <input
                                         id="admin-email"
@@ -329,16 +333,16 @@
                                         class="read-only-input"
                                     />
 
-                                    <small class="field-note">
+                                    <small>
                                         Email cannot be changed here.
                                     </small>
-                                </div>
+                                </label>
                             </div>
 
                             <div class="form-actions">
                                 <button
                                     type="button"
-                                    class="ghost-button"
+                                    class="secondary-button"
                                     :disabled="loading.profile"
                                     @click="toggleEditProfile"
                                 >
@@ -347,7 +351,7 @@
 
                                 <button
                                     type="submit"
-                                    class="action-button primary"
+                                    class="primary-button"
                                     :disabled="loading.profile"
                                 >
                                     {{
@@ -358,43 +362,36 @@
                                 </button>
                             </div>
                         </form>
-                    </div>
+                    </article>
 
-                    <!-- =============================================
-                         PASSWORD / SECURITY
-                    ============================================== -->
-                    <div class="glass-card password-card">
-
-                        <div class="card-header">
+                    <!-- SECURITY -->
+                    <article class="content-card">
+                        <header class="card-header">
                             <div>
                                 <p class="card-kicker">
                                     Account Security
                                 </p>
 
-                                <h3>
-                                    Security &amp; Password
-                                </h3>
+                                <h2>Security & Password</h2>
 
-                                <p class="card-description">
+                                <p>
                                     Change your password and keep your
-                                    administrator account secure.
+                                    administrator account protected.
                                 </p>
                             </div>
 
                             <span class="security-badge">
+                                <span></span>
                                 Protected
                             </span>
-                        </div>
+                        </header>
 
                         <form
                             class="password-form"
                             @submit.prevent="submitPassword"
                         >
-                            <!-- CURRENT PASSWORD -->
-                            <div class="form-group">
-                                <label for="current-password">
-                                    Current Password
-                                </label>
+                            <label class="form-group">
+                                <span>Current Password</span>
 
                                 <div class="password-input">
                                     <input
@@ -425,15 +422,11 @@
                                         }}
                                     </button>
                                 </div>
-                            </div>
+                            </label>
 
-                            <!-- NEW + CONFIRM PASSWORD -->
-                            <div class="form-row">
-
-                                <div class="form-group">
-                                    <label for="new-password">
-                                        New Password
-                                    </label>
+                            <div class="form-grid">
+                                <label class="form-group">
+                                    <span>New Password</span>
 
                                     <div class="password-input">
                                         <input
@@ -464,12 +457,10 @@
                                             }}
                                         </button>
                                     </div>
-                                </div>
+                                </label>
 
-                                <div class="form-group">
-                                    <label for="confirm-password">
-                                        Confirm Password
-                                    </label>
+                                <label class="form-group">
+                                    <span>Confirm Password</span>
 
                                     <div class="password-input">
                                         <input
@@ -502,27 +493,47 @@
                                             }}
                                         </button>
                                     </div>
-                                </div>
+                                </label>
                             </div>
 
-                            <!-- PASSWORD REQUIREMENTS -->
-                            <div class="password-requirements">
-                                <strong>
-                                    Password Requirements
-                                </strong>
+                            <section class="requirements-card">
+                                <div class="requirements-heading">
+                                    <div>
+                                        <strong>Password Requirements</strong>
+                                        <p>
+                                            Your new password must satisfy every
+                                            requirement below.
+                                        </p>
+                                    </div>
 
-                                <p>
-                                    Your new password must contain:
-                                </p>
+                                    <span
+                                        :class="[
+                                            'requirements-status',
+                                            {
+                                                passed:
+                                                    passwordRulesPassed &&
+                                                    passwordsMatch,
+                                            },
+                                        ]"
+                                    >
+                                        {{
+                                            passwordRulesPassed &&
+                                            passwordsMatch
+                                                ? 'Ready'
+                                                : 'Incomplete'
+                                        }}
+                                    </span>
+                                </div>
 
                                 <div class="requirements-grid">
-
                                     <div
-                                        class="requirement"
-                                        :class="{
-                                            passed:
-                                                passwordRules.length
-                                        }"
+                                        :class="[
+                                            'requirement',
+                                            {
+                                                passed:
+                                                    passwordRules.length,
+                                            },
+                                        ]"
                                     >
                                         <span>
                                             {{
@@ -536,11 +547,13 @@
                                     </div>
 
                                     <div
-                                        class="requirement"
-                                        :class="{
-                                            passed:
-                                                passwordRules.uppercase
-                                        }"
+                                        :class="[
+                                            'requirement',
+                                            {
+                                                passed:
+                                                    passwordRules.uppercase,
+                                            },
+                                        ]"
                                     >
                                         <span>
                                             {{
@@ -554,11 +567,13 @@
                                     </div>
 
                                     <div
-                                        class="requirement"
-                                        :class="{
-                                            passed:
-                                                passwordRules.number
-                                        }"
+                                        :class="[
+                                            'requirement',
+                                            {
+                                                passed:
+                                                    passwordRules.number,
+                                            },
+                                        ]"
                                     >
                                         <span>
                                             {{
@@ -572,11 +587,13 @@
                                     </div>
 
                                     <div
-                                        class="requirement"
-                                        :class="{
-                                            passed:
-                                                passwordRules.special
-                                        }"
+                                        :class="[
+                                            'requirement',
+                                            {
+                                                passed:
+                                                    passwordRules.special,
+                                            },
+                                        ]"
                                     >
                                         <span>
                                             {{
@@ -590,37 +607,35 @@
                                     </div>
 
                                     <div
-                                        class="requirement"
-                                        :class="{
-                                            passed:
-                                                passwordsMatch
-                                        }"
+                                        :class="[
+                                            'requirement',
+                                            {
+                                                passed: passwordsMatch,
+                                            },
+                                        ]"
                                     >
                                         <span>
-                                            {{
-                                                passwordsMatch
-                                                    ? '✓'
-                                                    : '•'
-                                            }}
+                                            {{ passwordsMatch ? '✓' : '•' }}
                                         </span>
 
                                         Passwords match
                                     </div>
-
                                 </div>
-                            </div>
+                            </section>
 
-                            <!-- PASSWORD BUTTON -->
                             <div class="password-actions">
+                                <div class="security-note">
+                                    <span>i</span>
 
-                                <p>
-                                    Never share your administrator password
-                                    with another user.
-                                </p>
+                                    <p>
+                                        Never share your administrator password
+                                        with another user.
+                                    </p>
+                                </div>
 
                                 <button
                                     type="submit"
-                                    class="action-button primary password-submit"
+                                    class="primary-button password-submit"
                                     :disabled="
                                         loading.password ||
                                         !passwordForm.old_password ||
@@ -636,7 +651,7 @@
                                 </button>
                             </div>
                         </form>
-                    </div>
+                    </article>
                 </div>
             </section>
         </main>
@@ -645,1037 +660,1646 @@
 
 <script setup>
 import {
+
     computed,
+
     onBeforeUnmount,
+
     onMounted,
+
     reactive,
+
     ref,
+
 } from 'vue';
+
+
 
 import api from '@/bootstrap';
 
+
+
 /* ==============================================================
+
    DATA
+
 ============================================================== */
+
+
 
 const admin = ref({});
 
+
+
 const updateProfileUrl = ref(
+
     '/api/admin/profile-info'
+
 );
+
+
 
 const changePasswordUrl = ref(
+
     '/api/admin/profile-change-pass'
+
 );
+
+
 
 const changePictureUrl = ref(
+
     '/api/admin/profile-picture'
+
 );
 
+
+
 const message = reactive({
+
     text: '',
+
     kind: 'success',
+
 });
+
+
 
 const profileForm = reactive({
+
     name: '',
+
     email: '',
+
 });
+
+
 
 const passwordForm = reactive({
+
     old_password: '',
+
     new_password: '',
+
     new_password_confirmation: '',
+
 });
 
+
+
 const loading = reactive({
+
     profile: false,
+
     password: false,
+
     picture: false,
+
 });
+
+
 
 const pictureFile = ref(null);
 
+
+
 const imagePreview = ref('');
+
+
 
 const isEditingProfile = ref(false);
 
+
+
 const showCurrentPassword = ref(false);
+
+
 
 const showNewPassword = ref(false);
 
+
+
 const showConfirmPassword = ref(false);
+
+
 
 let messageTimer = null;
 
+
+
 /* ==============================================================
+
    MESSAGE
+
 ============================================================== */
+
+
 
 function setMessage(
+
     text,
+
     kind = 'success'
+
 ) {
+
     if (messageTimer) {
+
         clearTimeout(messageTimer);
+
     }
+
+
 
     message.text = text;
+
     message.kind = kind;
 
+
+
     if (text) {
+
         messageTimer = setTimeout(() => {
+
             message.text = '';
+
         }, 5000);
+
     }
+
 }
 
+
+
 /* ==============================================================
+
    PROFILE EDITING
+
 ============================================================== */
+
+
 
 function toggleEditProfile() {
+
     if (isEditingProfile.value) {
+
         profileForm.name =
+
             admin.value?.name || '';
 
+
+
         profileForm.email =
+
             admin.value?.email || '';
+
     }
+
+
 
     isEditingProfile.value =
+
         !isEditingProfile.value;
+
 }
 
+
+
 /* ==============================================================
+
    IMAGE HELPERS
+
 ============================================================== */
+
+
 
 function normalizeImage(path) {
+
     if (!path) {
+
         return '';
+
     }
 
+
+
     if (
+
         path.startsWith('http') ||
+
         path.startsWith('/')
+
     ) {
+
         return path;
+
     }
+
+
 
     return `/${path}`;
+
 }
+
+
 
 function clearImagePreview() {
+
     if (
+
         imagePreview.value &&
+
         imagePreview.value.startsWith('blob:')
+
     ) {
+
         URL.revokeObjectURL(
+
             imagePreview.value
+
         );
+
     }
+
+
 
     imagePreview.value = '';
+
 }
+
+
 
 function clearSelectedPicture() {
+
     clearImagePreview();
+
+
 
     pictureFile.value = null;
+
 }
 
+
+
 /* ==============================================================
+
    LOAD PROFILE
+
 ============================================================== */
+
+
 
 async function loadProfile() {
+
     try {
+
         const response =
+
             await api.get(
+
                 '/api/admin/profile'
+
             );
+
+
 
         admin.value =
+
             response.data?.data?.admin ||
+
             {};
 
+
+
         profileForm.name =
+
             admin.value?.name ||
+
             '';
+
+
 
         profileForm.email =
+
             admin.value?.email ||
+
             '';
 
+
+
         if (admin.value?.role) {
+
             localStorage.setItem(
+
                 'admin_role',
+
                 admin.value.role
+
             );
+
         }
+
+
 
         if (
+
             admin.value?.facility_id !==
+
                 undefined &&
+
             admin.value?.facility_id !==
+
                 null
+
         ) {
+
             localStorage.setItem(
+
                 'admin_facility_id',
+
                 String(
+
                     admin.value.facility_id
+
                 )
+
             );
+
         } else {
+
             localStorage.removeItem(
+
                 'admin_facility_id'
+
             );
+
         }
 
+
+
         const formatUrl = (
+
             path,
+
             defaultPath
+
         ) => {
+
             const targetPath =
+
                 path || defaultPath;
 
+
+
             if (
+
                 targetPath.startsWith(
+
                     '/api'
+
                 )
+
             ) {
+
                 return targetPath;
+
             }
 
+
+
             return `/api${
+
                 targetPath.startsWith('/')
+
                     ? ''
+
                     : '/'
+
             }${targetPath}`;
+
         };
 
+
+
         updateProfileUrl.value =
+
             formatUrl(
+
                 response.data?.data
+
                     ?.update_profile_url,
+
                 '/admin/profile-info'
+
             );
+
+
 
         changePasswordUrl.value =
+
             formatUrl(
+
                 response.data?.data
+
                     ?.change_password_url,
+
                 '/admin/profile-change-pass'
+
             );
+
+
 
         changePictureUrl.value =
+
             formatUrl(
+
                 response.data?.data
+
                     ?.change_picture_url,
+
                 '/admin/profile-picture'
+
             );
+
     } catch (error) {
+
         console.error(
+
             'Profile load error:',
+
             error
+
         );
 
+
+
         setMessage(
+
             error.response?.data?.message ||
+
                 'Failed to load profile.',
+
             'error'
+
         );
+
     }
+
 }
 
+
+
 /* ==============================================================
+
    PROFILE PICTURE
+
 ============================================================== */
 
+
+
 function handlePictureChange(event) {
+
     const [file] =
+
         event.target.files ||
+
         [];
 
+
+
     if (!file) {
+
         return;
+
     }
+
+
 
     if (
+
         !file.type.startsWith(
+
             'image/'
+
         )
+
     ) {
+
         setMessage(
+
             'Please select a valid image.',
+
             'error'
+
         );
 
+
+
         return;
+
     }
+
+
 
     clearImagePreview();
 
+
+
     pictureFile.value =
+
         file;
 
+
+
     imagePreview.value =
+
         URL.createObjectURL(file);
+
 }
 
+
+
 async function submitPicture() {
+
     if (!pictureFile.value) {
+
         setMessage(
+
             'Choose an image first.',
+
             'error'
+
         );
 
+
+
         return;
+
     }
+
+
 
     loading.picture = true;
 
+
+
     setMessage('');
 
+
+
     const formData =
+
         new FormData();
 
+
+
     formData.append(
+
         'profile_picture',
+
         pictureFile.value
+
     );
 
+
+
     try {
+
         const response =
+
             await api.post(
+
                 changePictureUrl.value,
+
                 formData
+
             );
 
+
+
         const returnedData =
+
             response.data?.data;
 
+
+
         admin.value =
+
             returnedData?.admin ||
+
             returnedData ||
+
             admin.value;
+
+
 
         clearSelectedPicture();
 
-        setMessage(
-            response.data?.message ||
-                'Profile picture updated successfully.'
-        );
-    } catch (error) {
-        console.error(
-            'Profile picture error:',
-            error
-        );
+
 
         setMessage(
-            error.response?.data?.message ||
-                'Profile picture update failed.',
-            'error'
+
+            response.data?.message ||
+
+                'Profile picture updated successfully.'
+
         );
+
+    } catch (error) {
+
+        console.error(
+
+            'Profile picture error:',
+
+            error
+
+        );
+
+
+
+        setMessage(
+
+            error.response?.data?.message ||
+
+                'Profile picture update failed.',
+
+            'error'
+
+        );
+
     } finally {
+
         loading.picture = false;
+
     }
+
 }
 
+
+
 /* ==============================================================
+
    UPDATE PROFILE
+
 ============================================================== */
 
+
+
 async function submitProfile() {
+
     const name =
+
         profileForm.name.trim();
 
+
+
     if (!name) {
+
         setMessage(
+
             'Please enter your full name.',
+
             'error'
+
         );
 
+
+
         return;
+
     }
+
+
 
     loading.profile = true;
 
+
+
     setMessage('');
 
+
+
     try {
+
         const response =
+
             await api.put(
+
                 updateProfileUrl.value,
+
                 {
+
                     name,
+
                     email:
+
                         profileForm.email,
+
                 }
+
             );
 
+
+
         const returnedData =
+
             response.data?.data;
 
+
+
         admin.value =
+
             returnedData?.admin ||
+
             returnedData ||
+
             admin.value;
 
+
+
         profileForm.name =
+
             admin.value?.name ||
+
             name;
 
+
+
         profileForm.email =
+
             admin.value?.email ||
+
             profileForm.email;
 
+
+
         isEditingProfile.value =
+
             false;
 
-        setMessage(
-            response.data?.message ||
-                'Profile updated successfully.'
-        );
-    } catch (error) {
-        console.error(
-            'Profile update error:',
-            error
-        );
+
 
         setMessage(
-            error.response?.data?.message ||
-                'Profile update failed.',
-            'error'
+
+            response.data?.message ||
+
+                'Profile updated successfully.'
+
         );
+
+    } catch (error) {
+
+        console.error(
+
+            'Profile update error:',
+
+            error
+
+        );
+
+
+
+        setMessage(
+
+            error.response?.data?.message ||
+
+                'Profile update failed.',
+
+            'error'
+
+        );
+
     } finally {
+
         loading.profile = false;
+
     }
+
 }
 
+
+
 /* ==============================================================
+
    PASSWORD VALIDATION
+
 ============================================================== */
+
+
 
 const passwordRules = computed(() => {
+
     const value =
+
         passwordForm.new_password ||
+
         '';
 
+
+
     return {
+
         length:
+
             value.length >= 6,
 
+
+
         uppercase:
+
             /[A-Z]/.test(value),
 
+
+
         number:
+
             /\d/.test(value),
 
+
+
         special:
+
             /[!_.-]/.test(value),
+
     };
+
 });
 
+
+
 const passwordRulesPassed =
+
     computed(() =>
+
         Object.values(
+
             passwordRules.value
+
         ).every(Boolean)
+
     );
+
+
 
 const passwordsMatch =
+
     computed(() => {
+
         if (
+
             !passwordForm.new_password ||
+
             !passwordForm
+
                 .new_password_confirmation
+
         ) {
+
             return false;
+
         }
 
+
+
         return (
+
             passwordForm.new_password ===
+
             passwordForm
+
                 .new_password_confirmation
+
         );
+
     });
 
+
+
 function validatePasswordStrength(
+
     value
+
 ) {
+
     return /^(?=.*[A-Z])(?=.*\d)(?=.*[!_.-]).{6,}$/.test(
+
         value
+
     );
+
 }
 
+
+
 /* ==============================================================
+
    CHANGE PASSWORD
+
 ============================================================== */
 
+
+
 async function submitPassword() {
+
     if (
+
         !passwordForm.old_password
+
     ) {
+
         setMessage(
+
             'Enter your current password.',
+
             'error'
+
         );
 
+
+
         return;
+
     }
+
+
 
     if (
+
         !validatePasswordStrength(
+
             passwordForm.new_password
+
         )
+
     ) {
+
         setMessage(
+
             'Password must have at least 6 characters, one uppercase letter, one number, and one of !, _, -, or .',
+
             'error'
+
         );
 
+
+
         return;
+
     }
+
+
 
     if (!passwordsMatch.value) {
+
         setMessage(
+
             'Password confirmation does not match.',
+
             'error'
+
         );
 
+
+
         return;
+
     }
+
+
 
     loading.password = true;
 
+
+
     setMessage('');
 
+
+
     try {
+
         const response =
+
             await api.put(
+
                 changePasswordUrl.value,
+
                 passwordForm
+
             );
 
+
+
         passwordForm.old_password =
+
             '';
+
+
 
         passwordForm.new_password =
+
             '';
+
+
 
         passwordForm
+
             .new_password_confirmation =
+
             '';
 
+
+
         showCurrentPassword.value =
+
             false;
+
+
 
         showNewPassword.value =
+
             false;
+
+
 
         showConfirmPassword.value =
+
             false;
 
-        setMessage(
-            response.data?.message ||
-                'Password changed successfully.'
-        );
-    } catch (error) {
-        console.error(
-            'Password update error:',
-            error
-        );
+
 
         setMessage(
-            error.response?.data?.message ||
-                'Password update failed.',
-            'error'
+
+            response.data?.message ||
+
+                'Password changed successfully.'
+
         );
+
+    } catch (error) {
+
+        console.error(
+
+            'Password update error:',
+
+            error
+
+        );
+
+
+
+        setMessage(
+
+            error.response?.data?.message ||
+
+                'Password update failed.',
+
+            'error'
+
+        );
+
     } finally {
+
         loading.password = false;
+
     }
+
 }
 
+
+
 /* ==============================================================
+
    LIFECYCLE
+
 ============================================================== */
+
+
 
 onMounted(loadProfile);
 
+
+
 onBeforeUnmount(() => {
+
     if (messageTimer) {
+
         clearTimeout(messageTimer);
+
     }
 
+
+
     clearImagePreview();
+
 });
 </script>
 
 <style scoped>
-/* ==============================================================
-   GLOBAL PROFILE PAGE
-============================================================== */
+/* =========================================================
+   FOUNDATION
+========================================================= */
 
-* {
-    box-sizing: border-box;
-}
+.profile-page {
+    --bg: #071f16;
+    --bg-soft: #09271b;
+    --panel: #0d3827;
+    --panel-soft: #123f2e;
+    --panel-raised: #174b35;
 
-.admin-profile-page {
+    --green: #67aa7e;
+    --green-soft: #9ed1ad;
+    --green-bright: #b8e1c3;
+
+    --gold: #e1c875;
+    --gold-soft: #f0dda0;
+
+    --text: #f4f8f5;
+    --text-soft: #d7e5da;
+    --muted: #a7bcac;
+
+    --border: rgba(158, 209, 173, 0.15);
+    --border-strong: rgba(158, 209, 173, 0.26);
+
     min-height: 100%;
-    position: relative;
     overflow-x: hidden;
+
+    color: var(--text);
 
     background:
         radial-gradient(
-            circle at top left,
-            rgba(42, 154, 111, 0.25),
-            transparent 28%
+            circle at 7% 0%,
+            rgba(47, 125, 89, 0.22),
+            transparent 34%
         ),
         radial-gradient(
-            circle at bottom right,
-            rgba(217, 180, 91, 0.1),
-            transparent 25%
+            circle at 96% 10%,
+            rgba(225, 200, 117, 0.06),
+            transparent 22%
         ),
-        #092d22;
-
-    color: #f8f4ea;
+        linear-gradient(
+            150deg,
+            var(--bg-soft),
+            var(--bg)
+        );
 
     font-family:
         Inter,
+        ui-sans-serif,
         system-ui,
         -apple-system,
         BlinkMacSystemFont,
         "Segoe UI",
         sans-serif;
+
+    font-size: 16px;
 }
 
-.profile-shell {
-    width: min(100%, 1200px);
+.profile-page *,
+.profile-page *::before,
+.profile-page *::after {
+    box-sizing: border-box;
+}
 
+.profile-container {
+    width: min(100%, 1280px);
     margin: 0 auto;
-
-    padding:
-        30px 28px
-        40px;
+    padding: 28px 28px 40px;
 }
 
-/* ==============================================================
-   HEADER
-============================================================== */
 
-.profile-hero {
+/* =========================================================
+   HERO
+========================================================= */
+
+.profile-hero-card {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
 
-    justify-content:
-        space-between;
+    gap: 28px;
 
-    align-items:
-        center;
+    min-height: 195px;
 
-    gap: 30px;
+    margin-bottom: 18px;
+    padding: 30px 32px;
 
-    margin-bottom: 24px;
+    border: 1px solid rgba(158, 209, 173, 0.17);
+    border-radius: 22px;
+
+    background:
+        radial-gradient(
+            circle at 92% 20%,
+            rgba(225, 200, 117, 0.08),
+            transparent 25%
+        ),
+        linear-gradient(
+            135deg,
+            #174b35 0%,
+            #0d3827 58%,
+            #0a2c1f 100%
+        );
+
+    box-shadow:
+        0 22px 52px rgba(0, 0, 0, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
-.profile-kicker {
-    margin:
-        0 0 7px;
+.hero-copy {
+    min-width: 0;
+}
 
-    color: #e8cc84;
+.hero-kicker {
+    display: flex;
+    align-items: center;
+    gap: 9px;
 
-    font-size: 12px;
+    margin-bottom: 10px;
 
-    font-weight: 800;
+    color: var(--gold);
 
+    font-size: 0.78rem;
+    font-weight: 820;
     letter-spacing: 0.13em;
-
     text-transform: uppercase;
 }
 
-.profile-hero h1 {
-    margin:
-        0 0 8px;
+.hero-kicker-icon {
+    display: grid;
+    place-items: center;
 
-    color: #ffffff;
+    width: 31px;
+    height: 31px;
 
-    font-size:
-        clamp(
-            30px,
-            3vw,
-            40px
-        );
+    border: 1px solid rgba(225, 200, 117, 0.24);
+    border-radius: 9px;
 
-    line-height: 1.1;
-
-    font-weight: 800;
+    background: rgba(225, 200, 117, 0.08);
 }
 
-.profile-intro {
-    max-width: 650px;
+.hero-kicker-icon svg {
+    width: 17px;
+    height: 17px;
 
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.profile-hero-card h1 {
     margin: 0;
 
-    color:
-        rgba(
-            248,
-            244,
-            234,
-            0.8
-        );
+    color: #f8fbf9;
 
-    font-size: 15px;
-
-    line-height: 1.6;
+    font-size: clamp(2.15rem, 3vw, 3rem);
+    font-weight: 830;
+    line-height: 1.06;
+    letter-spacing: -0.04em;
 }
 
-/* ==============================================================
-   ACCOUNT STATUS
-============================================================== */
+.profile-hero-card .hero-copy > p {
+    max-width: 760px;
 
-.account-status {
-    min-width: 240px;
+    margin: 13px 0 0;
 
+    color: var(--text-soft);
+
+    font-size: 1rem;
+    line-height: 1.7;
+}
+
+.hero-chips {
     display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 
+    margin-top: 18px;
+}
+
+.hero-chip {
+    display: inline-flex;
     align-items: center;
+    gap: 7px;
 
-    gap: 11px;
+    min-height: 30px;
 
-    padding:
-        13px 15px;
+    padding: 6px 10px;
 
-    border:
-        1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.1
-        );
+    border: 1px solid rgba(158, 209, 173, 0.16);
+    border-radius: 999px;
 
-    border-radius: 13px;
+    background: rgba(255, 255, 255, 0.035);
 
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            0.06
-        );
+    color: #cfe0d3;
+
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.hero-chip.gold {
+    border-color: rgba(225, 200, 117, 0.18);
+
+    background: rgba(225, 200, 117, 0.055);
+
+    color: var(--gold-soft);
 }
 
 .status-dot {
-    width: 10px;
-    height: 10px;
+    width: 7px;
+    height: 7px;
 
-    border-radius: 50%;
+    border-radius: 999px;
 
-    background: #72d49a;
+    background: #7fd397;
 
     box-shadow:
         0 0 0 4px
-        rgba(
-            114,
-            212,
-            154,
-            0.12
-        );
+        rgba(127, 211, 151, 0.1);
 }
 
-.account-status small {
+.hero-account-card {
+    flex: 0 0 auto;
+
+    min-width: 310px;
+
+    padding: 16px;
+
+    border: 1px solid rgba(158, 209, 173, 0.15);
+    border-radius: 15px;
+
+    background: rgba(7, 31, 22, 0.38);
+}
+
+.hero-account-label {
     display: block;
 
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.55
-        );
+    margin-bottom: 10px;
 
-    font-size: 10px;
+    color: #93aa9a;
 
-    text-transform: uppercase;
-
+    font-size: 0.68rem;
+    font-weight: 760;
     letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
-.account-status strong {
-    display: block;
-
-    margin-top: 2px;
-
-    color: #ffffff;
-
-    font-size: 13px;
+.hero-account-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
 }
 
-/* ==============================================================
+.hero-avatar {
+    position: relative;
+
+    flex: 0 0 auto;
+
+    width: 48px;
+    height: 48px;
+}
+
+.hero-avatar img {
+    width: 48px;
+    height: 48px;
+
+    border: 1px solid rgba(225, 200, 117, 0.25);
+    border-radius: 13px;
+
+    object-fit: cover;
+
+    background: #174b35;
+}
+
+.hero-online-dot {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+
+    width: 13px;
+    height: 13px;
+
+    border: 3px solid #0c3425;
+    border-radius: 50%;
+
+    background: #7fd397;
+}
+
+.hero-account-row > div:last-child {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+}
+
+.hero-account-row strong {
+    overflow: hidden;
+
+    color: #f3f8f4;
+
+    font-size: 0.9rem;
+    font-weight: 760;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hero-account-row span {
+    overflow: hidden;
+
+    max-width: 210px;
+
+    color: #9eb3a4;
+
+    font-size: 0.76rem;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* =========================================================
    MESSAGE
-============================================================== */
+========================================================= */
 
-.profile-message {
+.profile-alert {
     position: relative;
 
     display: flex;
+    align-items: flex-start;
+    gap: 11px;
 
-    align-items: center;
-
-    gap: 10px;
-
-    margin-bottom: 20px;
-
-    padding:
-        13px 45px
-        13px 14px;
+    margin-bottom: 18px;
+    padding: 13px 46px 13px 14px;
 
     border-radius: 12px;
-
-    border: 1px solid;
-
-    font-size: 13px;
 }
 
-.profile-message.is-success {
-    background:
-        rgba(
-            34,
-            139,
-            64,
-            0.18
-        );
+.profile-alert-success {
+    border: 1px solid rgba(158, 209, 173, 0.2);
 
-    border-color:
-        rgba(
-            144,
-            221,
-            162,
-            0.18
-        );
+    background: rgba(72, 137, 91, 0.13);
 
-    color: #e3f9e8;
+    color: #d8ecdc;
 }
 
-.profile-message.is-error {
-    background:
-        rgba(
-            165,
-            43,
-            43,
-            0.18
-        );
+.profile-alert-error {
+    border: 1px solid rgba(255, 180, 180, 0.2);
 
-    border-color:
-        rgba(
-            255,
-            182,
-            182,
-            0.17
-        );
+    background: rgba(160, 55, 55, 0.13);
 
-    color: #ffe9e9;
+    color: #f2c3c3;
 }
 
-.message-icon {
-    width: 24px;
-    height: 24px;
-
+.alert-icon {
     display: grid;
-
     place-items: center;
 
-    flex: 0 0 24px;
+    flex: 0 0 auto;
 
-    border-radius: 50%;
+    width: 26px;
+    height: 26px;
 
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            0.09
-        );
+    border-radius: 8px;
+
+    background: rgba(255, 255, 255, 0.05);
 
     font-weight: 900;
 }
 
-.message-close {
-    position: absolute;
+.alert-copy {
+    display: grid;
+    gap: 2px;
+}
 
-    top: 6px;
+.alert-copy strong {
+    color: #f4f8f5;
+
+    font-size: 0.88rem;
+}
+
+.alert-copy span {
+    font-size: 0.81rem;
+    line-height: 1.45;
+}
+
+.alert-close {
+    position: absolute;
+    top: 8px;
     right: 12px;
 
     border: 0;
 
-    background: none;
+    background: transparent;
 
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.7
-        );
+    color: #bdcec1;
 
-    font-size: 22px;
+    font-size: 1.2rem;
 
     cursor: pointer;
 }
 
-/* ==============================================================
+
+/* =========================================================
    MAIN LAYOUT
-============================================================== */
+========================================================= */
 
 .profile-layout {
     display: grid;
 
     grid-template-columns:
-        minmax(
-            280px,
-            310px
-        )
-        minmax(
-            0,
-            1fr
-        );
+        minmax(300px, 340px)
+        minmax(0, 1fr);
 
-    gap: 20px;
+    gap: 18px;
 
     align-items: start;
 }
 
-.profile-details {
+.identity-column {
     min-width: 0;
-
-    display: grid;
-
-    grid-template-columns: 1fr;
-
-    gap: 20px;
 }
 
-/* ==============================================================
-   GLASS CARD
-============================================================== */
-
-.glass-card {
-    padding: 22px;
-
-    border:
-        1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.1
-        );
-
+.identity-card,
+.content-card {
+    border: 1px solid var(--border);
     border-radius: 18px;
 
     background:
         linear-gradient(
             145deg,
-            rgba(
-                13,
-                103,
-                76,
-                0.72
-            ),
-            rgba(
-                7,
-                73,
-                55,
-                0.78
-            )
+            rgba(18, 63, 46, 0.98),
+            rgba(13, 56, 39, 0.98)
         );
 
     box-shadow:
-        0 14px 35px
-        rgba(
-            0,
-            0,
-            0,
-            0.18
-        );
-
-    backdrop-filter: blur(14px);
+        0 18px 42px
+        rgba(0, 0, 0, 0.18);
 }
 
-/* ==============================================================
-   PROFILE CARD
-============================================================== */
-
-.profile-card {
+.identity-card {
     position: sticky;
-
     top: 20px;
+
+    padding: 20px;
 }
 
-.profile-card-header {
+.profile-content {
+    display: grid;
+    gap: 18px;
+
+    min-width: 0;
+}
+
+
+/* =========================================================
+   IDENTITY CARD
+========================================================= */
+
+.identity-card-top {
     display: flex;
-
-    justify-content:
-        space-between;
-
     align-items: center;
-
+    justify-content: space-between;
     gap: 10px;
 
-    margin-bottom: 20px;
+    margin-bottom: 18px;
 }
 
-.profile-card-header
-> span:first-child {
-    color: #b8d4c6;
+.identity-card-top > span:first-child {
+    color: #b3c8b8;
 
-    font-size: 11px;
-
+    font-size: 0.72rem;
     font-weight: 800;
-
-    letter-spacing: 0.1em;
-
+    letter-spacing: 0.09em;
     text-transform: uppercase;
 }
 
 .verified-badge,
-.small-badge,
+.verified-small,
 .security-badge {
-    padding:
-        5px 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 
+    min-height: 27px;
+
+    padding: 5px 8px;
+
+    border: 1px solid rgba(158, 209, 173, 0.18);
     border-radius: 999px;
 
-    background:
-        rgba(
-            114,
-            212,
-            154,
-            0.1
-        );
+    background: rgba(103, 170, 126, 0.08);
 
-    color: #b3efc6;
+    color: #c6e5ce;
 
-    font-size: 9px;
-
+    font-size: 0.7rem;
     font-weight: 800;
-
-    text-transform: uppercase;
 }
 
-/* ==============================================================
-   AVATAR
-============================================================== */
-
-.profile-avatar-wrap {
+.avatar-section {
     display: flex;
-
     justify-content: center;
 
-    margin:
-        5px 0
-        17px;
+    margin: 3px 0 16px;
 }
 
 .avatar-ring {
@@ -1684,251 +2308,223 @@ onBeforeUnmount(() => {
     width: 150px;
     height: 150px;
 
-    padding: 5px;
+    padding: 4px;
 
     border-radius: 50%;
 
     background:
         linear-gradient(
             135deg,
-            #d9b45b,
-            #55b890
+            var(--gold),
+            #67aa7e
         );
+
+    box-shadow:
+        0 14px 34px
+        rgba(0, 0, 0, 0.23);
 }
 
 .profile-avatar {
     width: 100%;
     height: 100%;
 
-    border:
-        4px solid
-        #0c5b44;
-
+    border: 4px solid #0d3827;
     border-radius: 50%;
 
     object-fit: cover;
 
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            0.07
-        );
+    background: #174b35;
 }
 
-.online-dot {
+.avatar-online {
     position: absolute;
-
-    right: 7px;
-    bottom: 13px;
+    right: 8px;
+    bottom: 11px;
 
     width: 18px;
     height: 18px;
 
-    border:
-        4px solid
-        #0c5b44;
-
+    border: 4px solid #0d3827;
     border-radius: 50%;
 
-    background: #72d49a;
+    background: #7fd397;
 }
 
-/* ==============================================================
-   IDENTITY
-============================================================== */
-
-.profile-identity {
+.identity-copy {
     text-align: center;
 }
 
-.profile-identity h2 {
-    margin:
-        0 0 4px;
+.identity-copy h2 {
+    margin: 0 0 4px;
 
-    color: #ffffff;
+    color: #f7fbf8;
 
-    font-size: 21px;
-
-    font-weight: 800;
+    font-size: 1.28rem;
+    font-weight: 810;
 }
 
-.profile-identity p {
-    margin:
-        0 0 10px;
+.identity-copy p {
+    margin: 0 0 10px;
 
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.67
-        );
+    color: #a7bcac;
 
-    font-size: 12.5px;
+    font-size: 0.82rem;
 
     overflow-wrap: anywhere;
 }
 
 .role-badge {
-    display: inline-block;
+    display: inline-flex;
 
-    padding:
-        6px 11px;
+    padding: 6px 10px;
 
-    border:
-        1px solid
-        rgba(
-            246,
-            214,
-            109,
-            0.2
-        );
-
+    border: 1px solid rgba(225, 200, 117, 0.18);
     border-radius: 999px;
 
-    background:
-        rgba(
-            217,
-            180,
-            91,
-            0.1
-        );
+    background: rgba(225, 200, 117, 0.06);
 
-    color: #efd276;
+    color: var(--gold-soft);
 
-    font-size: 11px;
-
+    font-size: 0.72rem;
     font-weight: 800;
 }
 
-.divider {
+.identity-divider {
     height: 1px;
 
-    margin:
-        20px 0;
+    margin: 18px 0;
 
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            0.09
-        );
+    background: rgba(158, 209, 173, 0.1);
 }
 
-/* ==============================================================
+
+/* =========================================================
    PHOTO
-============================================================== */
+========================================================= */
 
-.photo-label {
-    display: flex;
-
-    justify-content:
-        space-between;
-
-    align-items: center;
-
-    margin-bottom: 10px;
+.photo-heading {
+    margin-bottom: 9px;
 }
 
-.photo-label strong {
-    color: #ffffff;
-
-    font-size: 13px;
-}
-
-.photo-label small {
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.5
-        );
-
-    font-size: 9px;
-}
-
-.upload-button {
-    width: 100%;
-}
-
-.selected-file {
-    display: flex;
-
-    align-items: center;
-
-    justify-content:
-        space-between;
-
-    gap: 10px;
-
-    margin-top: 10px;
-
-    padding:
-        10px;
-
-    border-radius: 9px;
-
-    background:
-        rgba(
-            0,
-            0,
-            0,
-            0.14
-        );
-}
-
-.selected-file small {
+.photo-heading strong {
     display: block;
 
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.48
-        );
+    color: #edf5ef;
 
-    font-size: 9px;
-
-    text-transform: uppercase;
+    font-size: 0.86rem;
 }
 
-.selected-file strong {
+.photo-heading span {
     display: block;
-
-    max-width: 180px;
 
     margin-top: 2px;
 
+    color: #829889;
+
+    font-size: 0.72rem;
+}
+
+.photo-select-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    width: 100%;
+    min-height: 41px;
+
+    padding: 0.65rem 0.8rem;
+
+    border: 1px solid rgba(158, 209, 173, 0.2);
+    border-radius: 10px;
+
+    background: rgba(103, 170, 126, 0.07);
+
+    color: #d8e8dc;
+
+    font-size: 0.8rem;
+    font-weight: 760;
+
+    cursor: pointer;
+}
+
+.photo-select-button:hover {
+    border-color: rgba(158, 209, 173, 0.34);
+
+    background: rgba(103, 170, 126, 0.12);
+}
+
+.photo-select-button.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.photo-select-button svg {
+    width: 17px;
+    height: 17px;
+
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.selected-photo-file {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+
+    margin-top: 10px;
+    padding: 10px;
+
+    border: 1px solid rgba(158, 209, 173, 0.08);
+    border-radius: 9px;
+
+    background: rgba(7, 31, 22, 0.28);
+}
+
+.selected-photo-file > div {
+    min-width: 0;
+}
+
+.selected-photo-file span {
+    display: block;
+
+    color: #809687;
+
+    font-size: 0.66rem;
+    font-weight: 760;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.selected-photo-file strong {
+    display: block;
+
     overflow: hidden;
 
-    color: #ffffff;
+    max-width: 210px;
 
-    font-size: 11px;
+    margin-top: 2px;
+
+    color: #e8f1ea;
+
+    font-size: 0.77rem;
 
     text-overflow: ellipsis;
-
     white-space: nowrap;
 }
 
-.selected-file button {
+.selected-photo-file button {
     border: 0;
 
-    background: none;
+    background: transparent;
 
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.7
-        );
+    color: #b8c9bc;
 
-    font-size: 18px;
+    font-size: 1.1rem;
 
     cursor: pointer;
 }
@@ -1941,721 +2537,559 @@ onBeforeUnmount(() => {
 
     gap: 8px;
 
-    margin-top: 10px;
+    margin-top: 9px;
 }
-
-/* ==============================================================
-   ACCOUNT NOTE
-============================================================== */
 
 .account-note {
     display: flex;
-
-    align-items:
-        flex-start;
-
+    align-items: flex-start;
     gap: 9px;
 
-    margin-top: 18px;
-
+    margin-top: 17px;
     padding: 11px;
 
+    border: 1px solid rgba(158, 209, 173, 0.08);
     border-radius: 10px;
 
-    background:
-        rgba(
-            114,
-            212,
-            154,
-            0.07
-        );
+    background: rgba(103, 170, 126, 0.055);
 }
 
-.account-note > span {
-    width: 22px;
-    height: 22px;
-
+.note-icon {
     display: grid;
-
     place-items: center;
 
-    flex: 0 0 22px;
+    flex: 0 0 auto;
+
+    width: 24px;
+    height: 24px;
 
     border-radius: 50%;
 
-    background:
-        rgba(
-            114,
-            212,
-            154,
-            0.12
-        );
+    background: rgba(103, 170, 126, 0.11);
 
-    color: #b3efc6;
+    color: #c6e5ce;
 
-    font-size: 10px;
-
+    font-size: 0.72rem;
     font-weight: 900;
 }
 
-.account-note p {
-    margin: 0;
+.account-note strong {
+    display: block;
 
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.62
-        );
+    color: #dce9df;
 
-    font-size: 10.5px;
-
-    line-height: 1.5;
+    font-size: 0.76rem;
 }
 
-/* ==============================================================
-   CARD HEADER
-============================================================== */
+.account-note p {
+    margin: 2px 0 0;
+
+    color: #8fa495;
+
+    font-size: 0.74rem;
+    line-height: 1.45;
+}
+
+
+/* =========================================================
+   CONTENT CARDS
+========================================================= */
+
+.content-card {
+    padding: 21px;
+}
 
 .card-header {
     display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
 
-    justify-content:
-        space-between;
+    margin-bottom: 18px;
+    padding-bottom: 16px;
 
-    align-items:
-        flex-start;
-
-    gap: 20px;
-
-    margin-bottom: 20px;
-
-    padding-bottom: 17px;
-
-    border-bottom:
-        1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.09
-        );
+    border-bottom: 1px solid rgba(158, 209, 173, 0.1);
 }
 
 .card-kicker {
-    margin:
-        0 0 4px;
+    margin: 0 0 4px;
 
-    color: #e8cc84;
+    color: var(--gold);
 
-    font-size: 10px;
-
-    font-weight: 800;
-
+    font-size: 0.72rem;
+    font-weight: 810;
     letter-spacing: 0.1em;
-
     text-transform: uppercase;
 }
 
-.card-header h3 {
-    margin:
-        0 0 4px;
-
-    color: #ffffff;
-
-    font-size: 18px;
-
-    line-height: 1.3;
-}
-
-.card-description {
+.card-header h2 {
     margin: 0;
 
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.58
-        );
+    color: #f4faf5;
 
-    font-size: 12.5px;
+    font-size: 1.24rem;
+    font-weight: 810;
+    letter-spacing: -0.015em;
+}
 
+.card-header p:not(.card-kicker) {
+    max-width: 610px;
+
+    margin: 5px 0 0;
+
+    color: #9fb4a5;
+
+    font-size: 0.82rem;
     line-height: 1.5;
 }
 
-/* ==============================================================
-   PERSONAL INFORMATION
-============================================================== */
+.security-badge > span {
+    width: 7px;
+    height: 7px;
 
-.info-display {
+    border-radius: 999px;
+
+    background: #7fd397;
+}
+
+
+/* =========================================================
+   INFO
+========================================================= */
+
+.info-grid {
     display: grid;
 
     grid-template-columns:
-        repeat(
-            2,
-            minmax(
-                0,
-                1fr
-            )
-        );
+        repeat(2, minmax(0, 1fr));
+
+    gap: 10px;
+}
+
+.info-card {
+    min-width: 0;
+
+    padding: 13px 14px;
+
+    border: 1px solid rgba(158, 209, 173, 0.09);
+    border-radius: 11px;
+
+    background: rgba(7, 31, 22, 0.24);
+}
+
+.info-card.full-width {
+    grid-column: span 2;
+}
+
+.info-card > span {
+    display: block;
+
+    margin-bottom: 6px;
+
+    color: #819789;
+
+    font-size: 0.68rem;
+    font-weight: 760;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.info-card strong {
+    overflow-wrap: anywhere;
+
+    color: #dce9df;
+
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.info-value-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+
+/* =========================================================
+   FORMS
+========================================================= */
+
+.profile-form,
+.password-form {
+    display: grid;
+    gap: 15px;
+}
+
+.form-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
 
     gap: 12px;
 }
 
-.info-group {
-    min-width: 0;
-
-    padding: 15px;
-
-    border:
-        1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.08
-        );
-
-    border-radius: 11px;
-
-    background:
-        rgba(
-            0,
-            0,
-            0,
-            0.1
-        );
-}
-
-.info-group:last-child {
-    grid-column:
-        span 2;
-}
-
-.info-label {
-    display: block;
-
-    margin-bottom: 7px;
-
-    color:
-        rgba(
-            248,
-            244,
-            234,
-            0.58
-        );
-
-    font-size: 12px;
-
-    font-weight: 800;
-
-    text-transform: uppercase;
-
-    letter-spacing: 0.06em;
-}
-
-.info-value {
-    color: #ffffff;
-
-    font-size: 15px;
-
-    font-weight: 600;
-
-    line-height: 1.45;
-}
-
-.info-email-row {
-    display: flex;
-
-    align-items: center;
-
-    gap: 10px;
-
-    justify-content:
-        space-between;
-}
-
-/* ==============================================================
-   FORMS
-============================================================== */
-
-.info-edit-form,
-.password-form {
-    display: grid;
-
-    gap: 16px;
-}
-
-.form-row {
-    display: grid;
-
-    grid-template-columns:
-        repeat(
-            2,
-            minmax(
-                0,
-                1fr
-            )
-        );
-
-    gap: 14px;
-}
-
 .form-group {
-    display: flex;
-
-    flex-direction: column;
-
+    display: grid;
     gap: 7px;
 }
 
-.form-group label {
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.9
-        );
+.form-group > span {
+    color: #d8e5db;
 
-    font-size: 14px;
-
-    font-weight: 700;
+    font-size: 0.84rem;
+    font-weight: 720;
 }
 
 .form-group input {
     width: 100%;
+    min-height: 45px;
 
-    min-height: 49px;
+    padding: 0.75rem 0.82rem;
 
-    padding:
-        12px 13px;
-
-    border:
-        1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.14
-        );
-
+    border: 1px solid var(--border-strong);
     border-radius: 10px;
 
     outline: none;
 
-    background:
-        rgba(
-            0,
-            0,
-            0,
-            0.17
-        );
+    background: rgba(7, 31, 22, 0.75);
 
-    color: #ffffff;
+    color: #f1f8f3;
 
     font-family: inherit;
-
-    font-size: 14px;
+    font-size: 0.88rem;
+    font-weight: 520;
 }
 
 .form-group input::placeholder {
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.34
-        );
+    color: #8fa596;
+    opacity: 1;
 }
 
 .form-group input:focus {
-    border-color: #d9b45b;
-
-    background:
-        rgba(
-            0,
-            0,
-            0,
-            0.25
-        );
+    border-color: rgba(225, 200, 117, 0.48);
 
     box-shadow:
-        0 0 0 3px
-        rgba(
-            217,
-            180,
-            91,
-            0.1
-        );
+        0 0 0 4px
+        rgba(225, 200, 117, 0.09);
 }
 
 .read-only-input {
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.55
-        )
-        !important;
+    color: #95aa9b !important;
 
     background:
-        rgba(
-            255,
-            255,
-            255,
-            0.04
-        )
+        rgba(255, 255, 255, 0.025)
         !important;
 
     cursor: not-allowed;
 }
 
-.field-note {
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.48
-        );
+.form-group small {
+    color: #819789;
 
-    font-size: 10.5px;
+    font-size: 0.72rem;
 }
-
-/* ==============================================================
-   PASSWORD INPUT
-============================================================== */
 
 .password-input {
     position: relative;
 }
 
 .password-input input {
-    padding-right: 65px;
+    padding-right: 62px;
 }
 
 .password-input button {
     position: absolute;
-
-    right: 10px;
     top: 50%;
+    right: 8px;
 
-    transform:
-        translateY(-50%);
+    transform: translateY(-50%);
 
-    padding: 5px;
+    min-width: 44px;
+    min-height: 29px;
 
-    border: 0;
+    border: 1px solid rgba(225, 200, 117, 0.14);
+    border-radius: 7px;
 
-    background: none;
+    background: rgba(225, 200, 117, 0.055);
 
-    color: #efd98e;
+    color: var(--gold-soft);
 
-    font-size: 10px;
-
+    font-size: 0.68rem;
     font-weight: 800;
 
     cursor: pointer;
 }
 
-/* ==============================================================
-   PASSWORD REQUIREMENTS
-============================================================== */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 
-.password-requirements {
-    padding: 14px;
+    padding-top: 3px;
+}
 
-    border:
-        1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.08
-        );
 
-    border-radius: 11px;
+/* =========================================================
+   BUTTONS
+========================================================= */
+
+.primary-button,
+.secondary-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+
+    min-height: 40px;
+
+    padding: 0.63rem 0.9rem;
+
+    border-radius: 9px;
+
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 780;
+
+    cursor: pointer;
+
+    transition:
+        transform 150ms ease,
+        border-color 150ms ease,
+        background 150ms ease,
+        filter 150ms ease;
+}
+
+.primary-button {
+    border: 1px solid rgba(225, 200, 117, 0.45);
 
     background:
-        rgba(
-            0,
-            0,
-            0,
-            0.1
-        );
-}
-
-.password-requirements
-> strong {
-    color: #ffffff;
-
-    font-size: 13px;
-}
-
-.password-requirements
-> p {
-    margin:
-        3px 0
-        12px;
-
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.5
+        linear-gradient(
+            135deg,
+            #e1c875,
+            #c9ad57
         );
 
-    font-size: 11px;
+    color: #10271a;
+}
+
+.secondary-button {
+    border: 1px solid rgba(158, 209, 173, 0.2);
+
+    background: rgba(103, 170, 126, 0.07);
+
+    color: #dceadf;
+}
+
+.primary-button:hover:not(:disabled),
+.secondary-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.primary-button:hover:not(:disabled) {
+    filter: brightness(1.04);
+}
+
+.secondary-button:hover:not(:disabled) {
+    border-color: rgba(158, 209, 173, 0.34);
+
+    background: rgba(103, 170, 126, 0.12);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.secondary-button svg {
+    width: 16px;
+    height: 16px;
+
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+
+/* =========================================================
+   PASSWORD REQUIREMENTS
+========================================================= */
+
+.requirements-card {
+    padding: 14px;
+
+    border: 1px solid rgba(158, 209, 173, 0.09);
+    border-radius: 12px;
+
+    background: rgba(7, 31, 22, 0.23);
+}
+
+.requirements-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+
+    margin-bottom: 12px;
+}
+
+.requirements-heading strong {
+    color: #eaf3ec;
+
+    font-size: 0.84rem;
+}
+
+.requirements-heading p {
+    margin: 3px 0 0;
+
+    color: #819789;
+
+    font-size: 0.72rem;
+    line-height: 1.4;
+}
+
+.requirements-status {
+    display: inline-flex;
+
+    padding: 5px 8px;
+
+    border: 1px solid rgba(225, 200, 117, 0.16);
+    border-radius: 999px;
+
+    background: rgba(225, 200, 117, 0.05);
+
+    color: var(--gold-soft);
+
+    font-size: 0.66rem;
+    font-weight: 800;
+}
+
+.requirements-status.passed {
+    border-color: rgba(158, 209, 173, 0.18);
+
+    background: rgba(103, 170, 126, 0.08);
+
+    color: #c7e7cf;
 }
 
 .requirements-grid {
     display: grid;
 
     grid-template-columns:
-        repeat(
-            2,
-            minmax(
-                0,
-                1fr
-            )
-        );
+        repeat(2, minmax(0, 1fr));
 
     gap: 8px;
 }
 
 .requirement {
     display: flex;
-
     align-items: center;
+    gap: 8px;
 
-    gap: 7px;
+    min-height: 34px;
 
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.58
-        );
+    padding: 7px 9px;
 
-    font-size: 11px;
+    border: 1px solid rgba(158, 209, 173, 0.065);
+    border-radius: 9px;
+
+    background: rgba(255, 255, 255, 0.012);
+
+    color: #93a89a;
+
+    font-size: 0.76rem;
 }
 
 .requirement > span {
-    width: 18px;
-    height: 18px;
-
     display: grid;
-
     place-items: center;
 
-    flex: 0 0 18px;
+    flex: 0 0 auto;
+
+    width: 19px;
+    height: 19px;
 
     border-radius: 50%;
 
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            0.06
-        );
+    background: rgba(255, 255, 255, 0.04);
 
-    font-size: 9px;
+    font-size: 0.66rem;
+    font-weight: 900;
 }
 
 .requirement.passed {
-    color: #c5f3d5;
+    color: #c6e5ce;
 }
 
-.requirement.passed
-> span {
-    color: #b4efc6;
+.requirement.passed > span {
+    background: rgba(103, 170, 126, 0.11);
 
-    background:
-        rgba(
-            114,
-            212,
-            154,
-            0.13
-        );
+    color: #b8e1c3;
 }
-
-/* ==============================================================
-   PASSWORD ACTIONS
-============================================================== */
 
 .password-actions {
     display: flex;
-
     align-items: center;
+    justify-content: space-between;
+    gap: 18px;
 
-    justify-content:
-        space-between;
+    padding-top: 14px;
 
-    gap: 20px;
-
-    padding-top: 15px;
-
-    border-top:
-        1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.08
-        );
+    border-top: 1px solid rgba(158, 209, 173, 0.09);
 }
 
-.password-actions p {
-    margin: 0;
+.security-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
 
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.53
-        );
+    max-width: 440px;
+}
 
-    font-size: 10.5px;
+.security-note > span {
+    display: grid;
+    place-items: center;
+
+    flex: 0 0 auto;
+
+    width: 21px;
+    height: 21px;
+
+    border: 1px solid rgba(158, 209, 173, 0.13);
+    border-radius: 50%;
+
+    color: #a8beae;
+
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
+.security-note p {
+    margin: 1px 0 0;
+
+    color: #819789;
+
+    font-size: 0.72rem;
+    line-height: 1.45;
 }
 
 .password-submit {
-    min-width: 170px;
+    min-width: 155px;
 }
 
-/* ==============================================================
-   BUTTONS
-============================================================== */
 
-.edit-toggle-btn,
-.action-button,
-.ghost-button {
-    min-height: 41px;
-
-    display: inline-flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    padding:
-        9px 14px;
-
-    border-radius: 9px;
-
-    font-family: inherit;
-
-    font-size: 12.5px;
-
-    font-weight: 800;
-
-    cursor: pointer;
-
-    transition:
-        0.18s ease;
-}
-
-.edit-toggle-btn,
-.ghost-button {
-    border:
-        1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.12
-        );
-
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            0.07
-        );
-
-    color: #ffffff;
-}
-
-.edit-toggle-btn:hover,
-.ghost-button:hover:not(:disabled) {
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            0.12
-        );
-}
-
-.action-button.primary {
-    border: 0;
-
-    background:
-        linear-gradient(
-            135deg,
-            #f3d46a,
-            #d4af37
-        );
-
-    color: #12301e;
-
-    box-shadow:
-        0 8px 20px
-        rgba(
-            212,
-            175,
-            55,
-            0.18
-        );
-}
-
-.action-button.primary:hover:not(:disabled) {
-    transform:
-        translateY(-1px);
-
-    box-shadow:
-        0 10px 23px
-        rgba(
-            212,
-            175,
-            55,
-            0.25
-        );
-}
-
-.action-button:disabled,
-.ghost-button:disabled {
-    opacity: 0.5;
-
-    cursor: not-allowed;
-}
-
-.form-actions {
-    display: flex;
-
-    justify-content:
-        flex-end;
-
-    gap: 9px;
-}
-
-/* ==============================================================
-   TRANSITION
-============================================================== */
+/* =========================================================
+   TRANSITION / FOCUS
+========================================================= */
 
 .fade-enter-active,
 .fade-leave-active {
-    transition:
-        opacity
-        0.2s ease;
+    transition: opacity 0.18s ease;
 }
 
 .fade-enter-from,
@@ -2663,104 +3097,110 @@ onBeforeUnmount(() => {
     opacity: 0;
 }
 
-/* ==============================================================
-   RESPONSIVE
-============================================================== */
+button:focus-visible,
+input:focus-visible,
+label:focus-within {
+    outline: none;
+}
 
-@media (
-    max-width: 950px
-) {
-    .profile-layout {
-        grid-template-columns:
-            260px
-            minmax(
-                0,
-                1fr
-            );
-    }
-
-    .form-row {
-        grid-template-columns:
-            1fr;
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
     }
 }
 
-@media (
-    max-width: 800px
-) {
-    .profile-hero {
-        flex-direction:
-            column;
 
-        align-items:
-            flex-start;
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 980px) {
+    .profile-layout {
+        grid-template-columns:
+            minmax(270px, 310px)
+            minmax(0, 1fr);
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-account-card {
+        min-width: 270px;
+    }
+}
+
+@media (max-width: 820px) {
+    .profile-hero-card {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .hero-account-card {
+        min-width: 0;
+        width: 100%;
     }
 
     .profile-layout {
-        grid-template-columns:
-            1fr;
+        grid-template-columns: 1fr;
     }
 
-    .profile-card {
+    .identity-card {
         position: static;
 
         width: 100%;
+        max-width: 520px;
 
-        max-width: 480px;
-
-        margin:
-            0 auto;
+        margin: 0 auto;
     }
 
-    .info-display {
-        grid-template-columns:
-            1fr;
+    .info-grid {
+        grid-template-columns: 1fr;
     }
 
-    .info-group:last-child {
-        grid-column:
-            auto;
+    .info-card.full-width {
+        grid-column: auto;
     }
 }
 
-@media (
-    max-width: 600px
-) {
-    .profile-shell {
+@media (max-width: 600px) {
+    .profile-container {
         padding:
-            20px 14px
-            30px;
+            18px 14px
+            28px;
     }
 
-    .profile-hero h1 {
-        font-size: 29px;
+    .profile-hero-card {
+        min-height: auto;
+
+        padding: 22px;
     }
 
-    .glass-card {
-        padding: 18px;
+    .profile-hero-card h1 {
+        font-size: 1.9rem;
+    }
+
+    .content-card,
+    .identity-card {
+        padding: 17px;
     }
 
     .card-header {
-        flex-direction:
-            column;
+        align-items: stretch;
+        flex-direction: column;
     }
 
-    .edit-toggle-btn {
+    .card-header .secondary-button {
         width: 100%;
     }
 
-    .form-row,
     .requirements-grid {
-        grid-template-columns:
-            1fr;
+        grid-template-columns: 1fr;
     }
 
     .password-actions {
-        flex-direction:
-            column;
-
-        align-items:
-            stretch;
+        align-items: stretch;
+        flex-direction: column;
     }
 
     .password-submit {
@@ -2768,16 +3208,21 @@ onBeforeUnmount(() => {
     }
 
     .photo-actions {
-        grid-template-columns:
-            1fr;
+        grid-template-columns: 1fr;
     }
 
-    .info-email-row {
-        align-items:
-            flex-start;
+    .info-value-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
 
-        flex-direction:
-            column;
+    .form-actions {
+        align-items: stretch;
+        flex-direction: column-reverse;
+    }
+
+    .form-actions button {
+        width: 100%;
     }
 }
 </style>

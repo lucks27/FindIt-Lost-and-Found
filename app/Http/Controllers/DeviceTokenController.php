@@ -3,101 +3,396 @@
 namespace App\Http\Controllers;
 
 use App\Models\DeviceToken;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DeviceTokenController extends Controller
 {
-    public function store(Request $request)
-    {
-        $user = $request->user();
+    /*
+    |--------------------------------------------------------------------------
+    | REGISTER MOBILE PUSH TOKEN
+    |--------------------------------------------------------------------------
+    |
+    | Expected mobile payload:
+    |
+    | {
+    |     "token": "ExponentPushToken[...]",
+    |     "platform": "android"
+    | }
+    |
+    | or platform = ios.
+    |
+    */
 
-        $validated = $request->validate([
-            'token' => 'required|string|max:512',
-            'platform' => 'nullable|string|max:64',
-        ]);
+    public function store(
+        Request $request
+    ) {
+        $student =
+            $request->user();
 
-        $deviceToken = DeviceToken::updateOrCreate([
-            'student_id' => $user->id,
-            'token' => $validated['token'],
-        ], [
-            'platform' => $validated['platform'] ?? 'unknown',
-            'last_used_at' => now(),
-        ]);
+        $validated =
+            $request->validate([
+                'token' =>
+                    'required|string|max:2048',
 
-        return response()->json(['status' => 'success', 'data' => $deviceToken]);
-    }
+                'platform' =>
+                    'required|in:android,ios',
+            ]);
 
-    public function destroy(Request $request)
-    {
-        $user = $request->user();
+        $token =
+            trim(
+                $validated['token']
+            );
 
-        $validated = $request->validate([
-            'token' => 'required|string|max:512',
-        ]);
+        $pushService =
+            app(
+                PushNotificationService::class
+            );
 
-        DeviceToken::where('student_id', $user->id)
-            ->where('token', $validated['token'])
-            ->delete();
-
-        return response()->json(['status' => 'success', 'message' => 'Device token removed']);
-    }
-
-    public function storeWebPushSubscription(Request $request)
-    {
-        $user = $request->user();
-
-        $subscription = $request->input('subscription');
-        if (!is_array($subscription) || empty($subscription['endpoint'])) {
+        if (
+            !$pushService
+                ->isExpoPushToken(
+                    $token
+                )
+        ) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'A valid browser push subscription is required.',
+                'status' =>
+                    'error',
+
+                'message' =>
+                    'The provided token is not a valid Expo push token.',
             ], 422);
         }
 
-        $subscriptionPayload = json_encode($subscription);
+        $deviceToken =
+            DB::transaction(
+                function () use (
+                    $student,
+                    $token,
+                    $validated
+                ) {
+                    /*
+                    |--------------------------------------------------------------------------
+                    | ONE TOKEN BELONGS TO THE CURRENT LOGGED-IN STUDENT
+                    |--------------------------------------------------------------------------
+                    |
+                    | If the same physical app installation signs into another
+                    | account, ownership of the token moves to that account.
+                    |
+                    */
 
-        $deviceToken = DeviceToken::updateOrCreate([
-            'student_id' => $user->id,
-            'token' => $subscription['endpoint'],
-        ], [
-            'platform' => 'web',
-            'last_used_at' => now(),
-        ]);
+                    $record =
+                        DeviceToken::query()
+                            ->where(
+                                'token',
+                                $token
+                            )
+                            ->first();
 
-        $deviceToken->token = $subscriptionPayload;
-        $deviceToken->save();
+                    if (!$record) {
+                        $record =
+                            new DeviceToken();
+                    }
+
+                    $record->student_id =
+                        $student->id;
+
+                    $record->token =
+                        $token;
+
+                    $record->platform =
+                        $validated[
+                            'platform'
+                        ];
+
+                    $record->save();
+
+                    return $record;
+                }
+            );
 
         return response()->json([
-            'status' => 'success',
-            'message' => 'Web push subscription saved.',
-            'data' => $deviceToken,
+            'status' =>
+                'success',
+
+            'message' =>
+                'Push notification token registered.',
+
+            'data' =>
+                $deviceToken,
         ]);
     }
 
-    public function destroyWebPushSubscription(Request $request)
-    {
-        $user = $request->user();
 
-        $subscription = $request->input('subscription');
-        $endpoint = is_array($subscription) ? ($subscription['endpoint'] ?? null) : null;
+    /*
+    |--------------------------------------------------------------------------
+    | REMOVE MOBILE PUSH TOKEN
+    |--------------------------------------------------------------------------
+    */
 
-        if (empty($endpoint)) {
+    public function destroy(
+        Request $request
+    ) {
+        $student =
+            $request->user();
+
+        $validated =
+            $request->validate([
+                'token' =>
+                    'required|string|max:2048',
+            ]);
+
+        $deleted =
+            DeviceToken::query()
+                ->where(
+                    'student_id',
+                    $student->id
+                )
+                ->where(
+                    'token',
+                    trim(
+                        $validated['token']
+                    )
+                )
+                ->delete();
+
+        return response()->json([
+            'status' =>
+                'success',
+
+            'message' =>
+                $deleted
+                    ? 'Push token removed.'
+                    : 'Push token was already absent.',
+        ]);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | OPTIONAL EXISTING WEB PUSH SUPPORT
+    |--------------------------------------------------------------------------
+    |
+    | These endpoints are preserved so the current API routes do not break.
+    | Mobile Expo push remains the main Phase 8 implementation.
+    |
+    */
+
+    public function storeWebPushSubscription(
+        Request $request
+    ) {
+        $student =
+            $request->user();
+
+        $validated =
+            $request->validate([
+                'subscription' =>
+                    'required|array',
+
+                'subscription.endpoint' =>
+                    'required|string',
+
+                'subscription.keys' =>
+                    'required|array',
+
+                'subscription.keys.p256dh' =>
+                    'required|string',
+
+                'subscription.keys.auth' =>
+                    'required|string',
+            ]);
+
+        $encoded =
+            json_encode(
+                $validated[
+                    'subscription'
+                ],
+                JSON_UNESCAPED_SLASHES
+            );
+
+        $record =
+            DeviceToken::query()
+                ->where(
+                    'student_id',
+                    $student->id
+                )
+                ->where(
+                    'platform',
+                    'web'
+                )
+                ->where(
+                    'token',
+                    $encoded
+                )
+                ->first();
+
+        if (!$record) {
+            $record =
+                new DeviceToken();
+
+            $record->student_id =
+                $student->id;
+
+            $record->token =
+                $encoded;
+
+            $record->platform =
+                'web';
+
+            $record->save();
+        }
+
+        return response()->json([
+            'status' =>
+                'success',
+
+            'message' =>
+                'Web push subscription saved.',
+
+            'data' =>
+                $record,
+        ]);
+    }
+
+
+    public function destroyWebPushSubscription(
+        Request $request
+    ) {
+        $student =
+            $request->user();
+
+        $subscription =
+            $request->input(
+                'subscription'
+            );
+
+        $endpoint =
+            $request->input(
+                'endpoint'
+            );
+
+        $query =
+            DeviceToken::query()
+                ->where(
+                    'student_id',
+                    $student->id
+                )
+                ->where(
+                    'platform',
+                    'web'
+                );
+
+        if (
+            is_array(
+                $subscription
+            )
+        ) {
+            $encoded =
+                json_encode(
+                    $subscription,
+                    JSON_UNESCAPED_SLASHES
+                );
+
+            $query->where(
+                'token',
+                $encoded
+            );
+        } elseif (
+            is_string(
+                $endpoint
+            )
+            &&
+            trim(
+                $endpoint
+            ) !== ''
+        ) {
+            $query->where(
+                'token',
+                'like',
+                '%'
+                .
+                trim(
+                    $endpoint
+                )
+                .
+                '%'
+            );
+        } else {
             return response()->json([
-                'status' => 'error',
-                'message' => 'A valid browser push subscription is required.',
+                'status' =>
+                    'error',
+
+                'message' =>
+                    'A web push subscription or endpoint is required.',
             ], 422);
         }
 
-        DeviceToken::where('student_id', $user->id)
-            ->where(function ($query) use ($endpoint) {
-                $query->where('token', $endpoint)
-                    ->orWhereRaw('token LIKE ?', ["%\"endpoint\":\"{$endpoint}\"%"]);
-            })
-            ->delete();
+        $query->delete();
 
         return response()->json([
-            'status' => 'success',
-            'message' => 'Web push subscription removed.',
+            'status' =>
+                'success',
+
+            'message' =>
+                'Web push subscription removed.',
+        ]);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | AUTHENTICATED TEST PUSH
+    |--------------------------------------------------------------------------
+    |
+    | This lets us verify Laravel -> Expo -> phone independently from the
+    | Lost & Found workflow.
+    |
+    */
+
+    public function test(
+        Request $request,
+        PushNotificationService $pushService
+    ) {
+        $student =
+            $request->user();
+
+        $result =
+            $pushService
+                ->sendToStudent(
+                    (int)
+                    $student->id,
+
+                    'FindIt Push Test',
+
+                    'Push notifications are connected successfully.',
+
+                    [
+                        'type' =>
+                            'push_test',
+
+                        'action' =>
+                            'open_alerts',
+                    ]
+                );
+
+        return response()->json([
+            'status' =>
+                $result[
+                    'success'
+                ]
+                    ? 'success'
+                    : 'warning',
+
+            'message' =>
+                $result[
+                    'attempted'
+                ] > 0
+                    ? 'Push test sent to Expo Push Service.'
+                    : 'No Expo push token is currently registered for this account.',
+
+            'data' =>
+                $result,
         ]);
     }
 }

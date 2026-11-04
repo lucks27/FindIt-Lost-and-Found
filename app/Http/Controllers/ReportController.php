@@ -3,23 +3,130 @@
 namespace App\Http\Controllers;
 
 use App\Models\ClaimReview;
-use App\Models\DeviceToken;
 use App\Models\ItemVerification;
+use App\Models\ItemCategory;
 use App\Models\Notification;
+use App\Models\PointTransaction;
+use App\Models\PointRule;
 use App\Models\PotentialMatch;
 use App\Models\Report;
 use App\Models\ReportImage;
 use App\Models\Reward;
 use App\Models\SurrenderRequest;
+use App\Models\StudentRecognitionRecord;
+use App\Services\PotentialMatchService;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Minishlink\WebPush\WebPush;
 
 class ReportController extends Controller
 {
+    private const POINTS_PER_PESO = 100;
+
+    private const FOUND_REPORT_SUBMISSION_POINTS = 1;
+
+    /*
+    |--------------------------------------------------------------------------
+    | STUDENT MOBILE CATEGORY CHOICES
+    |--------------------------------------------------------------------------
+    |
+    | Only active categories configured through USC's Point Rules appear in
+    | the mobile Lost/Found forms. This public endpoint is read-only.
+    |
+    */
+
+    public function categories()
+    {
+        $rules = PointRule::query()->get();
+
+        $names = $rules->map(function (PointRule $rule) {
+            return mb_strtolower(trim((string) ($rule->category_name ?: $rule->item_category ?: '')));
+        })->filter()->unique()->values()->all();
+
+        $ids = Schema::hasColumn('point_rules', 'category_id')
+            ? $rules->pluck('category_id')->filter()->unique()->values()->all()
+            : [];
+
+        $categories = ItemCategory::query()
+            ->where('is_active', true)
+            ->where(function ($query) use ($ids, $names) {
+                if ($ids) {
+                    $query->whereIn('id', $ids);
+                }
+                if ($names) {
+                    $query->orWhereIn(DB::raw('LOWER(name)'), $names);
+                }
+                if (!$ids && !$names) {
+                    $query->whereRaw('1 = 0');
+                }
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'description']);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $categories,
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | FOUND TIME INPUT
+    |--------------------------------------------------------------------------
+    |
+    | Some mobile versions may send found_time, timeFound, or a value inside
+    | metadata. Use the canonical time_found field without altering other data.
+    |
+    */
+
+    private function mergeFoundTimeInput(Request $request): void
+    {
+        if ($request->filled('time_found')) {
+            return;
+        }
+
+        foreach (['found_time', 'timeFound', 'metadata.time_found', 'metadata.found_time'] as $field) {
+            if ($request->filled($field)) {
+                $request->merge(['time_found' => $request->input($field)]);
+                return;
+            }
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | NORMALIZE VALIDATED FOUND TIME
+    |--------------------------------------------------------------------------
+    |
+    | Store a real, supplied Time Found as HH:MM:SS for the reports TIME column.
+    | Never substitute created_at or the report submission time.
+    |
+    */
+
+    private function normalizeFoundTime(?string $value): ?string
+    {
+        if ($value === null || trim($value) === '') {
+            return null;
+        }
+
+        foreach (['H:i', 'H:i:s', 'g:i A', 'h:i A', 'g:i a', 'h:i a'] as $format) {
+            $time = \DateTimeImmutable::createFromFormat('!' . $format, trim($value));
+            $errors = \DateTimeImmutable::getLastErrors();
+
+            if ($time !== false && (
+                $errors === false ||
+                ($errors['warning_count'] === 0 && $errors['error_count'] === 0)
+            )) {
+                return $time->format('H:i:s');
+            }
+        }
+
+        return null;
+    }
+
     /*
     |--------------------------------------------------------------------------
     | PUBLIC REPORT FEED
@@ -469,13 +576,18 @@ class ReportController extends Controller
 
                     /*
                     |--------------------------------------------------------------------------
-                    | ONLY VERIFIED FOUND ITEMS MAY BE CLAIMED
+                    | CLAIMS ARE ONLY FOR VERIFIED FOUND ITEMS
                     |--------------------------------------------------------------------------
+                    |
+                    | under_claim_review remains claimable so another student may still submit
+                    | ownership proof while USC is reviewing a different pending claim.
+                    |
                     */
 
                     $claimableStatuses = [
                         Report::STATUS_VERIFIED,
                         Report::STATUS_POTENTIAL_MATCH_FOUND,
+                        Report::STATUS_UNDER_CLAIM_REVIEW,
                     ];
 
                     if (
@@ -491,15 +603,9 @@ class ReportController extends Controller
                                 'error',
 
                             'message' =>
-                                'Only verified found items can be claimed.',
+                                'Only verified found items that are still open for claims can be claimed.',
                         ], 422);
                     }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Finder cannot claim their own submitted found item.
-                    |--------------------------------------------------------------------------
-                    */
 
                     if (
                         (int) $report->student_id ===
@@ -510,13 +616,41 @@ class ReportController extends Controller
                                 'error',
 
                             'message' =>
-                                'You cannot submit a claim on your own report.',
+                                'You cannot submit a claim on your own found-item report.',
                         ], 422);
                     }
 
                     /*
                     |--------------------------------------------------------------------------
-                    | PREVENT DUPLICATE ACTIVE CLAIM
+                    | STOP NEW CLAIMS AFTER USC HAS APPROVED AN OWNER
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $approvedClaimExists =
+                        ClaimReview::query()
+                            ->where(
+                                'report_id',
+                                $report->id
+                            )
+                            ->where(
+                                'review_status',
+                                'approved'
+                            )
+                            ->exists();
+
+                    if ($approvedClaimExists) {
+                        return response()->json([
+                            'status' =>
+                                'error',
+
+                            'message' =>
+                                'This item already has an approved claimant and is no longer accepting claims.',
+                        ], 422);
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | PREVENT DUPLICATE ACTIVE CLAIM BY THE SAME STUDENT
                     |--------------------------------------------------------------------------
                     */
 
@@ -550,12 +684,6 @@ class ReportController extends Controller
                         ], 422);
                     }
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | EVIDENCE
-                    |--------------------------------------------------------------------------
-                    */
-
                     $evidence = [
                         'proof_description' =>
                             trim(
@@ -583,12 +711,6 @@ class ReportController extends Controller
                                 );
                     }
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | CREATE CLAIM
-                    |--------------------------------------------------------------------------
-                    */
-
                     $claim =
                         ClaimReview::create([
                             'report_id' =>
@@ -604,29 +726,17 @@ class ReportController extends Controller
                                 $evidence,
                         ]);
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | REPORT NOW UNDER CLAIM REVIEW
-                    |--------------------------------------------------------------------------
-                    */
-
                     $report->update([
                         'status' =>
                             Report::STATUS_UNDER_CLAIM_REVIEW,
                     ]);
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | NOTIFY ADMIN
-                    |--------------------------------------------------------------------------
-                    */
 
                     Notification::create([
                         'type' =>
                             'claim_submitted',
 
                         'title' =>
-                            'New Claim Submitted',
+                            'New Ownership Claim',
 
                         'message' =>
                             "A student submitted an ownership claim for '{$report->title}'.",
@@ -646,42 +756,341 @@ class ReportController extends Controller
                         'subject_id' =>
                             $claim->id,
 
+                        'data' => [
+                            'report_id' =>
+                                $report->id,
+
+                            'claim_id' =>
+                                $claim->id,
+
+                            'claimant_student_id' =>
+                                $user->id,
+                        ],
+
                         'is_read' =>
                             false,
                     ]);
 
                     /*
                     |--------------------------------------------------------------------------
-                    | ITEM VERIFICATION RECORD
+                    | NOTIFY THE FINDER ABOUT THE NEW CLAIM
                     |--------------------------------------------------------------------------
+                    |
+                    | Do not expose the claimant's private ownership evidence.
+                    | USC remains responsible for reviewing the proof.
+                    |
                     */
 
-                    ItemVerification::firstOrCreate(
-                        [
-                            'report_id' =>
-                                $report->id,
-                        ],
-                        [
+                    if (
+                        $report->student_id &&
+                        (int) $report->student_id !==
+                            (int) $user->id
+                    ) {
+                        $this->createStudentNotification([
+                            'student_id' =>
+                                $report->student_id,
+
+                            'type' =>
+                                'new_claim_request',
+
+                            'title' =>
+                                'New Claim Request',
+
+                            'message' =>
+                                "A student submitted an ownership claim for your found item '{$report->title}'. USC will review the claim and verify the ownership proof.",
+
+                            'action' =>
+                                'new_claim_request',
+
                             'status' =>
                                 'pending',
 
-                            'notes' =>
-                                'Pending USC ownership claim review.',
-                        ]
-                    );
+                            'recipient_id' =>
+                                $report->student_id,
+
+                            'recipient_role' =>
+                                'student',
+
+                            'subject_type' =>
+                                ClaimReview::class,
+
+                            'subject_id' =>
+                                $claim->id,
+
+                            'data' => [
+                                'report_id' =>
+                                    $report->id,
+
+                                'claim_id' =>
+                                    $claim->id,
+
+                                'private_evidence_exposed' =>
+                                    false,
+                            ],
+
+                            'is_read' =>
+                                false,
+                        ]);
+                    }
+
 
                     return response()->json([
                         'status' =>
                             'success',
 
                         'message' =>
-                            'Claim request submitted successfully. Please wait for USC verification.',
+                            'Ownership claim submitted successfully. USC will review your proof.',
 
                         'data' =>
-                            $claim->load(
-                                'report'
-                            ),
+                            $claim->load([
+                                'report.images',
+                                'claimantStudent',
+                            ]),
                     ], 201);
+                }
+            );
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'status' =>
+                    'error',
+
+                'message' =>
+                    $exception->getMessage(),
+            ], 422);
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | MY OWNERSHIP CLAIMS
+    |--------------------------------------------------------------------------
+    */
+
+    public function myClaims(
+        Request $request
+    ) {
+        $user =
+            $request->user();
+
+        $claims =
+            ClaimReview::query()
+                ->where(
+                    'claimant_student_id',
+                    $user->id
+                )
+                ->with([
+                    'report.images',
+                    'report.categoryRelation',
+                    'reviewedByAdmin',
+                ])
+                ->latest()
+                ->get();
+
+        return response()->json([
+            'status' =>
+                'success',
+
+            'data' =>
+                $claims,
+        ]);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SUBMIT ADDITIONAL CLAIM INFORMATION
+    |--------------------------------------------------------------------------
+    |
+    | Used after USC changes a claim to additional_information_required.
+    | The claimant can update their ownership proof and optionally attach a new
+    | proof photo. After resubmission, the claim returns to pending review.
+    |
+    */
+
+    public function submitAdditionalClaimInformation(
+        Request $request,
+        $id
+    ) {
+        $user =
+            $request->user();
+
+        $validated =
+            $request->validate([
+                'proof_description' =>
+                    'required|string|max:3000',
+
+                'proof_photo' =>
+                    'nullable|file|image|max:5120',
+            ]);
+
+        try {
+            return DB::transaction(
+                function () use (
+                    $request,
+                    $id,
+                    $user,
+                    $validated
+                ) {
+                    $claim =
+                        ClaimReview::query()
+                            ->where(
+                                'id',
+                                $id
+                            )
+                            ->where(
+                                'claimant_student_id',
+                                $user->id
+                            )
+                            ->where(
+                                'review_status',
+                                'additional_information_required'
+                            )
+                            ->lockForUpdate()
+                            ->firstOrFail();
+
+                    $report =
+                        $claim
+                            ->report()
+                            ->lockForUpdate()
+                            ->firstOrFail();
+
+                    if (
+                        !$report->isFound() ||
+                        $report->status ===
+                            Report::STATUS_READY_FOR_RELEASE ||
+                        in_array(
+                            $report->status,
+                            [
+                                Report::STATUS_COMPLETED_RETURN,
+                                Report::STATUS_ARCHIVED,
+                                Report::STATUS_REJECTED,
+                            ],
+                            true
+                        )
+                    ) {
+                        return response()->json([
+                            'status' =>
+                                'error',
+
+                            'message' =>
+                                'This claim can no longer receive additional information.',
+                        ], 422);
+                    }
+
+                    $evidence =
+                        is_array(
+                            $claim->evidence
+                        )
+                            ? $claim->evidence
+                            : [];
+
+                    $evidence[
+                        'proof_description'
+                    ] =
+                        trim(
+                            $validated[
+                                'proof_description'
+                            ]
+                        );
+
+                    $evidence[
+                        'additional_information_submitted_at'
+                    ] =
+                        now()->toIso8601String();
+
+                    if (
+                        $request->hasFile(
+                            'proof_photo'
+                        )
+                    ) {
+                        $evidence[
+                            'proof_photo'
+                        ] =
+                            $request
+                                ->file(
+                                    'proof_photo'
+                                )
+                                ->store(
+                                    'claim-evidence',
+                                    'public'
+                                );
+                    }
+
+                    $claim->update([
+                        'review_status' =>
+                            'pending',
+
+                        'evidence' =>
+                            $evidence,
+
+                        'reviewed_by_admin_id' =>
+                            null,
+
+                        'reviewed_at' =>
+                            null,
+                    ]);
+
+                    if (
+                        $report->status !==
+                        Report::STATUS_UNDER_CLAIM_REVIEW
+                    ) {
+                        $report->update([
+                            'status' =>
+                                Report::STATUS_UNDER_CLAIM_REVIEW,
+                        ]);
+                    }
+
+                    Notification::create([
+                        'type' =>
+                            'claim_information_submitted',
+
+                        'title' =>
+                            'Claim Information Updated',
+
+                        'message' =>
+                            "The claimant submitted additional ownership proof for '{$report->title}'.",
+
+                        'action' =>
+                            'claim_submitted',
+
+                        'status' =>
+                            'pending',
+
+                        'recipient_role' =>
+                            'admin',
+
+                        'subject_type' =>
+                            ClaimReview::class,
+
+                        'subject_id' =>
+                            $claim->id,
+
+                        'data' => [
+                            'report_id' =>
+                                $report->id,
+
+                            'claim_id' =>
+                                $claim->id,
+                        ],
+
+                        'is_read' =>
+                            false,
+                    ]);
+
+                    return response()->json([
+                        'status' =>
+                            'success',
+
+                        'message' =>
+                            'Additional ownership proof submitted. Your claim is back under USC review.',
+
+                        'data' =>
+                            $claim->fresh([
+                                'report.images',
+                                'claimantStudent',
+                            ]),
+                    ]);
                 }
             );
         } catch (\Throwable $exception) {
@@ -707,6 +1116,8 @@ class ReportController extends Controller
     ) {
         $user =
             $request->user();
+
+        $this->mergeFoundTimeInput($request);
 
         /*
         |--------------------------------------------------------------------------
@@ -759,7 +1170,11 @@ class ReportController extends Controller
                     */
 
                     'date_occurred' =>
-                        'required|date|before_or_equal:today',
+                        'required|date|before_or_equal:' . now('Asia/Manila')->toDateString(),
+
+                    // Optional for older mobile clients; never invent the time.
+                    'time_found' =>
+                        'nullable|date_format:H:i,H:i:s,g:i A,h:i A',
 
                     /*
                     |--------------------------------------------------------------------------
@@ -794,6 +1209,9 @@ class ReportController extends Controller
                 [
                     'date_occurred.before_or_equal' =>
                         'The report date cannot be in the future.',
+
+                    'time_found.date_format' =>
+                        'Time Found must be a valid time, such as 14:35 or 2:35 PM.',
 
                     'images.required' =>
                         'At least one image is required to submit a report.',
@@ -866,9 +1284,6 @@ class ReportController extends Controller
                 'type' =>
                     $validated['type'],
 
-                'report_type' =>
-                    $validated['type'],
-
                 'title' =>
                     trim(
                         $validated['title']
@@ -914,6 +1329,9 @@ class ReportController extends Controller
                     $validated[
                         'date_occurred'
                     ],
+
+                'time_found' =>
+                    $this->normalizeFoundTime($validated['time_found'] ?? null),
 
                 'metadata' =>
                     $validated['metadata']
@@ -1015,7 +1433,7 @@ class ReportController extends Controller
             |--------------------------------------------------------------------------
             */
 
-            Notification::create([
+            $this->createStudentNotification([
                 'student_id' =>
                     $user->id,
 
@@ -1100,6 +1518,27 @@ class ReportController extends Controller
                     false,
             ]);
         }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | SMALL FOUND-REPORT SUBMISSION RECOGNITION AWARD
+            |--------------------------------------------------------------------------
+            |
+            | Revised SNSU flow:
+            | - Finder submits the found report.
+            | - The finder receives a small initial recognition award.
+            | - The larger category-based award is given only after Completed Return.
+            |
+            | The award is idempotent by report reference, so the same report cannot
+            | receive the submission point twice.
+            |
+            */
+
+            $this->awardFoundReportSubmissionPoints(
+                $user,
+                $report
+            );
 
         /*
         |--------------------------------------------------------------------------
@@ -1229,6 +1668,371 @@ class ReportController extends Controller
             'data' =>
                 $report,
         ], 201);
+    }
+
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE LOST REPORT AFTER USC REQUESTS CORRECTION
+    |--------------------------------------------------------------------------
+    |
+    | Owner-only correction endpoint for lost reports that are still waiting
+    | for USC approval. The official status remains pending_approval.
+    |
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE REPORT AFTER USC REQUESTS MORE INFORMATION
+    |--------------------------------------------------------------------------
+    |
+    | LOST:
+    | - pending_approval
+    |
+    | FOUND:
+    | - pending_surrender
+    | - pending_verification
+    |
+    | The student may only update their own non-terminal report.
+    | Official workflow statuses are preserved while the corrected information
+    | is returned to the proper USC queue.
+    |
+    */
+
+    public function update(
+        Request $request,
+        $id
+    ) {
+        $user = $request->user();
+
+        $this->mergeFoundTimeInput($request);
+
+        $report = Report::query()
+            ->whereKey($id)
+            ->firstOrFail();
+
+        if (
+            (int) $report->student_id !==
+            (int) $user->id
+        ) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'You do not own this report.',
+            ], 403);
+        }
+
+        $allowed = false;
+
+        if ($report->isLost()) {
+            $allowed = in_array(
+                $report->status,
+                [
+                    Report::STATUS_PENDING_APPROVAL,
+                    'correction_requested',
+                ],
+                true
+            );
+        }
+
+        if ($report->isFound()) {
+            $allowed = in_array(
+                $report->status,
+                [
+                    Report::STATUS_PENDING_SURRENDER,
+                    Report::STATUS_PENDING_VERIFICATION,
+                ],
+                true
+            );
+        }
+
+        if (!$allowed) {
+            return response()->json([
+                'status' => 'error',
+                'message' =>
+                    'This report can no longer be edited in its current workflow status.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'title' =>
+                'sometimes|required|string|max:255',
+
+            'description' =>
+                'sometimes|required|string|max:5000',
+
+            'private_identifying_details' =>
+                'sometimes|required|string|max:5000',
+
+            'category_id' =>
+                'sometimes|nullable|exists:item_categories,id',
+
+            'metadata' =>
+                'sometimes|nullable|array',
+
+            'metadata.category' =>
+                'sometimes|nullable|string|max:255',
+
+            'color' =>
+                'sometimes|nullable|string|max:255',
+
+            'location' =>
+                'sometimes|required|string|max:255',
+
+            'date_occurred' =>
+                'sometimes|required|date|before_or_equal:' . now('Asia/Manila')->toDateString(),
+
+            'time_found' =>
+                'sometimes|nullable|date_format:H:i,H:i:s,g:i A,h:i A',
+        ], [
+            'date_occurred.before_or_equal' =>
+                'The report date cannot be in the future.',
+
+            'time_found.date_format' =>
+                'Time Found must be a valid time, such as 14:35 or 2:35 PM.',
+        ]);
+
+        $update = [];
+
+        foreach (
+            [
+                'title',
+                'description',
+                'private_identifying_details',
+                'category_id',
+                'color',
+                'location',
+                'date_occurred',
+                'time_found',
+            ]
+            as $field
+        ) {
+            if (array_key_exists($field, $validated)) {
+                $value = $validated[$field];
+
+                if (
+                    is_string($value) &&
+                    $field !== 'date_occurred'
+                ) {
+                    $value = trim($value);
+                }
+
+                $update[$field] = $field === 'time_found'
+                    ? $this->normalizeFoundTime($value)
+                    : $value;
+            }
+        }
+
+        $metadata = array_merge(
+            $report->metadata ?? [],
+            $validated['metadata'] ?? []
+        );
+
+        if (
+            isset($validated['metadata']) &&
+            array_key_exists(
+                'category',
+                $validated['metadata']
+            )
+        ) {
+            $update['category'] =
+                $validated['metadata']['category'];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | LOST CORRECTION RESUBMISSION
+        |--------------------------------------------------------------------------
+        */
+
+        if ($report->isLost()) {
+            unset(
+                $metadata['correction_requested'],
+                $metadata['correction_request'],
+                $metadata['correction_requested_at'],
+                $metadata['correction_requested_by_admin_id']
+            );
+
+            $metadata['correction_resubmitted_at'] =
+                now()->toIso8601String();
+
+            $update['status'] =
+                Report::STATUS_PENDING_APPROVAL;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | FOUND DETAILS RESUBMISSION
+        |--------------------------------------------------------------------------
+        */
+
+        if ($report->isFound()) {
+            $metadata['details_resubmitted_at'] =
+                now()->toIso8601String();
+
+            $metadata['details_resubmitted_from_status'] =
+                $report->status;
+
+            if (
+                $report->status ===
+                Report::STATUS_PENDING_SURRENDER
+            ) {
+                $update['status'] =
+                    Report::STATUS_PENDING_SURRENDER;
+            }
+
+            if (
+                $report->status ===
+                Report::STATUS_PENDING_VERIFICATION
+            ) {
+                $update['status'] =
+                    Report::STATUS_PENDING_VERIFICATION;
+            }
+        }
+
+        $update['metadata'] = $metadata;
+
+        DB::transaction(function () use (
+            $report,
+            $update
+        ) {
+            $report->update($update);
+
+            /*
+            |--------------------------------------------------------------------------
+            | IF USC REQUESTED VERIFICATION DETAILS, RETURN IT TO PENDING REVIEW
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $report->isFound() &&
+                $report->status ===
+                    Report::STATUS_PENDING_VERIFICATION
+            ) {
+                $verification =
+                    ItemVerification::query()
+                        ->where(
+                            'report_id',
+                            $report->id
+                        )
+                        ->first();
+
+                if (
+                    $verification &&
+                    $verification->status ===
+                        'needs_more_information'
+                ) {
+                    $verification->update([
+                        'status' => 'pending',
+                    ]);
+                }
+            }
+        });
+
+        /*
+        |--------------------------------------------------------------------------
+        | NOTIFY USC THAT THE STUDENT RESUBMITTED
+        |--------------------------------------------------------------------------
+        */
+
+        if ($report->isLost()) {
+            Notification::create([
+                'type' => 'pending_report',
+                'title' => 'Lost Report Updated',
+                'message' =>
+                    "The student updated lost-item report '{$report->title}' and it is ready for USC review again.",
+                'action' => 'pending_report',
+                'status' => 'pending',
+                'recipient_role' => 'admin',
+                'subject_type' => Report::class,
+                'subject_id' => $report->id,
+                'data' => [
+                    'report_id' => $report->id,
+                    'resubmitted' => true,
+                ],
+                'is_read' => false,
+            ]);
+        }
+
+        if (
+            $report->isFound() &&
+            $report->status ===
+                Report::STATUS_PENDING_SURRENDER
+        ) {
+            Notification::create([
+                'type' => 'pending_surrender',
+                'title' => 'Found Report Details Updated',
+                'message' =>
+                    "The finder updated details for '{$report->title}'. The item is still waiting to be surrendered to USC.",
+                'action' => 'pending_surrender',
+                'status' => 'pending',
+                'recipient_role' => 'admin',
+                'subject_type' => Report::class,
+                'subject_id' => $report->id,
+                'data' => [
+                    'report_id' => $report->id,
+                    'resubmitted' => true,
+                ],
+                'is_read' => false,
+            ]);
+        }
+
+        if (
+            $report->isFound() &&
+            $report->status ===
+                Report::STATUS_PENDING_VERIFICATION
+        ) {
+            $verification =
+                ItemVerification::query()
+                    ->where(
+                        'report_id',
+                        $report->id
+                    )
+                    ->first();
+
+            Notification::create([
+                'type' => 'item_verification',
+                'title' => 'Verification Details Updated',
+                'message' =>
+                    "The finder updated details for '{$report->title}'. Please continue USC verification.",
+                'action' => 'item_verification',
+                'status' => 'pending',
+                'recipient_role' => 'admin',
+                'subject_type' =>
+                    $verification
+                        ? ItemVerification::class
+                        : Report::class,
+                'subject_id' =>
+                    $verification?->id
+                        ?? $report->id,
+                'data' => [
+                    'report_id' => $report->id,
+                    'verification_id' =>
+                        $verification?->id,
+                    'resubmitted' => true,
+                ],
+                'is_read' => false,
+            ]);
+        }
+
+        $report->load([
+            'student',
+            'images',
+            'visiblePost',
+            'surrenderRequest',
+            'itemVerification',
+        ]);
+
+        $report->makeHidden(
+            'private_identifying_details'
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' =>
+                'Report updated successfully and returned to the USC workflow.',
+            'data' => $report,
+        ]);
     }
 
 
@@ -1582,33 +2386,12 @@ class ReportController extends Controller
             ], 404);
         }
 
-        $oppositeType =
-            $report->isLost()
-                ? Report::TYPE_FOUND
-                : Report::TYPE_LOST;
-
-        $requiredStatus =
-            $oppositeType ===
-            Report::TYPE_FOUND
-                ? Report::STATUS_VERIFIED
-                : Report::STATUS_APPROVED;
-
         $candidates =
-            Report::query()
-                ->where(
-                    'type',
-                    $oppositeType
-                )
-                ->where(
-                    'status',
-                    $requiredStatus
-                )
-                ->where(
-                    'id',
-                    '<>',
-                    $report->id
-                )
-                ->get();
+            app(
+                PotentialMatchService::class
+            )->candidatesFor(
+                $report
+            );
 
         /*
         |--------------------------------------------------------------------------
@@ -1677,12 +2460,6 @@ class ReportController extends Controller
                 $matchId
             );
 
-        /*
-        |--------------------------------------------------------------------------
-        | OWNER ONLY
-        |--------------------------------------------------------------------------
-        */
-
         if (
             (int) $report->student_id !==
             (int) $user->id
@@ -1696,11 +2473,27 @@ class ReportController extends Controller
             ], 403);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | MUST BE OPPOSITE TYPES
-        |--------------------------------------------------------------------------
-        */
+        $service =
+            app(
+                PotentialMatchService::class
+            );
+
+        if (
+            !$service->isEligible(
+                $report
+            ) ||
+            !$service->isEligible(
+                $matchedReport
+            )
+        ) {
+            return response()->json([
+                'status' =>
+                    'error',
+
+                'message' =>
+                    'One of the reports is not eligible for a potential match.',
+            ], 422);
+        }
 
         if (
             $report->type ===
@@ -1715,176 +2508,111 @@ class ReportController extends Controller
             ], 422);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | BASE ELIGIBILITY
-        |--------------------------------------------------------------------------
-        */
+        try {
+            $result =
+                $service
+                    ->submitSuggestion(
+                        $report,
+                        $matchedReport
+                    );
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'status' =>
+                    'error',
+
+                'message' =>
+                    $exception->getMessage(),
+            ], 422);
+        }
+
+        $match =
+            $result['match'];
 
         if (
-            !$this->isEligibleForMatching(
-                $report
-            ) ||
-            !$this->isEligibleForMatching(
-                $matchedReport
-            )
+            $match->status ===
+            'rejected'
         ) {
             return response()->json([
                 'status' =>
                     'error',
 
                 'message' =>
-                    'One of the reports is not eligible for a potential match.',
+                    'USC previously rejected this report pairing.',
             ], 422);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | IDENTIFY LOST AND FOUND REPORT CORRECTLY
-        |--------------------------------------------------------------------------
-        */
+        if (
+            $match->status ===
+            'confirmed'
+        ) {
+            return response()->json([
+                'status' =>
+                    'success',
 
-        $lostReport =
-            $report->isLost()
-                ? $report
-                : $matchedReport;
+                'message' =>
+                    'This potential match has already been confirmed by USC.',
 
-        $foundReport =
-            $report->isFound()
-                ? $report
-                : $matchedReport;
-
-        $existingMatch =
-            PotentialMatch::query()
-                ->where(
-                    'lost_report_id',
-                    $lostReport->id
-                )
-                ->where(
-                    'found_report_id',
-                    $foundReport->id
-                )
-                ->first();
-
-        $score =
-            $this->calculateMatchScore(
-                $lostReport,
-                $foundReport
-            );
-
-        if (!$existingMatch) {
-            $existingMatch =
-                PotentialMatch::create([
-                    'lost_report_id' =>
-                        $lostReport->id,
-
-                    'found_report_id' =>
-                        $foundReport->id,
-
-                    'score' =>
-                        min(
-                            100,
-                            $score
-                        ),
-
-                    'status' =>
-                        'pending',
-
-                    'review_notes' =>
-                        'Potential match suggested by student.',
-                ]);
+                'data' =>
+                    $match,
+            ]);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | UPDATE REPORT WORKFLOW STATUS
-        |--------------------------------------------------------------------------
-        */
+        if ($result['created']) {
+            Notification::create([
+                'type' =>
+                    'potential_match',
 
-        $lostReport->update([
-            'status' =>
-                Report::STATUS_POTENTIAL_MATCH_FOUND,
-        ]);
+                'title' =>
+                    'Potential Match Needs Review',
 
-        $foundReport->update([
-            'status' =>
-                Report::STATUS_POTENTIAL_MATCH_FOUND,
-        ]);
+                'message' =>
+                    "A student suggested a potential Lost/Found match with a similarity score of {$result['score']}%.",
 
-        /*
-        |--------------------------------------------------------------------------
-        | NOTIFY BOTH STUDENTS
-        |--------------------------------------------------------------------------
-        */
+                'action' =>
+                    'potential_match',
 
-        $this->createMatchNotification(
-            $lostReport,
-            $foundReport
-        );
+                'status' =>
+                    'pending',
 
-        $this->createMatchNotification(
-            $foundReport,
-            $lostReport
-        );
+                'recipient_role' =>
+                    'admin',
 
-        /*
-        |--------------------------------------------------------------------------
-        | ADMIN NOTIFICATION
-        |--------------------------------------------------------------------------
-        */
+                'subject_type' =>
+                    PotentialMatch::class,
 
-        Notification::create([
-            'type' =>
-                'potential_match_found',
+                'subject_id' =>
+                    $match->id,
 
-            'title' =>
-                'Potential Match Found',
+                'data' => [
+                    'potential_match_id' =>
+                        $match->id,
 
-            'message' =>
-                "A potential match was detected between '{$lostReport->title}' and '{$foundReport->title}'.",
+                    'lost_report_id' =>
+                        $match->lost_report_id,
 
-            'action' =>
-                'potential_match_found',
+                    'found_report_id' =>
+                        $match->found_report_id,
 
-            'status' =>
-                'pending',
+                    'score' =>
+                        $result['score'],
+                ],
 
-            'recipient_role' =>
-                'admin',
-
-            'subject_type' =>
-                PotentialMatch::class,
-
-            'subject_id' =>
-                $existingMatch->id,
-
-            'data' => [
-                'lost_report_id' =>
-                    $lostReport->id,
-
-                'found_report_id' =>
-                    $foundReport->id,
-
-                'score' =>
-                    min(
-                        100,
-                        $score
-                    ),
-            ],
-
-            'is_read' =>
-                false,
-        ]);
+                'is_read' =>
+                    false,
+            ]);
+        }
 
         return response()->json([
             'status' =>
                 'success',
 
             'message' =>
-                'Potential match submitted for USC review.',
+                $result['created']
+                    ? 'Potential match submitted to USC for review.'
+                    : 'This potential match is already waiting for USC review.',
 
             'data' =>
-                $existingMatch,
+                $match,
         ]);
     }
 
@@ -1898,29 +2626,11 @@ class ReportController extends Controller
     protected function isEligibleForMatching(
         Report $report
     ): bool {
-        if ($report->isLost()) {
-            return in_array(
-                $report->status,
-                [
-                    Report::STATUS_APPROVED,
-                    Report::STATUS_POTENTIAL_MATCH_FOUND,
-                ],
-                true
-            );
-        }
-
-        if ($report->isFound()) {
-            return in_array(
-                $report->status,
-                [
-                    Report::STATUS_VERIFIED,
-                    Report::STATUS_POTENTIAL_MATCH_FOUND,
-                ],
-                true
-            );
-        }
-
-        return false;
+        return app(
+            PotentialMatchService::class
+        )->isEligible(
+            $report
+        );
     }
 
 
@@ -1946,283 +2656,11 @@ class ReportController extends Controller
         Report $first,
         Report $second
     ): int {
-        $score =
-            0;
-
-        /*
-        |--------------------------------------------------------------------------
-        | CATEGORY - 20
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            !empty(
-                $first->category
-            ) &&
-            !empty(
-                $second->category
-            ) &&
-            Str::lower(
-                trim(
-                    $first->category
-                )
-            ) ===
-            Str::lower(
-                trim(
-                    $second->category
-                )
-            )
-        ) {
-            $score +=
-                20;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | ITEM NAME - 20
-        |--------------------------------------------------------------------------
-        */
-
-        $firstTitle =
-            Str::lower(
-                trim(
-                    (string)
-                    $first->title
-                )
-            );
-
-        $secondTitle =
-            Str::lower(
-                trim(
-                    (string)
-                    $second->title
-                )
-            );
-
-        if (
-            $firstTitle !== '' &&
-            $secondTitle !== ''
-        ) {
-            if (
-                $firstTitle ===
-                $secondTitle
-            ) {
-                $score +=
-                    20;
-            } elseif (
-                Str::contains(
-                    $firstTitle,
-                    $secondTitle
-                ) ||
-                Str::contains(
-                    $secondTitle,
-                    $firstTitle
-                )
-            ) {
-                $score +=
-                    15;
-            } else {
-                $firstTitleWords =
-                    $this->extractKeywords(
-                        $firstTitle
-                    );
-
-                $secondTitleWords =
-                    $this->extractKeywords(
-                        $secondTitle
-                    );
-
-                $commonTitleWords =
-                    array_intersect(
-                        $firstTitleWords,
-                        $secondTitleWords
-                    );
-
-                $score +=
-                    min(
-                        10,
-                        count(
-                            $commonTitleWords
-                        ) * 5
-                    );
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | DESCRIPTION - 20
-        |--------------------------------------------------------------------------
-        */
-
-        $firstDescription =
-            $this->extractKeywords(
-                (string)
-                $first->description
-            );
-
-        $secondDescription =
-            $this->extractKeywords(
-                (string)
-                $second->description
-            );
-
-        $descriptionMatches =
-            array_intersect(
-                $firstDescription,
-                $secondDescription
-            );
-
-        $score +=
-            min(
-                20,
-                count(
-                    $descriptionMatches
-                ) * 4
-            );
-
-        /*
-        |--------------------------------------------------------------------------
-        | COLOR - 15
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            !empty(
-                $first->color
-            ) &&
-            !empty(
-                $second->color
-            )
-        ) {
-            $firstColor =
-                Str::lower(
-                    trim(
-                        $first->color
-                    )
-                );
-
-            $secondColor =
-                Str::lower(
-                    trim(
-                        $second->color
-                    )
-                );
-
-            if (
-                $firstColor ===
-                $secondColor
-            ) {
-                $score +=
-                    15;
-            } elseif (
-                Str::contains(
-                    $firstColor,
-                    $secondColor
-                ) ||
-                Str::contains(
-                    $secondColor,
-                    $firstColor
-                )
-            ) {
-                $score +=
-                    10;
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | LOCATION - 15
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            !empty(
-                $first->location
-            ) &&
-            !empty(
-                $second->location
-            )
-        ) {
-            $firstLocation =
-                Str::lower(
-                    trim(
-                        $first->location
-                    )
-                );
-
-            $secondLocation =
-                Str::lower(
-                    trim(
-                        $second->location
-                    )
-                );
-
-            if (
-                $firstLocation ===
-                $secondLocation
-            ) {
-                $score +=
-                    15;
-            } elseif (
-                Str::contains(
-                    $firstLocation,
-                    $secondLocation
-                ) ||
-                Str::contains(
-                    $secondLocation,
-                    $firstLocation
-                )
-            ) {
-                $score +=
-                    10;
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | DATE - 10
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            $first->date_occurred &&
-            $second->date_occurred
-        ) {
-            $difference =
-                abs(
-                    $first
-                        ->date_occurred
-                        ->diffInDays(
-                            $second
-                                ->date_occurred,
-                            false
-                        )
-                );
-
-            if ($difference === 0) {
-                $score +=
-                    10;
-            } elseif (
-                $difference <= 1
-            ) {
-                $score +=
-                    8;
-            } elseif (
-                $difference <= 3
-            ) {
-                $score +=
-                    5;
-            } elseif (
-                $difference <= 7
-            ) {
-                $score +=
-                    2;
-            }
-        }
-
-        return min(
-            100,
-            $score
+        return app(
+            PotentialMatchService::class
+        )->calculateScore(
+            $first,
+            $second
         );
     }
 
@@ -2278,6 +2716,286 @@ class ReportController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | AWARD SMALL FOUND-REPORT SUBMISSION POINT
+    |--------------------------------------------------------------------------
+    */
+
+    protected function awardFoundReportSubmissionPoints(
+        $student,
+        Report $report
+    ): array {
+        if (
+            !$student ||
+            !$report->isFound()
+        ) {
+            return [
+                'awarded' => 0,
+                'balance' => 0,
+            ];
+        }
+
+        $points =
+            self::FOUND_REPORT_SUBMISSION_POINTS;
+
+        $existing =
+            PointTransaction::query()
+                ->where(
+                    'student_id',
+                    $student->id
+                )
+                ->where(
+                    'type',
+                    'found_report_submission'
+                )
+                ->where(
+                    'reference_type',
+                    Report::class
+                )
+                ->where(
+                    'reference_id',
+                    $report->id
+                )
+                ->first();
+
+        $awarded = 0;
+
+        if (!$existing) {
+            PointTransaction::create([
+                'student_id' =>
+                    $student->id,
+
+                'type' =>
+                    'found_report_submission',
+
+                'direction' =>
+                    'credit',
+
+                'points' =>
+                    $points,
+
+                'amount' =>
+                    round(
+                        $points /
+                        self::POINTS_PER_PESO,
+                        2
+                    ),
+
+                'description' =>
+                    'Small recognition award for submitting a found-item report.',
+
+                'reference_type' =>
+                    Report::class,
+
+                'reference_id' =>
+                    $report->id,
+            ]);
+
+            $awarded =
+                $points;
+        }
+
+        $balance =
+            (int)
+            PointTransaction::query()
+                ->where(
+                    'student_id',
+                    $student->id
+                )
+                ->sum('points');
+
+        StudentRecognitionRecord::updateOrCreate(
+            [
+                'student_id' =>
+                    $student->id,
+            ],
+            [
+                'recognition_points' =>
+                    $balance,
+
+                'peso_value' =>
+                    round(
+                        $balance /
+                        self::POINTS_PER_PESO,
+                        2
+                    ),
+
+                'reward_count' =>
+                    (int)
+                    ($student->reward_count ?? 0),
+
+                'report_count' =>
+                    $student
+                        ->reports()
+                        ->count(),
+            ]
+        );
+
+        if ($awarded > 0) {
+            $this->createStudentNotification([
+                'student_id' =>
+                    $student->id,
+
+                'type' =>
+                    'recognition_points_awarded',
+
+                'title' =>
+                    'Recognition Point Awarded',
+
+                'message' =>
+                    "You received {$awarded} recognition point for submitting the found-item report '{$report->title}'. Additional category points can be awarded after a successful completed return.",
+
+                'action' =>
+                    'recognition_points_awarded',
+
+                'status' =>
+                    'pending',
+
+                'recipient_id' =>
+                    $student->id,
+
+                'recipient_role' =>
+                    'student',
+
+                'subject_type' =>
+                    Report::class,
+
+                'subject_id' =>
+                    $report->id,
+
+                'data' => [
+                    'report_id' =>
+                        $report->id,
+
+                    'points_awarded' =>
+                        $awarded,
+
+                    'recognition_points_balance' =>
+                        $balance,
+
+                    'award_type' =>
+                        'found_report_submission',
+                ],
+
+                'is_read' =>
+                    false,
+            ]);
+
+        }
+
+        return [
+            'awarded' =>
+                $awarded,
+
+            'balance' =>
+                $balance,
+        ];
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CREATE STUDENT NOTIFICATION + REMOTE PUSH
+    |--------------------------------------------------------------------------
+    |
+    | The database notification is always created first. Push failure is
+    | non-fatal so report/claim workflows continue normally.
+    |
+    */
+
+    protected function createStudentNotification(
+        array $payload
+    ) {
+        $notification =
+            Notification::create(
+                $payload
+            );
+
+        $studentId =
+            (int)
+            (
+                $payload[
+                    'student_id'
+                ]
+                ??
+                $payload[
+                    'recipient_id'
+                ]
+                ??
+                0
+            );
+
+        if ($studentId > 0) {
+            try {
+                app(
+                    PushNotificationService::class
+                )->sendToStudent(
+                    $studentId,
+
+                    (string)
+                    (
+                        $payload[
+                            'title'
+                        ]
+                        ??
+                        'FindIt'
+                    ),
+
+                    (string)
+                    (
+                        $payload[
+                            'message'
+                        ]
+                        ??
+                        ''
+                    ),
+
+                    array_merge(
+                        is_array(
+                            $payload[
+                                'data'
+                            ]
+                            ??
+                            null
+                        )
+                            ? $payload[
+                                'data'
+                            ]
+                            : [],
+                        [
+                            'notification_id' =>
+                                $notification->id,
+
+                            'type' =>
+                                $payload[
+                                    'type'
+                                ]
+                                ??
+                                null,
+
+                            'action' =>
+                                $payload[
+                                    'action'
+                                ]
+                                ??
+                                null,
+                        ]
+                    )
+                );
+            } catch (
+                \Throwable $exception
+            ) {
+                report(
+                    $exception
+                );
+            }
+        }
+
+        return $notification;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
     | CREATE MATCH NOTIFICATION
     |--------------------------------------------------------------------------
     */
@@ -2287,7 +3005,7 @@ class ReportController extends Controller
         Report $otherReport
     ) {
         $notification =
-            Notification::create([
+            $this->createStudentNotification([
                 'student_id' =>
                     $report->student_id,
 
@@ -2330,406 +3048,8 @@ class ReportController extends Controller
                     false,
             ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Push sending failure must NOT break the workflow.
-        |--------------------------------------------------------------------------
-        */
-
-        try {
-            $this->sendPushNotificationToUser(
-                (int)
-                $report->student_id,
-
-                'Potential Match Found',
-
-                "A possible match was found for '{$report->title}'.",
-
-                [
-                    'action' =>
-                        'potential_match_found',
-
-                    'report_id' =>
-                        $report->id,
-
-                    'matched_report_id' =>
-                        $otherReport->id,
-                ]
-            );
-        } catch (\Throwable $exception) {
-            report(
-                $exception
-            );
-        }
-
         return $notification;
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | SEND PUSH NOTIFICATION
-    |--------------------------------------------------------------------------
-    |
-    | Push notification failures do not affect normal API workflow.
-    |
-    */
-
-    protected function sendPushNotificationToUser(
-        int $studentId,
-        string $title,
-        string $body,
-        array $data = []
-    ) {
-        $deviceTokens =
-            DeviceToken::where(
-                'student_id',
-                $studentId
-            )->get();
-
-        if (
-            $deviceTokens->isEmpty()
-        ) {
-            return false;
-        }
-
-        $expoTokens =
-            [];
-
-        $fcmTokens =
-            [];
-
-        $webSubscriptions =
-            [];
-
-        foreach (
-            $deviceTokens
-            as
-            $deviceToken
-        ) {
-            $tokenValue =
-                (string)
-                $deviceToken->token;
-
-            if (
-                $deviceToken->platform ===
-                'web'
-            ) {
-                $subscription =
-                    json_decode(
-                        $tokenValue,
-                        true
-                    );
-
-                if (
-                    is_array(
-                        $subscription
-                    ) &&
-                    !empty(
-                        $subscription[
-                            'endpoint'
-                        ]
-                    )
-                ) {
-                    $subscriptionObject =
-                        null;
-
-                    if (
-                        method_exists(
-                            \Minishlink\WebPush\Subscription::class,
-                            'create'
-                        )
-                    ) {
-                        $subscriptionObject =
-                            \Minishlink\WebPush\Subscription::create(
-                                $subscription
-                            );
-                    }
-
-                    if (
-                        !$subscriptionObject instanceof
-                        \Minishlink\WebPush\SubscriptionInterface
-                    ) {
-                        $subscriptionObject =
-                            new \Minishlink\WebPush\Subscription(
-                                (string) (
-                                    $subscription[
-                                        'endpoint'
-                                    ] ??
-                                    ''
-                                ),
-                                (string) (
-                                    $subscription[
-                                        'keys'
-                                    ][
-                                        'p256dh'
-                                    ] ??
-                                    ''
-                                ),
-                                (string) (
-                                    $subscription[
-                                        'keys'
-                                    ][
-                                        'auth'
-                                    ] ??
-                                    ''
-                                )
-                            );
-                    }
-
-                    if (
-                        $subscriptionObject instanceof
-                        \Minishlink\WebPush\SubscriptionInterface
-                    ) {
-                        $webSubscriptions[] =
-                            $subscriptionObject;
-                    }
-                }
-
-                continue;
-            }
-
-            if (
-                Str::startsWith(
-                    $tokenValue,
-                    'ExponentPushToken'
-                )
-            ) {
-                $expoTokens[] =
-                    $tokenValue;
-            } else {
-                $fcmTokens[] =
-                    $tokenValue;
-            }
-        }
-
-        $success =
-            true;
-
-        /*
-        |--------------------------------------------------------------------------
-        | EXPO PUSH
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            !empty(
-                $expoTokens
-            )
-        ) {
-            $expoPayloads =
-                array_map(
-                    fn ($token) => [
-                        'to' =>
-                            $token,
-
-                        'title' =>
-                            $title,
-
-                        'body' =>
-                            $body,
-
-                        'data' =>
-                            $data,
-                    ],
-                    $expoTokens
-                );
-
-            try {
-                $expoResponse =
-                    Http::withHeaders([
-                        'Accept' =>
-                            'application/json',
-
-                        'Content-Type' =>
-                            'application/json',
-                    ])->post(
-                        'https://exp.host/--/api/v2/push/send',
-                        $expoPayloads
-                    );
-
-                if (
-                    !$expoResponse->successful()
-                ) {
-                    $success =
-                        false;
-                }
-            } catch (\Throwable $exception) {
-                report(
-                    $exception
-                );
-
-                $success =
-                    false;
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | FCM
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            !empty(
-                $fcmTokens
-            )
-        ) {
-            $serverKey =
-                env(
-                    'FCM_SERVER_KEY'
-                );
-
-            if (
-                !empty(
-                    $serverKey
-                )
-            ) {
-                try {
-                    $fcmPayload = [
-                        'registration_ids' =>
-                            $fcmTokens,
-
-                        'notification' => [
-                            'title' =>
-                                $title,
-
-                            'body' =>
-                                $body,
-                        ],
-
-                        'data' =>
-                            $data,
-                    ];
-
-                    $fcmResponse =
-                        Http::withHeaders([
-                            'Authorization' =>
-                                "key={$serverKey}",
-
-                            'Content-Type' =>
-                                'application/json',
-                        ])->post(
-                            'https://fcm.googleapis.com/fcm/send',
-                            $fcmPayload
-                        );
-
-                    if (
-                        !$fcmResponse->successful()
-                    ) {
-                        $success =
-                            false;
-                    }
-                } catch (\Throwable $exception) {
-                    report(
-                        $exception
-                    );
-
-                    $success =
-                        false;
-                }
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | WEB PUSH
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            !empty(
-                $webSubscriptions
-            )
-        ) {
-            $publicKey =
-                env(
-                    'VAPID_PUBLIC_KEY'
-                );
-
-            $privateKey =
-                env(
-                    'VAPID_PRIVATE_KEY'
-                );
-
-            if (
-                !empty(
-                    $publicKey
-                ) &&
-                !empty(
-                    $privateKey
-                )
-            ) {
-                try {
-                    $webPush =
-                        new WebPush([
-                            'VAPID' => [
-                                'subject' =>
-                                    env(
-                                        'VAPID_SUBJECT',
-                                        'mailto:admin@ssct.edu.ph'
-                                    ),
-
-                                'publicKey' =>
-                                    $publicKey,
-
-                                'privateKey' =>
-                                    $privateKey,
-                            ],
-                        ]);
-
-                    foreach (
-                        $webSubscriptions
-                        as
-                        $subscription
-                    ) {
-                        try {
-                            $webPush->sendOneNotification(
-                                $subscription,
-                                json_encode([
-                                    'title' =>
-                                        $title,
-
-                                    'body' =>
-                                        $body,
-
-                                    'data' =>
-                                        $data,
-
-                                    'tag' =>
-                                        'findit-notification',
-                                ]),
-                                [
-                                    'TTL' =>
-                                        86400,
-                                ]
-                            );
-                        } catch (
-                            \Throwable $exception
-                        ) {
-                            report(
-                                $exception
-                            );
-
-                            $success =
-                                false;
-                        }
-                    }
-
-                    $webPush->flush();
-                } catch (
-                    \Throwable $exception
-                ) {
-                    report(
-                        $exception
-                    );
-
-                    $success =
-                        false;
-                }
-            }
-        }
-
-        return $success;
-    }
 }

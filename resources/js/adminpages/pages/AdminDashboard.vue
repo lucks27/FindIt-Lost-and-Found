@@ -1,540 +1,714 @@
 <template>
 
-    <div class="dashboard-page">
+    <main class="findit-dashboard">
 
-        <!-- Decorative background -->
+        <!-- =========================================================
 
-        <div class="bg-orb bg-orb-left"></div>
+             HERO
 
-        <div class="bg-orb bg-orb-right"></div>
+        ========================================================== -->
 
-        <div class="bg-pattern"></div>
+        <section class="dashboard-hero">
 
+            <div class="dashboard-hero-copy">
 
+                <div class="dashboard-kicker">
 
-        <main class="dashboard-content">
+                    <span class="dashboard-kicker-icon" aria-hidden="true">
 
-            <!-- ERROR -->
+                        <svg viewBox="0 0 24 24">
 
-            <div v-if="errorMessage" class="inline-alert">
+                            <path d="M4 19V9M10 19V5M16 19v-7M22 19V3" />
 
-                <span class="alert-icon">!</span>
+                        </svg>
 
-                {{ errorMessage }}
+                    </span>
+
+                    <span>Operations Dashboard</span>
+
+                </div>
+
+                <h1>Lost &amp; Found Command Center</h1>
+
+                <p>
+
+                    Monitor active workflow queues, public listings, potential
+
+                    matches, completed records, and the latest administrative
+
+                    activity from one clear workspace.
+
+                </p>
+
+                <div class="dashboard-hero-meta">
+
+                    <span class="dashboard-meta-chip">
+
+                        <span class="dashboard-live-dot"></span>
+
+                        Live workflow
+
+                    </span>
+
+                    <span class="dashboard-meta-chip">
+
+                        6 operational queues
+
+                    </span>
+
+                    <span class="dashboard-meta-chip gold">
+
+                        {{ metrics.totalReports }} total reports
+
+                    </span>
+
+                </div>
 
             </div>
 
+            <div class="dashboard-hero-side">
 
+                <div class="hero-metric-grid">
 
-            <!-- ==============================
+                    <article class="hero-metric">
 
-           QUEUE OVERVIEW
+                        <span>Total Reports</span>
 
-      =============================== -->
+                        <strong>{{ animatedMetrics.totalReports }}</strong>
 
-            <section class="queue-shell">
+                        <small>Current report volume</small>
 
-                <div class="section-heading">
+                    </article>
 
-                    <div>
+                    <article class="hero-metric">
 
-                        <span class="section-eyebrow">
+                        <span>Pending Intake</span>
 
-                            Live Queue
+                        <strong>{{ metrics.openReports }}</strong>
 
-                        </span>
+                        <small>Surrender + report review</small>
 
-
-
-                        <h2>
-
-                            Workflow Overview
-
-                        </h2>
-
-                    </div>
-
-
-
-                    <div class="live-pill">
-
-                        <span class="live-dot"></span>
-
-                        6 workflow lanes
-
-                    </div>
+                    </article>
 
                 </div>
 
+                <button
 
+                    type="button"
 
-                <!-- Loading -->
+                    class="dashboard-refresh-button"
 
-                <div v-if="loading" class="queue-grid">
+                    :disabled="loading"
 
-                    <div v-for="i in 6" :key="i" class="queue-card skeleton-card">
+                    @click="loadDashboard"
 
-                        <div class="skeleton skeleton-icon"></div>
+                >
 
-                        <div class="skeleton skeleton-number"></div>
+                    <svg
 
-                        <div class="skeleton skeleton-title"></div>
+                        :class="{ spinning: loading }"
 
-                        <div class="skeleton skeleton-small"></div>
+                        viewBox="0 0 24 24"
 
-                    </div>
+                        aria-hidden="true"
+
+                    >
+
+                        <path d="M19 7v4h-4M5 17v-4h4M6.3 9a6.5 6.5 0 0 1 10.7-2L19 9M5 15l2 2a6.5 6.5 0 0 0 10.7-2" />
+
+                    </svg>
+
+                    <span>
+
+                        {{ loading ? 'Refreshing…' : 'Refresh Dashboard' }}
+
+                    </span>
+
+                </button>
+
+            </div>
+
+        </section>
+
+        <!-- =========================================================
+
+             ERROR
+
+        ========================================================== -->
+
+        <div
+
+            v-if="errorMessage"
+
+            class="dashboard-alert"
+
+            role="alert"
+
+        >
+
+            <span class="dashboard-alert-icon">!</span>
+
+            <div>
+
+                <strong>Unable to load the dashboard</strong>
+
+                <p>{{ errorMessage }}</p>
+
+            </div>
+
+        </div>
+
+        <!-- =========================================================
+
+             WORKFLOW OVERVIEW
+
+        ========================================================== -->
+
+        <section class="workflow-section">
+
+            <div class="workflow-section-header">
+
+                <div>
+
+                    <p class="dashboard-section-kicker">Live Queue</p>
+
+                    <h2>Workflow Overview</h2>
+
+                    <p>
+
+                        Open the queue that needs attention and continue the
+
+                        Lost and Found workflow.
+
+                    </p>
 
                 </div>
 
+                <span class="workflow-live-pill">
 
+                    <span class="dashboard-live-dot"></span>
 
-                <!-- Cards -->
+                    6 workflow lanes
 
-                <div v-else class="queue-grid">
+                </span>
 
-                    <router-link v-for="(card, index) in countCards" :key="card.key" :to="{ name: card.route }"
+            </div>
 
-                        class="queue-card" :style="{
+            <!-- Loading -->
 
-                            '--accent': card.accent,
+            <div
 
-                            '--accent-soft': card.softAccent,
+                v-if="loading"
 
-                            animationDelay: `${index * 0.06}s`
+                class="workflow-card-grid"
 
-                        }">
+            >
 
-                        <!-- Decoration -->
+                <article
 
-                        <span class="card-glow"></span>
+                    v-for="i in 6"
 
-                        <span class="card-edge"></span>
+                    :key="i"
 
+                    class="workflow-card skeleton-workflow-card"
 
+                >
 
-                        <div class="queue-card-header">
+                    <div class="skeleton skeleton-square"></div>
 
-                            <div class="queue-icon">
+                    <div class="skeleton skeleton-count"></div>
 
-                                <svg viewBox="0 0 24 24" v-html="card.iconPath"></svg>
+                    <div class="skeleton skeleton-heading"></div>
 
-                            </div>
+                    <div class="skeleton skeleton-line"></div>
 
-
-
-                            <span class="queue-code">
-
-                                {{ card.code }}
-
-                            </span>
-
-                        </div>
-
-
-
-                        <strong class="queue-value">
-
-                            {{ animatedMetrics[card.key] }}
-
-                        </strong>
-
-
-
-                        <div class="queue-copy">
-
-                            <h3>
-
-                                {{ card.label }}
-
-                            </h3>
-
-
-
-                            <p>
-
-                                {{ card.description }}
-
-                            </p>
-
-                        </div>
-
-
-
-                        <div class="queue-footer">
-
-                            <span>
-
-                                {{ card.linkText }}
-
-                            </span>
-
-
-
-                            <span class="arrow-box">
-
-                                <svg viewBox="0 0 24 24">
-
-                                    <path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2"
-
-                                        stroke-linecap="round" stroke-linejoin="round" />
-
-                                </svg>
-
-                            </span>
-
-                        </div>
-
-                    </router-link>
-
-                </div>
-
-            </section>
-
-
-
-            <!-- ==============================
-
-           LOWER PANELS
-
-      =============================== -->
-
-
-
-            <section class="analytics-grid">
-
-                <!-- WORKFLOW -->
-
-                <article class="panel workflow-panel">
-
-                    <span class="panel-orb panel-orb-one"></span>
-
-                    <span class="panel-orb panel-orb-two"></span>
-
-
-
-                    <div class="panel-header">
-
-                        <div>
-
-                            <span class="panel-eyebrow">
-
-                                Reports Overview
-
-                            </span>
-
-
-
-                            <h2>
-
-                                Current workflow mix
-
-                            </h2>
-
-                        </div>
-
-
-
-                        <div class="gold-badge">
-
-                            {{ animatedMetrics.totalReports }}
-
-                            reports
-
-                        </div>
-
-                    </div>
-
-
-
-                    <!-- Loading -->
-
-                    <div v-if="loading" class="chart-loading">
-
-                        <div class="skeleton chart-circle-loading"></div>
-
-
-
-                        <div class="legend-loading">
-
-                            <div v-for="i in 4" :key="i" class="skeleton legend-loading-row"></div>
-
-                        </div>
-
-                    </div>
-
-
-
-                    <div v-else class="chart-layout">
-
-                        <!-- Donut -->
-
-                        <div class="donut-wrapper">
-
-                            <svg class="donut" viewBox="0 0 120 120">
-
-                                <circle class="donut-track" cx="60" cy="60" r="50" />
-
-
-
-                                <circle v-for="segment in chartSegments" :key="segment.key" class="donut-segment"
-
-                                    cx="60" cy="60" r="50" :style="{
-
-                                        stroke: segment.color,
-
-                                        strokeDasharray:
-
-                                            chartAnimated
-
-                                                ? segment.dashArray
-
-                                                : `0 ${circumference}`,
-
-                                        transform:
-
-                                            `rotate(${segment.rotation}deg)`
-
-                                    }" />
-
-                            </svg>
-
-
-
-                            <div class="donut-center">
-
-                                <span>
-
-                                    TOTAL
-
-                                </span>
-
-
-
-                                <strong>
-
-                                    {{ animatedMetrics.totalReports }}
-
-                                </strong>
-
-
-
-                                <small>
-
-                                    REPORTS
-
-                                </small>
-
-                            </div>
-
-                        </div>
-
-
-
-                        <!-- Legend -->
-
-                        <div class="chart-legend">
-
-                            <div v-for="item in legendItems" :key="item.key" class="legend-item">
-
-                                <div class="legend-left">
-
-                                    <span class="legend-bar" :style="{
-
-                                        backgroundColor: item.color
-
-                                    }"></span>
-
-
-
-                                    <div>
-
-                                        <strong>
-
-                                            {{ item.label }}
-
-                                        </strong>
-
-
-
-                                        <small>
-
-                                            {{ item.description }}
-
-                                        </small>
-
-                                    </div>
-
-                                </div>
-
-
-
-                                <span class="legend-value">
-
-                                    {{ item.value }}
-
-                                </span>
-
-                            </div>
-
-                        </div>
-
-                    </div>
+                    <div class="skeleton skeleton-link"></div>
 
                 </article>
 
+            </div>
 
+            <!-- Cards -->
 
-                <!-- RECENT ACTIVITY -->
+            <div
 
-                <article class="panel activity-panel">
+                v-else
 
-                    <span class="panel-orb activity-orb"></span>
+                class="workflow-card-grid"
 
+            >
 
+                <router-link
 
-                    <div class="panel-header">
+                    v-for="(card, index) in countCards"
 
-                        <div>
+                    :key="card.key"
 
-                            <span class="panel-eyebrow">
+                    :to="{ name: card.route }"
 
-                                Recent Activity
+                    class="workflow-card"
 
-                            </span>
+                    :style="{
 
+                        '--workflow-accent': card.accent,
 
+                        '--workflow-soft': card.softAccent,
 
-                            <h2>
+                        animationDelay: `${index * 0.055}s`,
 
-                                Latest backend events
+                    }"
 
-                            </h2>
+                >
+
+                    <span class="workflow-card-glow"></span>
+
+                    <div class="workflow-card-top">
+
+                        <div
+
+                            class="workflow-card-icon"
+
+                            aria-hidden="true"
+
+                        >
+
+                            <svg
+
+                                viewBox="0 0 24 24"
+
+                                v-html="card.iconPath"
+
+                            ></svg>
 
                         </div>
 
+                        <span class="workflow-card-code">
 
-
-                        <span class="activity-badge">
-
-                            {{ recentActivity.length }}
+                            {{ card.code }}
 
                         </span>
 
                     </div>
 
+                    <strong class="workflow-card-value">
 
+                        {{ animatedMetrics[card.key] }}
 
-                    <!-- Loading -->
+                    </strong>
 
-                    <div v-if="loading" class="activity-loading">
+                    <div class="workflow-card-copy">
 
-                        <div v-for="i in 5" :key="i" class="loading-event">
-
-                            <div class="skeleton loading-dot"></div>
-
-
-
-                            <div class="loading-text">
-
-                                <div class="skeleton loading-title"></div>
-
-                                <div class="skeleton loading-date"></div>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-
-                    <!-- Empty -->
-
-                    <div v-else-if="!recentActivity.length" class="empty-state">
-
-                        <div class="empty-icon">
-
-                            <svg viewBox="0 0 24 24">
-
-                                <path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" fill="none"
-
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-
-                                    stroke-linejoin="round" />
-
-                            </svg>
-
-                        </div>
-
-
-
-                        <h3>
-
-                            No activity yet
-
-                        </h3>
-
-
+                        <h3>{{ card.label }}</h3>
 
                         <p>
 
-                            Workflow updates will appear here once
-
-                            activity is recorded.
+                            {{ card.description }}
 
                         </p>
 
                     </div>
 
+                    <div class="workflow-card-action">
 
+                        <span>{{ card.linkText }}</span>
 
-                    <!-- Timeline -->
+                        <span class="workflow-arrow">
 
-                    <transition-group v-else name="timeline" tag="ul" class="timeline-list">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
 
-                        <li v-for="event in recentActivity" :key="event.id" class="timeline-row">
+                                <path
 
-                            <div class="timeline-marker">
+                                    d="M5 12h14M13 6l6 6-6 6"
 
-                                <span></span>
+                                    fill="none"
+
+                                    stroke="currentColor"
+
+                                    stroke-width="2.2"
+
+                                    stroke-linecap="round"
+
+                                    stroke-linejoin="round"
+
+                                />
+
+                            </svg>
+
+                        </span>
+
+                    </div>
+
+                </router-link>
+
+            </div>
+
+        </section>
+
+        <!-- =========================================================
+
+             ANALYTICS
+
+        ========================================================== -->
+
+        <section class="dashboard-analytics-grid">
+
+            <!-- REPORTS OVERVIEW -->
+
+            <article class="dashboard-panel workflow-panel">
+
+                <header class="dashboard-panel-header">
+
+                    <div>
+
+                        <p class="dashboard-section-kicker">
+
+                            Reports Overview
+
+                        </p>
+
+                        <h2>Current workflow mix</h2>
+
+                        <p>
+
+                            A breakdown of Lost, Found, open, and completed
+
+                            report records.
+
+                        </p>
+
+                    </div>
+
+                    <span class="panel-count-pill">
+
+                        {{ animatedMetrics.totalReports }}
+
+                        reports
+
+                    </span>
+
+                </header>
+
+                <div
+
+                    v-if="loading"
+
+                    class="chart-loading-layout"
+
+                >
+
+                    <div class="skeleton chart-skeleton"></div>
+
+                    <div class="legend-loading">
+
+                        <div
+
+                            v-for="i in 4"
+
+                            :key="i"
+
+                            class="skeleton legend-skeleton"
+
+                        ></div>
+
+                    </div>
+
+                </div>
+
+                <div
+
+                    v-else
+
+                    class="reports-chart-layout"
+
+                >
+
+                    <div class="donut-wrapper">
+
+                        <svg
+
+                            class="dashboard-donut"
+
+                            viewBox="0 0 120 120"
+
+                            role="img"
+
+                            aria-label="Report workflow distribution"
+
+                        >
+
+                            <circle
+
+                                class="donut-track"
+
+                                cx="60"
+
+                                cy="60"
+
+                                r="50"
+
+                            />
+
+                            <circle
+
+                                v-for="segment in chartSegments"
+
+                                :key="segment.key"
+
+                                class="donut-segment"
+
+                                cx="60"
+
+                                cy="60"
+
+                                r="50"
+
+                                :style="{
+
+                                    stroke: segment.color,
+
+                                    strokeDasharray:
+
+                                        chartAnimated
+
+                                            ? segment.dashArray
+
+                                            : `0 ${circumference}`,
+
+                                    transform:
+
+                                        `rotate(${segment.rotation}deg)`,
+
+                                }"
+
+                            />
+
+                        </svg>
+
+                        <div class="donut-center">
+
+                            <span>Total</span>
+
+                            <strong>{{ animatedMetrics.totalReports }}</strong>
+
+                            <small>Reports</small>
+
+                        </div>
+
+                    </div>
+
+                    <div class="dashboard-legend">
+
+                        <div
+
+                            v-for="item in legendItems"
+
+                            :key="item.key"
+
+                            class="dashboard-legend-item"
+
+                        >
+
+                            <div class="legend-label-group">
+
+                                <span
+
+                                    class="legend-accent"
+
+                                    :style="{ backgroundColor: item.color }"
+
+                                ></span>
+
+                                <div>
+
+                                    <strong>{{ item.label }}</strong>
+
+                                    <small>{{ item.description }}</small>
+
+                                </div>
 
                             </div>
 
+                            <span class="dashboard-legend-value">
 
+                                {{ item.value }}
 
-                            <div class="timeline-content">
+                            </span>
 
-                                <p>
+                        </div>
 
-                                    {{ event.label }}
+                    </div>
 
-                                </p>
+                </div>
 
+            </article>
 
+            <!-- RECENT ACTIVITY -->
 
-                                <small>
+            <article class="dashboard-panel activity-panel">
 
-                                    {{ formatDate(event.when) }}
+                <header class="dashboard-panel-header">
 
-                                </small>
+                    <div>
 
-                            </div>
+                        <p class="dashboard-section-kicker">
 
-                        </li>
+                            Recent Activity
 
-                    </transition-group>
+                        </p>
 
-                </article>
+                        <h2>Latest backend events</h2>
 
-            </section>
+                        <p>
 
-        </main>
+                            The newest workflow activity recorded by the
 
-    </div>
+                            administration system.
+
+                        </p>
+
+                    </div>
+
+                    <span class="activity-count-pill">
+
+                        {{ recentActivity.length }}
+
+                    </span>
+
+                </header>
+
+                <!-- Loading -->
+
+                <div
+
+                    v-if="loading"
+
+                    class="activity-loading"
+
+                >
+
+                    <div
+
+                        v-for="i in 5"
+
+                        :key="i"
+
+                        class="activity-loading-row"
+
+                    >
+
+                        <div class="skeleton activity-dot-skeleton"></div>
+
+                        <div>
+
+                            <div class="skeleton activity-title-skeleton"></div>
+
+                            <div class="skeleton activity-date-skeleton"></div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- Empty -->
+
+                <div
+
+                    v-else-if="!recentActivity.length"
+
+                    class="activity-empty-state"
+
+                >
+
+                    <div class="activity-empty-icon">
+
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+
+                            <path
+
+                                d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+
+                                fill="none"
+
+                                stroke="currentColor"
+
+                                stroke-width="2"
+
+                                stroke-linecap="round"
+
+                                stroke-linejoin="round"
+
+                            />
+
+                        </svg>
+
+                    </div>
+
+                    <h3>No activity yet</h3>
+
+                    <p>
+
+                        Workflow updates will appear here once activity is
+
+                        recorded.
+
+                    </p>
+
+                </div>
+
+                <!-- Timeline -->
+
+                <transition-group
+
+                    v-else
+
+                    name="timeline"
+
+                    tag="ul"
+
+                    class="dashboard-timeline"
+
+                >
+
+                    <li
+
+                        v-for="event in recentActivity"
+
+                        :key="event.id"
+
+                        class="dashboard-timeline-row"
+
+                    >
+
+                        <div class="timeline-marker">
+
+                            <span></span>
+
+                        </div>
+
+                        <div class="timeline-copy">
+
+                            <p>{{ event.label }}</p>
+
+                            <small>
+
+                                {{ formatDate(event.when) }}
+
+                            </small>
+
+                        </div>
+
+                    </li>
+
+                </transition-group>
+
+            </article>
+
+        </section>
+
+    </main>
 
 </template>
-
-
 
 <script setup>
 
@@ -552,23 +726,13 @@ import {
 
 } from 'vue'
 
-
-
 import api from '@/bootstrap'
-
-
 
 const loading = ref(false)
 
-
-
 const errorMessage = ref('')
 
-
-
 const chartAnimated = ref(false)
-
-
 
 const dashboard = ref({
 
@@ -577,8 +741,6 @@ const dashboard = ref({
     recent_activity: []
 
 })
-
-
 
 const displayedMetrics = ref({
 
@@ -598,23 +760,17 @@ const displayedMetrics = ref({
 
 })
 
-
-
 /* ==============================
 
    METRICS
 
-============================== */
-
-
+\============================== */
 
 const metrics = computed(() => {
 
     const summary =
 
         dashboard.value.summary || {}
-
-
 
     return {
 
@@ -626,8 +782,6 @@ const metrics = computed(() => {
 
             ),
 
-
-
         pendingSurrenders:
 
             Number(
@@ -635,8 +789,6 @@ const metrics = computed(() => {
                 summary.pending_surrenders || 0
 
             ),
-
-
 
         pendingReports:
 
@@ -646,8 +798,6 @@ const metrics = computed(() => {
 
             ),
 
-
-
         pendingVerifications:
 
             Number(
@@ -655,8 +805,6 @@ const metrics = computed(() => {
                 summary.pending_verifications || 0
 
             ),
-
-
 
         mobilePosts:
 
@@ -666,8 +814,6 @@ const metrics = computed(() => {
 
             ),
 
-
-
         potentialMatches:
 
             Number(
@@ -676,8 +822,6 @@ const metrics = computed(() => {
 
             ),
 
-
-
         archivedItems:
 
             Number(
@@ -685,8 +829,6 @@ const metrics = computed(() => {
                 summary.archived_items || 0
 
             ),
-
-
 
         openReports:
 
@@ -702,8 +844,6 @@ const metrics = computed(() => {
 
             ),
 
-
-
         lostReports:
 
             Number(
@@ -712,8 +852,6 @@ const metrics = computed(() => {
 
             ),
 
-
-
         foundReports:
 
             Number(
@@ -721,8 +859,6 @@ const metrics = computed(() => {
                 summary.pending_verifications || 0
 
             ),
-
-
 
         totalReleases:
 
@@ -736,8 +872,6 @@ const metrics = computed(() => {
 
 })
 
-
-
 const animatedMetrics =
 
     computed(
@@ -745,8 +879,6 @@ const animatedMetrics =
         () => displayedMetrics.value
 
     )
-
-
 
 const recentActivity =
 
@@ -760,15 +892,11 @@ const recentActivity =
 
     )
 
-
-
 /* ==============================
 
    QUEUE CARDS
 
-============================== */
-
-
+\============================== */
 
 const countCards = computed(() => [
 
@@ -778,49 +906,33 @@ const countCards = computed(() => [
 
             'pendingSurrenders',
 
-
-
         code:
 
             'PS',
-
-
 
         label:
 
             'Pending surrender',
 
-
-
         description:
 
             'Items waiting for surrender processing.',
-
-
 
         route:
 
             'superadmin.pending-surrender',
 
-
-
         linkText:
 
             'Open queue',
-
-
 
         accent:
 
             '#8fd5a5',
 
-
-
         softAccent:
 
             'rgba(143,213,165,0.20)',
-
-
 
         iconPath:
 
@@ -828,57 +940,39 @@ const countCards = computed(() => [
 
     },
 
-
-
     {
 
         key:
 
             'pendingReports',
 
-
-
         code:
 
             'PR',
-
-
 
         label:
 
             'Pending reports',
 
-
-
         description:
 
             'Reports waiting for admin review.',
-
-
 
         route:
 
             'superadmin.pending-report',
 
-
-
         linkText:
 
             'Review reports',
-
-
 
         accent:
 
             '#70c991',
 
-
-
         softAccent:
 
             'rgba(112,201,145,0.20)',
-
-
 
         iconPath:
 
@@ -886,57 +980,39 @@ const countCards = computed(() => [
 
     },
 
-
-
     {
 
         key:
 
             'pendingVerifications',
 
-
-
         code:
 
             'IV',
-
-
 
         label:
 
             'Item verification',
 
-
-
         description:
 
             'Records waiting for verification.',
-
-
 
         route:
 
             'superadmin.item-verification',
 
-
-
         linkText:
 
             'Open verification',
-
-
 
         accent:
 
             '#b8e7c4',
 
-
-
         softAccent:
 
             'rgba(184,231,196,0.22)',
-
-
 
         iconPath:
 
@@ -944,57 +1020,39 @@ const countCards = computed(() => [
 
     },
 
-
-
     {
 
         key:
 
             'mobilePosts',
 
-
-
         code:
 
             'MP',
-
-
 
         label:
 
             'Posted to mobile',
 
-
-
         description:
 
             'Records currently published to mobile.',
-
-
 
         route:
 
             'superadmin.mobile-posts',
 
-
-
         linkText:
 
             'Manage posts',
-
-
 
         accent:
 
             '#5eb77d',
 
-
-
         softAccent:
 
             'rgba(94,183,125,0.20)',
-
-
 
         iconPath:
 
@@ -1002,57 +1060,39 @@ const countCards = computed(() => [
 
     },
 
-
-
     {
 
         key:
 
             'potentialMatches',
 
-
-
         code:
 
             'PM',
-
-
 
         label:
 
             'Potential matches',
 
-
-
         description:
 
             'Possible report matches ready for review.',
-
-
 
         route:
 
             'superadmin.matches',
 
-
-
         linkText:
 
             'Review matches',
-
-
 
         accent:
 
             '#9bd9ad',
 
-
-
         softAccent:
 
             'rgba(155,217,173,0.20)',
-
-
 
         iconPath:
 
@@ -1060,57 +1100,39 @@ const countCards = computed(() => [
 
     },
 
-
-
     {
 
         key:
 
             'archivedItems',
 
-
-
         code:
 
             'AR',
-
-
 
         label:
 
             'Archived items',
 
-
-
         description:
 
             'Completed records stored in archive.',
-
-
 
         route:
 
             'superadmin.archive',
 
-
-
         linkText:
 
             'Open archive',
-
-
 
         accent:
 
             '#74ba8b',
 
-
-
         softAccent:
 
             'rgba(116,186,139,0.20)',
-
-
 
         iconPath:
 
@@ -1120,15 +1142,11 @@ const countCards = computed(() => [
 
 ])
 
-
-
 /* ==============================
 
    CHART LEGEND
 
-============================== */
-
-
+\============================== */
 
 const legendItems = computed(() => [
 
@@ -1138,25 +1156,17 @@ const legendItems = computed(() => [
 
             'lost',
 
-
-
         label:
 
             'Lost reports',
-
-
 
         description:
 
             'Pending review',
 
-
-
         value:
 
             metrics.value.lostReports,
-
-
 
         color:
 
@@ -1164,33 +1174,23 @@ const legendItems = computed(() => [
 
     },
 
-
-
     {
 
         key:
 
             'found',
 
-
-
         label:
 
             'Found reports',
-
-
 
         description:
 
             'Verification queue',
 
-
-
         value:
 
             metrics.value.foundReports,
-
-
 
         color:
 
@@ -1198,33 +1198,23 @@ const legendItems = computed(() => [
 
     },
 
-
-
     {
 
         key:
 
             'open',
 
-
-
         label:
 
             'Open reports',
-
-
 
         description:
 
             'Active workflow',
 
-
-
         value:
 
             metrics.value.openReports,
-
-
 
         color:
 
@@ -1232,33 +1222,23 @@ const legendItems = computed(() => [
 
     },
 
-
-
     {
 
         key:
 
             'released',
 
-
-
         label:
 
             'Releases recorded',
-
-
 
         description:
 
             'Archived records',
 
-
-
         value:
 
             metrics.value.totalReleases,
-
-
 
         color:
 
@@ -1268,19 +1248,13 @@ const legendItems = computed(() => [
 
 ])
 
-
-
 /* ==============================
 
    DONUT CHART
 
-============================== */
-
-
+\============================== */
 
 const RADIUS = 50
-
-
 
 const circumference =
 
@@ -1289,8 +1263,6 @@ const circumference =
     Math.PI *
 
     RADIUS
-
-
 
 const chartSegments =
 
@@ -1306,13 +1278,9 @@ const chartSegments =
 
                         item.key,
 
-
-
                     value:
 
                         item.value,
-
-
 
                     color:
 
@@ -1321,8 +1289,6 @@ const chartSegments =
                 })
 
             )
-
-
 
         const total =
 
@@ -1336,19 +1302,13 @@ const chartSegments =
 
             )
 
-
-
         if (!total) {
 
             return []
 
         }
 
-
-
         let rotation = -90
-
-
 
         return parts
 
@@ -1366,15 +1326,11 @@ const chartSegments =
 
                     item.value / total
 
-
-
                 const arc =
 
                     fraction *
 
                     circumference
-
-
 
                 const segment = {
 
@@ -1382,17 +1338,11 @@ const chartSegments =
 
                         item.key,
 
-
-
                     color:
 
                         item.color,
 
-
-
                     rotation,
-
-
 
                     dashArray:
 
@@ -1402,13 +1352,9 @@ const chartSegments =
 
                 }
 
-
-
                 rotation +=
 
                     fraction * 360
-
-
 
                 return segment
 
@@ -1416,15 +1362,11 @@ const chartSegments =
 
     })
 
-
-
 /* ==============================
 
    NUMBER ANIMATION
 
-============================== */
-
-
+\============================== */
 
 function animateValue(
 
@@ -1444,19 +1386,13 @@ function animateValue(
 
             to
 
-
-
         return
 
     }
 
-
-
     const start =
 
         performance.now()
-
-
 
     function tick(now) {
 
@@ -1472,8 +1408,6 @@ function animateValue(
 
             )
 
-
-
         const eased =
 
             1 -
@@ -1486,8 +1420,6 @@ function animateValue(
 
             )
 
-
-
         displayedMetrics.value[key] =
 
             Math.round(
@@ -1499,8 +1431,6 @@ function animateValue(
                 eased
 
             )
-
-
 
         if (progress < 1) {
 
@@ -1520,8 +1450,6 @@ function animateValue(
 
     }
 
-
-
     requestAnimationFrame(
 
         tick
@@ -1530,13 +1458,9 @@ function animateValue(
 
 }
 
-
-
 watch(
 
     () => metrics.value,
-
-
 
     newMetrics => {
 
@@ -1558,8 +1482,6 @@ watch(
 
         ]
 
-
-
         keys.forEach(
 
             key => {
@@ -1568,15 +1490,11 @@ watch(
 
                     key,
 
-
-
                     displayedMetrics.value[
 
                     key
 
                     ],
-
-
 
                     newMetrics[key]
 
@@ -1590,15 +1508,11 @@ watch(
 
 )
 
-
-
 /* ==============================
 
    DATE
 
-============================== */
-
-
+\============================== */
 
 function formatDate(value) {
 
@@ -1608,13 +1522,9 @@ function formatDate(value) {
 
     }
 
-
-
     const date =
 
         new Date(value)
-
-
 
     if (
 
@@ -1630,8 +1540,6 @@ function formatDate(value) {
 
     }
 
-
-
     return date.toLocaleString(
 
         [],
@@ -1642,25 +1550,17 @@ function formatDate(value) {
 
                 'short',
 
-
-
             day:
 
                 'numeric',
-
-
 
             year:
 
                 'numeric',
 
-
-
             hour:
 
                 'numeric',
-
-
 
             minute:
 
@@ -1672,15 +1572,11 @@ function formatDate(value) {
 
 }
 
-
-
 /* ==============================
 
    API
 
-============================== */
-
-
+\============================== */
 
 async function loadDashboard() {
 
@@ -1688,19 +1584,13 @@ async function loadDashboard() {
 
         true
 
-
-
     errorMessage.value =
 
         ''
 
-
-
     chartAnimated.value =
 
         false
-
-
 
     try {
 
@@ -1711,8 +1601,6 @@ async function loadDashboard() {
                 '/api/admin/dashboard'
 
             )
-
-
 
         dashboard.value =
 
@@ -1725,8 +1613,6 @@ async function loadDashboard() {
                 recent_activity: []
 
             }
-
-
 
         Object.keys(
 
@@ -1756,8 +1642,6 @@ async function loadDashboard() {
 
             'Failed to load dashboard metrics.'
 
-
-
         dashboard.value = {
 
             summary: {},
@@ -1772,11 +1656,7 @@ async function loadDashboard() {
 
             false
 
-
-
         await nextTick()
-
-
 
         const keys = [
 
@@ -1796,8 +1676,6 @@ async function loadDashboard() {
 
         ]
 
-
-
         keys.forEach(
 
             key => {
@@ -1816,8 +1694,6 @@ async function loadDashboard() {
 
         )
 
-
-
         requestAnimationFrame(
 
             () => {
@@ -1834,8 +1710,6 @@ async function loadDashboard() {
 
 }
 
-
-
 onMounted(
 
     loadDashboard
@@ -1844,71 +1718,91 @@ onMounted(
 
 </script>
 
-
-
 <style scoped>
 
-* {
+/* =========================================================
 
-    box-sizing: border-box;
+   PAGE FOUNDATION
 
-}
+\========================================================= */
 
+.findit-dashboard {
 
+    --dash-bg: #ffffff;
 
-/* =====================================
+    --dash-bg-soft: #f4f8f5;
 
-   PAGE
+    --dash-panel: #0d3827;
 
-===================================== */
+    --dash-panel-soft: #123f2e;
 
+    --dash-panel-raised: #174b35;
 
+    --dash-green: #67aa7e;
 
-.dashboard-page {
+    --dash-green-soft: #9ed1ad;
 
-    position: relative;
+    --dash-green-bright: #b8e1c3;
 
+    --dash-gold: #e1c875;
 
+    --dash-gold-soft: #f0dda0;
 
-    min-height: 100%;
+    --dash-text: #f4f8f5;
 
-    height: 100%;
+    --dash-text-soft: #d8e7db;
 
+    --dash-muted: #a8beae;
 
+    --dash-border: rgba(158, 209, 173, 0.15);
 
-    padding:
+    --dash-border-strong: rgba(158, 209, 173, 0.26);
 
-        30px 32px 44px;
+    min-height: calc(100vh - 60px);
 
+    padding: 28px 30px 38px;
 
-
-    overflow-y: auto;
-
-    overflow-x: hidden;
-
-
-
-    color:
-
-        #173d2e;
-
-
+    color: var(--dash-text);
 
     background:
 
-        linear-gradient(180deg,
+        radial-gradient(
 
-            #eef8f0 0%,
+            circle at 7% 0%,
 
-            #dcefe1 40%,
+            rgba(47, 125, 89, 0.23),
 
-            #c3e2ca 100%);
+            transparent 34%
 
+        ),
 
+        radial-gradient(
+
+            circle at 96% 8%,
+
+            rgba(225, 200, 117, 0.06),
+
+            transparent 22%
+
+        ),
+
+        linear-gradient(
+
+            150deg,
+
+            var(--dash-bg-soft),
+
+            var(--dash-bg)
+
+        );
 
     font-family:
 
         Inter,
+
+        ui-sans-serif,
+
+        system-ui,
 
         -apple-system,
 
@@ -1916,933 +1810,819 @@ onMounted(
 
         "Segoe UI",
 
-        Roboto,
-
         sans-serif;
 
-}
+    font-size: 16px;
 
-
-
-/* Background decoration */
-
-
-
-.bg-orb,
-
-.bg-pattern {
-
-    position: absolute;
-
-    pointer-events: none;
+    line-height: 1.5;
 
 }
 
+.findit-dashboard *,
 
+.findit-dashboard *::before,
 
-.bg-orb {
+.findit-dashboard *::after {
 
-    border-radius:
-
-        999px;
-
-}
-
-
-
-.bg-orb-left {
-
-    width: 450px;
-
-    height: 450px;
-
-
-
-    top: -220px;
-
-    left: -150px;
-
-
-
-    background:
-
-        radial-gradient(circle,
-
-            rgba(255,
-
-                255,
-
-                255,
-
-                0.7),
-
-            transparent 70%);
+    box-sizing: border-box;
 
 }
 
+/* =========================================================
 
+   HERO
 
-.bg-orb-right {
+\========================================================= */
 
-    width: 420px;
-
-    height: 420px;
-
-
-
-    top: 20px;
-
-    right: -180px;
-
-
-
-    background:
-
-        radial-gradient(circle,
-
-            rgba(21,
-
-                95,
-
-                62,
-
-                0.17),
-
-            transparent 68%);
-
-}
-
-
-
-.bg-pattern {
-
-    inset: 0;
-
-
-
-    opacity: 0.23;
-
-
-
-    background-image:
-
-        linear-gradient(rgba(18,
-
-                60,
-
-                45,
-
-                0.04) 1px,
-
-            transparent 1px),
-
-
-
-        linear-gradient(90deg,
-
-            rgba(18,
-
-                60,
-
-                45,
-
-                0.04) 1px,
-
-            transparent 1px);
-
-
-
-    background-size:
-
-        34px 34px;
-
-}
-
-
-
-.dashboard-content {
-
-    position: relative;
-
-    z-index: 2;
-
-
+.dashboard-hero {
 
     display: grid;
 
+    grid-template-columns:
 
+        minmax(0, 1.45fr)
 
-    gap: 22px;
+        minmax(320px, 0.55fr);
 
-
-
-    width:
-
-        min(100%,
-
-            1360px);
-
-
-
-    margin:
-
-        0 auto;
-
-}
-
-
-
-/* =====================================
-
-   ALERT
-
-===================================== */
-
-
-
-.inline-alert {
-
-    display: flex;
-
-
+    gap: 28px;
 
     align-items: center;
 
+    width: min(100%, 1380px);
 
+    margin: 0 auto 18px;
 
-    gap: 10px;
+    padding: 30px 32px;
 
+    border: 1px solid rgba(158, 209, 173, 0.17);
 
-
-    padding:
-
-        13px 16px;
-
-
-
-    border:
-
-        1px solid rgba(160,
-
-            54,
-
-            54,
-
-            0.2);
-
-
-
-    border-radius:
-
-        14px;
-
-
+    border-radius: 22px;
 
     background:
 
-        rgba(255,
+        radial-gradient(
 
-            255,
+            circle at 92% 18%,
 
-            255,
+            rgba(225, 200, 117, 0.09),
 
-            0.74);
+            transparent 25%
 
+        ),
 
+        linear-gradient(
 
-    color:
+            135deg,
 
-        #812f2f;
+            #174b35 0%,
 
+            #0d3827 58%,
 
+            #0a2c1f 100%
+
+        );
 
     box-shadow:
 
-        0 9px 22px rgba(70,
+        0 22px 52px rgba(0, 0, 0, 0.22),
 
-            35,
-
-            35,
-
-            0.06);
-
-
-
-    font-size:
-
-        13px;
-
-
-
-    font-weight:
-
-        700;
+        inset 0 1px 0 rgba(255, 255, 255, 0.035);
 
 }
 
+.dashboard-hero-copy {
 
+    min-width: 0;
 
-.alert-icon {
+}
+
+.dashboard-kicker {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 9px;
+
+    margin-bottom: 10px;
+
+    color: var(--dash-gold);
+
+    font-size: 0.78rem;
+
+    font-weight: 820;
+
+    letter-spacing: 0.13em;
+
+    text-transform: uppercase;
+
+}
+
+.dashboard-kicker-icon {
 
     display: grid;
-
-
-
-    width: 23px;
-
-    height: 23px;
-
-
 
     place-items: center;
 
+    width: 31px;
 
+    height: 31px;
 
-    border-radius:
+    border: 1px solid rgba(225, 200, 117, 0.24);
 
-        50%;
+    border-radius: 9px;
 
-
-
-    background:
-
-        #9b4444;
-
-
-
-    color:
-
-        white;
+    background: rgba(225, 200, 117, 0.08);
 
 }
 
+.dashboard-kicker-icon svg {
 
+    width: 17px;
 
-/* =====================================
+    height: 17px;
 
-   QUEUE SHELL
+    fill: none;
 
-===================================== */
+    stroke: currentColor;
 
+    stroke-width: 1.8;
 
+    stroke-linecap: round;
 
-.queue-shell {
-
-    padding:
-
-        22px;
-
-
-
-    border:
-
-        1px solid rgba(255,
-
-            255,
-
-            255,
-
-            0.62);
-
-
-
-    border-radius:
-
-        26px;
-
-
-
-    background:
-
-        linear-gradient(145deg,
-
-            rgba(255,
-
-                255,
-
-                255,
-
-                0.56),
-
-            rgba(255,
-
-                255,
-
-                255,
-
-                0.26));
-
-
-
-    box-shadow:
-
-        0 18px 50px rgba(21,
-
-            82,
-
-            57,
-
-            0.11);
-
-
-
-    backdrop-filter:
-
-        blur(15px);
+    stroke-linejoin: round;
 
 }
 
-
-
-.section-heading {
-
-    display: flex;
-
-
-
-    align-items: center;
-
-
-
-    justify-content:
-
-        space-between;
-
-
-
-    gap: 20px;
-
-
-
-    margin-bottom:
-
-        18px;
-
-}
-
-
-
-.section-eyebrow,
-
-.panel-eyebrow {
-
-    display: block;
-
-
-
-    margin-bottom:
-
-        5px;
-
-
-
-    color:
-
-        #8f772d;
-
-
-
-    font-size:
-
-        10px;
-
-
-
-    font-weight:
-
-        900;
-
-
-
-    letter-spacing:
-
-        0.18em;
-
-
-
-    text-transform:
-
-        uppercase;
-
-}
-
-
-
-.section-heading h2,
-
-.panel-header h2 {
+.dashboard-hero h1 {
 
     margin: 0;
 
+    color: #f8fbf9;
 
+    font-size: clamp(2.15rem, 3vw, 3rem);
 
-    font-size:
+    font-weight: 830;
 
-        20px;
+    line-height: 1.06;
 
-
-
-    font-weight:
-
-        800;
-
-
-
-    letter-spacing:
-
-        -0.02em;
+    letter-spacing: -0.04em;
 
 }
 
+.dashboard-hero-copy > p {
 
+    max-width: 790px;
 
-.section-heading h2 {
+    margin: 13px 0 0;
 
-    color:
+    color: var(--dash-text-soft);
 
-        #174632;
+    font-size: 1rem;
+
+    line-height: 1.7;
 
 }
 
+.dashboard-hero-meta {
 
+    display: flex;
 
-.live-pill {
-
-    display:
-
-        inline-flex;
-
-
-
-    align-items:
-
-        center;
-
-
+    flex-wrap: wrap;
 
     gap: 8px;
 
-
-
-    padding:
-
-        8px 12px;
-
-
-
-    border-radius:
-
-        999px;
-
-
-
-    background:
-
-        rgba(20,
-
-            77,
-
-            58,
-
-            0.1);
-
-
-
-    color:
-
-        #2f6249;
-
-
-
-    font-size:
-
-        11px;
-
-
-
-    font-weight:
-
-        800;
+    margin-top: 18px;
 
 }
 
+.dashboard-meta-chip,
 
+.workflow-live-pill {
 
-.live-dot {
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    min-height: 31px;
+
+    padding: 6px 10px;
+
+    border: 1px solid rgba(158, 209, 173, 0.16);
+
+    border-radius: 999px;
+
+    background: rgba(255, 255, 255, 0.035);
+
+    color: #cfe0d3;
+
+    font-size: 0.78rem;
+
+    font-weight: 720;
+
+}
+
+.dashboard-meta-chip.gold {
+
+    border-color: rgba(225, 200, 117, 0.18);
+
+    background: rgba(225, 200, 117, 0.055);
+
+    color: var(--dash-gold-soft);
+
+}
+
+.dashboard-live-dot {
 
     width: 7px;
 
     height: 7px;
 
+    border-radius: 999px;
 
-
-    border-radius:
-
-        50%;
-
-
-
-    background:
-
-        #3f9363;
-
-
+    background: #7fd397;
 
     box-shadow:
 
-        0 0 0 4px rgba(31,
+        0 0 0 4px
 
-            120,
-
-            83,
-
-            0.1);
+        rgba(127, 211, 151, 0.1);
 
 }
 
-
-
-/* =====================================
-
-   QUEUE CARDS
-
-===================================== */
-
-
-
-.queue-grid {
+.dashboard-hero-side {
 
     display: grid;
 
+    gap: 12px;
 
+}
+
+.hero-metric-grid {
+
+    display: grid;
 
     grid-template-columns:
 
-        repeat(6,
+        repeat(2, minmax(0, 1fr));
 
-            minmax(0,
-
-                1fr));
-
-
-
-    gap: 14px;
+    gap: 10px;
 
 }
 
-
-
-.queue-card {
-
-    position: relative;
-
-
+.hero-metric {
 
     min-width: 0;
 
+    padding: 15px;
 
+    border: 1px solid rgba(158, 209, 173, 0.14);
 
-    min-height:
+    border-radius: 13px;
 
-        220px;
-
-
-
-    overflow: hidden;
-
-
-
-    padding:
-
-        18px;
-
-
-
-    border:
-
-        1px solid rgba(8,
-
-            42,
-
-            31,
-
-            0.28);
-
-
-
-    border-radius:
-
-        19px;
-
-
-
-    background:
-
-        linear-gradient(150deg,
-
-            #2f7d59 0%,
-
-            #1b523b 100%);
-
-
-
-    color:
-
-        white;
-
-
-
-    text-decoration:
-
-        none;
-
-
-
-    box-shadow:
-
-        0 14px 30px rgba(12,
-
-            67,
-
-            44,
-
-            0.16);
-
-
-
-    animation:
-
-        cardRise 0.48s ease-out both;
-
-
-
-    transition:
-
-        transform 0.24s ease,
-
-        box-shadow 0.24s ease,
-
-        border-color 0.24s ease;
+    background: rgba(7, 31, 22, 0.34);
 
 }
 
+.hero-metric span {
 
+    display: block;
 
-.queue-card:hover {
+    color: #a8beae;
 
-    transform:
+    font-size: 0.72rem;
 
-        translateY(-6px);
+    font-weight: 780;
 
+    letter-spacing: 0.065em;
 
-
-    box-shadow:
-
-        0 23px 46px rgba(12,
-
-            67,
-
-            44,
-
-            0.25);
-
-
-
-    border-color:
-
-        var(--accent);
+    text-transform: uppercase;
 
 }
 
+.hero-metric strong {
 
+    display: block;
 
-.queue-card::after {
+    margin-top: 4px;
 
-    content: "";
+    color: #f8fbf9;
 
+    font-size: 1.85rem;
 
+    font-weight: 830;
 
-    position: absolute;
-
-
-
-    left: 0;
-
-    right: 0;
-
-    bottom: 0;
-
-
-
-    height: 4px;
-
-
-
-    background:
-
-        linear-gradient(90deg,
-
-            var(--accent),
-
-            transparent 82%);
+    line-height: 1.05;
 
 }
 
+.hero-metric small {
 
+    display: block;
 
-.card-glow {
+    margin-top: 5px;
 
-    position: absolute;
+    color: #8ea596;
 
+    font-size: 0.73rem;
 
-
-    width: 180px;
-
-    height: 180px;
-
-
-
-    top: -105px;
-
-    right: -100px;
-
-
-
-    border-radius:
-
-        50%;
-
-
-
-    background:
-
-        radial-gradient(circle,
-
-            var(--accent-soft),
-
-            transparent 70%);
+    line-height: 1.35;
 
 }
 
+.dashboard-refresh-button {
 
-
-.card-edge {
-
-    position: absolute;
-
-
-
-    top: 0;
-
-    right: 0;
-
-
-
-    width: 46px;
-
-    height: 46px;
-
-
-
-    border-left:
-
-        1px solid rgba(255,
-
-            255,
-
-            255,
-
-            0.08);
-
-
-
-    border-bottom:
-
-        1px solid rgba(255,
-
-            255,
-
-            255,
-
-            0.08);
-
-
-
-    border-bottom-left-radius:
-
-        18px;
-
-}
-
-
-
-.queue-card-header {
-
-    position: relative;
-
-    z-index: 2;
-
-
-
-    display: flex;
-
-
+    display: inline-flex;
 
     align-items: center;
 
+    justify-content: center;
 
+    gap: 8px;
 
-    justify-content:
+    min-height: 43px;
 
-        space-between;
+    padding: 0.72rem 1rem;
+
+    border: 1px solid rgba(225, 200, 117, 0.48);
+
+    border-radius: 11px;
+
+    background:
+
+        linear-gradient(
+
+            135deg,
+
+            #e1c875,
+
+            #c9ad57
+
+        );
+
+    color: #10271a;
+
+    font-family: inherit;
+
+    font-size: 0.87rem;
+
+    font-weight: 790;
+
+    cursor: pointer;
+
+    box-shadow:
+
+        0 9px 22px
+
+        rgba(0, 0, 0, 0.17);
+
+    transition:
+
+        transform 150ms ease,
+
+        filter 150ms ease;
 
 }
 
+.dashboard-refresh-button:hover:not(:disabled) {
 
+    transform: translateY(-1px);
 
-.queue-icon {
+    filter: brightness(1.04);
+
+}
+
+.dashboard-refresh-button:disabled {
+
+    opacity: 0.58;
+
+    cursor: not-allowed;
+
+}
+
+.dashboard-refresh-button svg {
+
+    width: 18px;
+
+    height: 18px;
+
+    fill: none;
+
+    stroke: currentColor;
+
+    stroke-width: 2;
+
+    stroke-linecap: round;
+
+    stroke-linejoin: round;
+
+}
+
+.spinning {
+
+    animation: spin 0.85s linear infinite;
+
+}
+
+/* =========================================================
+
+   ALERT
+
+\========================================================= */
+
+.dashboard-alert {
+
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 11px;
+
+    width: min(100%, 1380px);
+
+    margin: 0 auto 18px;
+
+    padding: 13px 14px;
+
+    border: 1px solid rgba(255, 180, 180, 0.2);
+
+    border-radius: 12px;
+
+    background: rgba(160, 55, 55, 0.14);
+
+    color: #f2c3c3;
+
+}
+
+.dashboard-alert-icon {
 
     display: grid;
 
+    place-items: center;
 
+    flex: 0 0 auto;
+
+    width: 26px;
+
+    height: 26px;
+
+    border-radius: 8px;
+
+    background: rgba(255, 255, 255, 0.05);
+
+    font-weight: 900;
+
+}
+
+.dashboard-alert strong {
+
+    display: block;
+
+    color: #f8dddd;
+
+    font-size: 0.9rem;
+
+}
+
+.dashboard-alert p {
+
+    margin: 2px 0 0;
+
+    font-size: 0.82rem;
+
+    line-height: 1.45;
+
+}
+
+/* =========================================================
+
+   WORKFLOW SECTION
+
+\========================================================= */
+
+.workflow-section {
+
+    width: min(100%, 1380px);
+
+    margin: 0 auto 18px;
+
+    padding: 22px;
+
+    border: 1px solid var(--dash-border);
+
+    border-radius: 20px;
+
+    background:
+
+        linear-gradient(
+
+            145deg,
+
+            rgba(18, 63, 46, 0.98),
+
+            rgba(13, 56, 39, 0.98)
+
+        );
+
+    box-shadow:
+
+        0 20px 46px
+
+        rgba(0, 0, 0, 0.18);
+
+}
+
+.workflow-section-header {
+
+    display: flex;
+
+    align-items: flex-start;
+
+    justify-content: space-between;
+
+    gap: 18px;
+
+    margin-bottom: 18px;
+
+}
+
+.dashboard-section-kicker {
+
+    margin: 0 0 5px;
+
+    color: var(--dash-green-soft);
+
+    font-size: 0.75rem;
+
+    font-weight: 810;
+
+    letter-spacing: 0.11em;
+
+    text-transform: uppercase;
+
+}
+
+.workflow-section-header h2,
+
+.dashboard-panel-header h2 {
+
+    margin: 0;
+
+    color: #f4faf5;
+
+    font-size: 1.35rem;
+
+    font-weight: 810;
+
+    letter-spacing: -0.015em;
+
+}
+
+.workflow-section-header > div > p:not(.dashboard-section-kicker),
+
+.dashboard-panel-header > div > p:not(.dashboard-section-kicker) {
+
+    max-width: 640px;
+
+    margin: 6px 0 0;
+
+    color: #9fb4a5;
+
+    font-size: 0.86rem;
+
+    line-height: 1.5;
+
+}
+
+.workflow-live-pill {
+
+    flex: 0 0 auto;
+
+    color: #cfe4d4;
+
+}
+
+/* =========================================================
+
+   WORKFLOW CARDS
+
+\========================================================= */
+
+.workflow-card-grid {
+
+    display: grid;
+
+    grid-template-columns:
+
+        repeat(3, minmax(0, 1fr));
+
+    gap: 13px;
+
+}
+
+.workflow-card {
+
+    --workflow-accent: #9ed1ad;
+
+    --workflow-soft: rgba(158, 209, 173, 0.12);
+
+    position: relative;
+
+    display: flex;
+
+    flex-direction: column;
+
+    min-width: 0;
+
+    min-height: 238px;
+
+    overflow: hidden;
+
+    padding: 18px;
+
+    border: 1px solid rgba(158, 209, 173, 0.13);
+
+    border-radius: 16px;
+
+    background:
+
+        linear-gradient(
+
+            145deg,
+
+            rgba(23, 75, 53, 0.98),
+
+            rgba(11, 48, 34, 0.98)
+
+        );
+
+    color: #f5faf6;
+
+    text-decoration: none;
+
+    box-shadow:
+
+        0 10px 24px
+
+        rgba(0, 0, 0, 0.13);
+
+    animation:
+
+        workflowCardIn
+
+        0.44s ease-out
+
+        both;
+
+    transition:
+
+        transform 170ms ease,
+
+        border-color 170ms ease,
+
+        background 170ms ease,
+
+        box-shadow 170ms ease;
+
+}
+
+.workflow-card::after {
+
+    content: "";
+
+    position: absolute;
+
+    inset: auto 0 0;
+
+    height: 3px;
+
+    background:
+
+        linear-gradient(
+
+            90deg,
+
+            var(--workflow-accent),
+
+            transparent 76%
+
+        );
+
+}
+
+.workflow-card:hover {
+
+    transform: translateY(-3px);
+
+    border-color: color-mix(
+
+        in srgb,
+
+        var(--workflow-accent) 45%,
+
+        transparent
+
+    );
+
+    background:
+
+        linear-gradient(
+
+            145deg,
+
+            rgba(27, 84, 60, 0.98),
+
+            rgba(13, 56, 39, 0.99)
+
+        );
+
+    box-shadow:
+
+        0 18px 34px
+
+        rgba(0, 0, 0, 0.19);
+
+}
+
+.workflow-card-glow {
+
+    position: absolute;
+
+    top: -90px;
+
+    right: -75px;
+
+    width: 160px;
+
+    height: 160px;
+
+    border-radius: 50%;
+
+    background:
+
+        radial-gradient(
+
+            circle,
+
+            var(--workflow-soft),
+
+            transparent 70%
+
+        );
+
+    pointer-events: none;
+
+}
+
+.workflow-card-top {
+
+    position: relative;
+
+    z-index: 1;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 12px;
+
+}
+
+.workflow-card-icon {
+
+    display: grid;
+
+    place-items: center;
 
     width: 42px;
 
     height: 42px;
 
+    border: 1px solid
 
+        color-mix(
 
-    place-items: center;
+            in srgb,
 
+            var(--workflow-accent) 55%,
 
+            transparent
 
-    border:
+        );
 
-        1px solid var(--accent);
+    border-radius: 12px;
 
+    background: var(--workflow-soft);
 
-
-    border-radius:
-
-        13px;
-
-
-
-    background:
-
-        var(--accent-soft);
-
-
-
-    color:
-
-        var(--accent);
+    color: var(--workflow-accent);
 
 }
 
-
-
-.queue-icon svg {
+.workflow-card-icon svg {
 
     width: 21px;
 
@@ -2850,151 +2630,55 @@ onMounted(
 
 }
 
+.workflow-card-code {
 
+    display: inline-flex;
 
-.queue-code {
+    align-items: center;
 
-    display:
+    justify-content: center;
 
-        inline-flex;
+    min-width: 34px;
 
+    min-height: 27px;
 
+    padding: 4px 8px;
 
-    align-items:
+    border: 1px solid rgba(255, 255, 255, 0.07);
 
-        center;
+    border-radius: 8px;
 
+    background: rgba(255, 255, 255, 0.045);
 
+    color: #b9ccbf;
 
-    justify-content:
+    font-size: 0.7rem;
 
-        center;
+    font-weight: 850;
 
-
-
-    min-width:
-
-        31px;
-
-
-
-    height:
-
-        25px;
-
-
-
-    padding:
-
-        0 7px;
-
-
-
-    border-radius:
-
-        8px;
-
-
-
-    background:
-
-        rgba(255,
-
-            255,
-
-            255,
-
-            0.08);
-
-
-
-    color:
-
-        rgba(255,
-
-            255,
-
-            255,
-
-            0.62);
-
-
-
-    font-size:
-
-        9px;
-
-
-
-    font-weight:
-
-        900;
-
-
-
-    letter-spacing:
-
-        0.12em;
+    letter-spacing: 0.08em;
 
 }
 
+.workflow-card-value {
 
+    position: relative;
 
-.queue-value {
+    z-index: 1;
 
-    position:
+    display: block;
 
-        relative;
+    margin-top: 16px;
 
+    color: #ffffff;
 
+    font-size: 2.35rem;
 
-    z-index:
+    font-weight: 850;
 
-        2;
+    line-height: 1;
 
-
-
-    display:
-
-        block;
-
-
-
-    margin-top:
-
-        18px;
-
-
-
-    color:
-
-        white;
-
-
-
-    font-size:
-
-        35px;
-
-
-
-    line-height:
-
-        1;
-
-
-
-    font-weight:
-
-        900;
-
-
-
-    letter-spacing:
-
-        -0.04em;
-
-
+    letter-spacing: -0.04em;
 
     font-variant-numeric:
 
@@ -3002,807 +2686,297 @@ onMounted(
 
 }
 
+.workflow-card-copy {
 
+    position: relative;
 
-.queue-copy {
+    z-index: 1;
 
-    position:
-
-        relative;
-
-
-
-    z-index:
-
-        2;
-
-
-
-    margin-top:
-
-        13px;
+    margin-top: 12px;
 
 }
 
+.workflow-card-copy h3 {
 
+    margin: 0 0 5px;
 
-.queue-copy h3 {
+    color: #f5faf6;
 
-    margin:
+    font-size: 1rem;
 
-        0 0 5px;
+    font-weight: 790;
 
-
-
-    color:
-
-        #ffffff;
-
-
-
-    font-size:
-
-        13px;
-
-
-
-    font-weight:
-
-        800;
+    line-height: 1.28;
 
 }
 
-
-
-.queue-copy p {
-
-    min-height:
-
-        32px;
-
-
+.workflow-card-copy p {
 
     margin: 0;
 
+    color: #b7cabd;
 
+    font-size: 0.86rem;
 
-    color:
-
-        rgba(240,
-
-            248,
-
-            244,
-
-            0.63);
-
-
-
-    font-size:
-
-        10.5px;
-
-
-
-    line-height:
-
-        1.5;
+    line-height: 1.52;
 
 }
 
+.workflow-card-action {
 
+    position: relative;
 
-.queue-footer {
-
-    position:
-
-        relative;
-
-
-
-    z-index:
-
-        2;
-
-
+    z-index: 1;
 
     display: flex;
 
+    align-items: center;
 
+    justify-content: space-between;
 
-    align-items:
+    gap: 10px;
 
-        center;
+    margin-top: auto;
 
+    padding-top: 13px;
 
+    border-top: 1px solid rgba(255, 255, 255, 0.075);
 
-    justify-content:
+    color: var(--dash-gold-soft);
 
-        space-between;
+    font-size: 0.81rem;
 
-
-
-    margin-top:
-
-        15px;
-
-
-
-    padding-top:
-
-        12px;
-
-
-
-    border-top:
-
-        1px solid rgba(255,
-
-            255,
-
-            255,
-
-            0.09);
-
-
-
-    color:
-
-        #e1c875;
-
-
-
-    font-size:
-
-        10.5px;
-
-
-
-    font-weight:
-
-        800;
+    font-weight: 780;
 
 }
 
-
-
-.arrow-box {
+.workflow-arrow {
 
     display: grid;
-
-
-
-    width: 26px;
-
-    height: 26px;
-
-
 
     place-items: center;
 
+    width: 29px;
 
+    height: 29px;
 
-    border-radius:
+    border: 1px solid rgba(225, 200, 117, 0.14);
 
-        8px;
+    border-radius: 8px;
 
+    background: rgba(225, 200, 117, 0.065);
 
-
-    background:
-
-        rgba(247,
-
-            216,
-
-            104,
-
-            0.1);
+    color: var(--dash-gold);
 
 }
 
+.workflow-arrow svg {
 
+    width: 14px;
 
-.arrow-box svg {
-
-    width: 13px;
-
-    height: 13px;
-
-
+    height: 14px;
 
     transition:
 
-        transform 0.2s ease;
+        transform 160ms ease;
 
 }
 
+.workflow-card:hover .workflow-arrow svg {
 
-
-.queue-card:hover .arrow-box svg {
-
-    transform:
-
-        translateX(2px);
+    transform: translateX(2px);
 
 }
 
-
-
-/* =====================================
+/* =========================================================
 
    ANALYTICS
 
-===================================== */
+\========================================================= */
 
-
-
-.analytics-grid {
+.dashboard-analytics-grid {
 
     display: grid;
 
-
-
     grid-template-columns:
 
-        minmax(0,
+        minmax(0, 1.25fr)
 
-            1.2fr) minmax(320px,
+        minmax(340px, 0.75fr);
 
-            0.8fr);
+    gap: 16px;
 
+    width: min(100%, 1380px);
 
-
-    gap:
-
-        20px;
+    margin: 0 auto;
 
 }
 
+.dashboard-panel {
 
+    overflow: hidden;
 
-.panel {
+    border: 1px solid var(--dash-border);
 
-    position:
-
-        relative;
-
-
-
-    overflow:
-
-        hidden;
-
-
-
-    padding:
-
-        24px;
-
-
-
-    border:
-
-        1px solid rgba(8,
-
-            42,
-
-            31,
-
-            0.23);
-
-
-
-    border-radius:
-
-        24px;
-
-
+    border-radius: 19px;
 
     background:
 
-        linear-gradient(145deg,
+        linear-gradient(
 
-            #286f50,
+            145deg,
 
-            #184a36);
+            rgba(18, 63, 46, 0.98),
 
+            rgba(13, 56, 39, 0.98)
 
+        );
 
     box-shadow:
 
-        0 18px 40px rgba(10,
+        0 20px 46px
 
-            57,
-
-            38,
-
-            0.17);
+        rgba(0, 0, 0, 0.18);
 
 }
 
-
-
-.panel-orb {
-
-    position:
-
-        absolute;
-
-
-
-    border-radius:
-
-        50%;
-
-
-
-    pointer-events:
-
-        none;
-
-}
-
-
-
-.panel-orb-one {
-
-    width:
-
-        230px;
-
-
-
-    height:
-
-        230px;
-
-
-
-    top:
-
-        -130px;
-
-
-
-    right:
-
-        -80px;
-
-
-
-    background:
-
-        radial-gradient(circle,
-
-            rgba(247,
-
-                216,
-
-                104,
-
-                0.12),
-
-            transparent 70%);
-
-}
-
-
-
-.panel-orb-two {
-
-    width:
-
-        180px;
-
-
-
-    height:
-
-        180px;
-
-
-
-    left:
-
-        -100px;
-
-
-
-    bottom:
-
-        -100px;
-
-
-
-    background:
-
-        radial-gradient(circle,
-
-            rgba(255,
-
-                255,
-
-                255,
-
-                0.09),
-
-            transparent 70%);
-
-}
-
-
-
-.activity-orb {
-
-    width:
-
-        230px;
-
-
-
-    height:
-
-        230px;
-
-
-
-    bottom:
-
-        -150px;
-
-
-
-    right:
-
-        -120px;
-
-
-
-    background:
-
-        radial-gradient(circle,
-
-            rgba(247,
-
-                216,
-
-                104,
-
-                0.09),
-
-            transparent 70%);
-
-}
-
-
-
-.panel-header {
-
-    position:
-
-        relative;
-
-
-
-    z-index:
-
-        2;
-
-
+.dashboard-panel-header {
 
     display: flex;
 
+    align-items: flex-start;
 
+    justify-content: space-between;
 
-    align-items:
+    gap: 18px;
 
-        center;
+    padding: 21px 22px 17px;
 
-
-
-    justify-content:
-
-        space-between;
-
-
-
-    gap:
-
-        15px;
-
-
-
-    margin-bottom:
-
-        22px;
-
-}
-
-
-
-.panel-header h2 {
-
-    color:
-
-        white;
-
-}
-
-
-
-.gold-badge,
-
-.activity-badge {
-
-    display:
-
-        inline-flex;
-
-
-
-    align-items:
-
-        center;
-
-
-
-    justify-content:
-
-        center;
-
-
-
-    min-height:
-
-        30px;
-
-
-
-    padding:
-
-        0 11px;
-
-
-
-    border-radius:
-
-        999px;
-
-
-
-    font-size:
-
-        10px;
-
-
-
-    font-weight:
-
-        900;
-
-}
-
-
-
-.gold-badge {
-
-    color:
-
-        #e1c875;
-
-
+    border-bottom: 1px solid var(--dash-border);
 
     background:
 
-        rgba(247,
+        linear-gradient(
 
-            216,
+            135deg,
 
-            104,
+            #174b35,
 
-            0.11);
+            #0d3827
 
-
-
-    border:
-
-        1px solid rgba(247,
-
-            216,
-
-            104,
-
-            0.17);
+        );
 
 }
 
+.panel-count-pill,
 
+.activity-count-pill {
 
-.activity-badge {
+    display: inline-flex;
 
-    min-width:
+    align-items: center;
 
-        30px;
+    justify-content: center;
 
+    flex: 0 0 auto;
 
+    min-height: 30px;
 
-    color:
+    padding: 6px 10px;
 
-        rgba(255,
+    border: 1px solid rgba(225, 200, 117, 0.17);
 
-            255,
+    border-radius: 999px;
 
-            255,
+    background: rgba(225, 200, 117, 0.05);
 
-            0.82);
+    color: var(--dash-gold-soft);
 
+    font-size: 0.75rem;
 
-
-    background:
-
-        rgba(255,
-
-            255,
-
-            255,
-
-            0.09);
+    font-weight: 780;
 
 }
 
+.activity-count-pill {
 
+    min-width: 32px;
 
-/* =====================================
+}
 
-   DONUT
+/* =========================================================
 
-===================================== */
+   DONUT / LEGEND
 
+\========================================================= */
 
-
-.chart-layout {
-
-    position:
-
-        relative;
-
-
-
-    z-index:
-
-        2;
-
-
+.reports-chart-layout {
 
     display: grid;
 
-
-
     grid-template-columns:
 
-        220px minmax(0,
+        225px minmax(0, 1fr);
 
-            1fr);
+    gap: 24px;
 
+    align-items: center;
 
-
-    gap:
-
-        24px;
-
-
-
-    align-items:
-
-        center;
+    padding: 24px;
 
 }
-
-
 
 .donut-wrapper {
 
-    position:
+    position: relative;
 
-        relative;
+    width: 205px;
 
+    height: 205px;
 
-
-    width:
-
-        210px;
-
-
-
-    height:
-
-        210px;
-
-
-
-    margin:
-
-        0 auto;
+    margin: 0 auto;
 
 }
 
+.dashboard-donut {
 
+    width: 100%;
 
-.donut {
-
-    width:
-
-        100%;
-
-
-
-    height:
-
-        100%;
-
-
+    height: 100%;
 
     filter:
 
-        drop-shadow(0 7px 15px rgba(8,
+        drop-shadow(
 
-                45,
+            0 7px 15px
 
-                31,
+            rgba(0, 0, 0, 0.18)
 
-                0.2));
+        );
 
 }
-
-
 
 .donut-track,
 
 .donut-segment {
 
-    fill:
+    fill: none;
 
-        none;
-
-
-
-    stroke-width:
-
-        15;
+    stroke-width: 14;
 
 }
-
-
 
 .donut-track {
 
-    stroke:
-
-        rgba(235,
-
-            247,
-
-            239,
-
-            0.14);
+    stroke: rgba(235, 247, 239, 0.11);
 
 }
 
-
-
 .donut-segment {
 
-    stroke-linecap:
+    stroke-linecap: round;
 
-        round;
-
-
-
-    transform-origin:
-
-        60px 60px;
-
-
+    transform-origin: 60px 60px;
 
     transition:
 
@@ -3812,1245 +2986,571 @@ onMounted(
 
 }
 
-
-
 .donut-center {
 
-    position:
+    position: absolute;
 
-        absolute;
-
-
-
-    inset:
-
-        0;
-
-
+    inset: 0;
 
     display: flex;
 
+    flex-direction: column;
 
+    align-items: center;
 
-    flex-direction:
+    justify-content: center;
 
-        column;
-
-
-
-    align-items:
-
-        center;
-
-
-
-    justify-content:
-
-        center;
-
-
-
-    text-align:
-
-        center;
+    text-align: center;
 
 }
-
-
 
 .donut-center span,
 
 .donut-center small {
 
-    color:
+    color: #9db3a3;
 
-        rgba(255,
+    font-size: 0.7rem;
 
-            255,
+    font-weight: 800;
 
-            255,
+    letter-spacing: 0.09em;
 
-            0.82);
-
-
-
-    font-size:
-
-        9px;
-
-
-
-    font-weight:
-
-        900;
-
-
-
-    letter-spacing:
-
-        0.13em;
+    text-transform: uppercase;
 
 }
-
-
 
 .donut-center strong {
 
-    margin:
+    margin: 2px 0;
 
-        3px 0;
+    color: #ffffff;
 
+    font-size: 2.25rem;
 
+    font-weight: 850;
 
-    color:
-
-        #ffffff;
-
-
-
-    font-size:
-
-        34px;
-
-
-
-    font-weight:
-
-        900;
-
-
-
-    line-height:
-
-        1;
+    line-height: 1;
 
 }
 
-
-
-/* =====================================
-
-   LEGEND
-
-===================================== */
-
-
-
-.chart-legend {
-
-    display:
-
-        grid;
-
-
-
-    gap:
-
-        9px;
-
-}
-
-
-
-.legend-item {
-
-    display:
-
-        flex;
-
-
-
-    align-items:
-
-        center;
-
-
-
-    justify-content:
-
-        space-between;
-
-
-
-    gap:
-
-        14px;
-
-
-
-    padding:
-
-        11px 12px;
-
-
-
-    border:
-
-        1px solid rgba(255,
-
-            255,
-
-            255,
-
-            0.05);
-
-
-
-    border-radius:
-
-        14px;
-
-
-
-    background:
-
-        rgba(7,
-
-            46,
-
-            32,
-
-            0.13);
-
-
-
-    transition:
-
-        0.2s ease;
-
-}
-
-
-
-.legend-item:hover {
-
-    transform:
-
-        translateX(3px);
-
-
-
-    background:
-
-        rgba(7,
-
-            46,
-
-            32,
-
-            0.21);
-
-}
-
-
-
-.legend-left {
-
-    display: flex;
-
-
-
-    align-items:
-
-        center;
-
-
-
-    gap:
-
-        10px;
-
-}
-
-
-
-.legend-bar {
-
-    width:
-
-        9px;
-
-
-
-    height:
-
-        28px;
-
-
-
-    border-radius:
-
-        999px;
-
-}
-
-
-
-.legend-left strong {
-
-    display:
-
-        block;
-
-
-
-    color:
-
-        white;
-
-
-
-    font-size:
-
-        11.5px;
-
-}
-
-
-
-.legend-left small {
-
-    display:
-
-        block;
-
-
-
-    margin-top:
-
-        2px;
-
-
-
-    color:
-
-        rgba(239,
-
-            247,
-
-            243,
-
-            0.52);
-
-
-
-    font-size:
-
-        9.5px;
-
-}
-
-
-
-.legend-value {
-
-    color:
-
-        #e1c875;
-
-
-
-    font-size:
-
-        15px;
-
-
-
-    font-weight:
-
-        900;
-
-}
-
-
-
-/* =====================================
-
-   ACTIVITY
-
-===================================== */
-
-
-
-.timeline-list {
-
-    position:
-
-        relative;
-
-
-
-    z-index:
-
-        2;
-
-
-
-    margin:
-
-        0;
-
-
-
-    padding:
-
-        0;
-
-
-
-    list-style:
-
-        none;
-
-}
-
-
-
-.timeline-row {
-
-    display:
-
-        grid;
-
-
-
-    grid-template-columns:
-
-        18px minmax(0,
-
-            1fr);
-
-
-
-    gap:
-
-        12px;
-
-
-
-    padding-bottom:
-
-        18px;
-
-}
-
-
-
-.timeline-row:last-child {
-
-    padding-bottom:
-
-        0;
-
-}
-
-
-
-.timeline-marker {
-
-    position:
-
-        relative;
-
-
-
-    display: flex;
-
-
-
-    justify-content:
-
-        center;
-
-}
-
-
-
-.timeline-marker::after {
-
-    content:
-
-        "";
-
-
-
-    position:
-
-        absolute;
-
-
-
-    top:
-
-        14px;
-
-
-
-    bottom:
-
-        -18px;
-
-
-
-    width:
-
-        1px;
-
-
-
-    background:
-
-        rgba(255,
-
-            255,
-
-            255,
-
-            0.13);
-
-}
-
-
-
-.timeline-row:last-child .timeline-marker::after {
-
-    display:
-
-        none;
-
-}
-
-
-
-.timeline-marker span {
-
-    position:
-
-        relative;
-
-
-
-    z-index:
-
-        2;
-
-
-
-    width:
-
-        10px;
-
-
-
-    height:
-
-        10px;
-
-
-
-    margin-top:
-
-        4px;
-
-
-
-    border-radius:
-
-        50%;
-
-
-
-    background:
-
-        #e1c875;
-
-
-
-    box-shadow:
-
-        0 0 0 4px rgba(247,
-
-            216,
-
-            104,
-
-            0.11);
-
-}
-
-
-
-.timeline-content p {
-
-    margin:
-
-        0 0 4px;
-
-
-
-    color:
-
-        white;
-
-
-
-    font-size:
-
-        12.5px;
-
-
-
-    font-weight:
-
-        750;
-
-
-
-    line-height:
-
-        1.45;
-
-}
-
-
-
-.timeline-content small {
-
-    color:
-
-        rgba(237,
-
-            246,
-
-            241,
-
-            0.52);
-
-
-
-    font-size:
-
-        10px;
-
-}
-
-
-
-/* =====================================
-
-   EMPTY
-
-===================================== */
-
-
-
-.empty-state {
-
-    position:
-
-        relative;
-
-
-
-    z-index:
-
-        2;
-
-
+.dashboard-legend {
 
     display: grid;
 
-
-
-    min-height:
-
-        220px;
-
-
-
-    place-items:
-
-        center;
-
-
-
-    align-content:
-
-        center;
-
-
-
-    padding:
-
-        28px;
-
-
-
-    text-align:
-
-        center;
-
-
-
-    border:
-
-        1px dashed rgba(247,
-
-            216,
-
-            104,
-
-            0.22);
-
-
-
-    border-radius:
-
-        18px;
-
-
-
-    background:
-
-        rgba(8,
-
-            48,
-
-            34,
-
-            0.13);
+    gap: 7px;
 
 }
 
+.dashboard-legend-item {
 
+    display: flex;
 
-.empty-icon {
+    align-items: center;
 
-    display:
+    justify-content: space-between;
 
-        grid;
+    gap: 14px;
 
+    min-height: 50px;
 
+    padding: 9px 11px;
 
-    width:
+    border: 1px solid rgba(158, 209, 173, 0.07);
 
-        44px;
+    border-radius: 10px;
 
+    background: rgba(7, 31, 22, 0.22);
 
+    transition:
 
-    height:
+        background 150ms ease,
 
-        44px;
-
-
-
-    margin-bottom:
-
-        11px;
-
-
-
-    place-items:
-
-        center;
-
-
-
-    border-radius:
-
-        14px;
-
-
-
-    background:
-
-        rgba(247,
-
-            216,
-
-            104,
-
-            0.1);
-
-
-
-    color:
-
-        #e1c875;
+        transform 150ms ease;
 
 }
 
+.dashboard-legend-item:hover {
 
+    transform: translateX(2px);
 
-.empty-icon svg {
-
-    width:
-
-        21px;
-
-
-
-    height:
-
-        21px;
+    background: rgba(7, 31, 22, 0.34);
 
 }
 
+.legend-label-group {
 
+    display: flex;
 
-.empty-state h3 {
+    align-items: center;
 
-    margin:
+    gap: 10px;
 
-        0 0 5px;
-
-
-
-    color:
-
-        white;
-
-
-
-    font-size:
-
-        14px;
+    min-width: 0;
 
 }
 
+.legend-accent {
 
+    flex: 0 0 auto;
 
-.empty-state p {
+    width: 8px;
 
-    max-width:
+    height: 29px;
 
-        270px;
-
-
-
-    margin:
-
-        0;
-
-
-
-    color:
-
-        rgba(237,
-
-            246,
-
-            241,
-
-            0.58);
-
-
-
-    font-size:
-
-        11px;
-
-
-
-    line-height:
-
-        1.55;
+    border-radius: 999px;
 
 }
 
+.legend-label-group > div {
 
-
-/* =====================================
-
-   SKELETON
-
-===================================== */
-
-
-
-.skeleton {
-
-    border-radius:
-
-        8px;
-
-
-
-    background:
-
-        linear-gradient(90deg,
-
-            rgba(255,
-
-                255,
-
-                255,
-
-                0.08) 25%,
-
-
-
-            rgba(255,
-
-                255,
-
-                255,
-
-                0.16) 50%,
-
-
-
-            rgba(255,
-
-                255,
-
-                255,
-
-                0.08) 75%);
-
-
-
-    background-size:
-
-        200% 100%;
-
-
-
-    animation:
-
-        shimmer 1.4s infinite linear;
+    min-width: 0;
 
 }
 
+.legend-label-group strong {
 
+    display: block;
 
-.skeleton-card {
+    overflow: hidden;
 
-    pointer-events:
+    color: #dce9df;
 
-        none;
+    font-size: 0.85rem;
 
-}
+    font-weight: 730;
 
+    text-overflow: ellipsis;
 
-
-.skeleton-icon {
-
-    width:
-
-        42px;
-
-
-
-    height:
-
-        42px;
-
-
-
-    border-radius:
-
-        13px;
+    white-space: nowrap;
 
 }
 
+.legend-label-group small {
 
+    display: block;
 
-.skeleton-number {
+    margin-top: 2px;
 
-    width:
+    color: #829889;
 
-        60px;
-
-
-
-    height:
-
-        32px;
-
-
-
-    margin-top:
-
-        20px;
+    font-size: 0.72rem;
 
 }
 
+.dashboard-legend-value {
 
+    color: var(--dash-gold-soft);
 
-.skeleton-title {
+    font-size: 0.92rem;
 
-    width:
-
-        75%;
-
-
-
-    height:
-
-        11px;
-
-
-
-    margin-top:
-
-        18px;
+    font-weight: 820;
 
 }
 
+/* =========================================================
 
+   ACTIVITY
 
-.skeleton-small {
+\========================================================= */
 
-    width:
+.dashboard-timeline {
 
-        54%;
+    margin: 0;
 
+    padding: 18px 22px 22px;
 
-
-    height:
-
-        9px;
-
-
-
-    margin-top:
-
-        31px;
+    list-style: none;
 
 }
 
+.dashboard-timeline-row {
 
-
-.chart-loading {
-
-    display:
-
-        grid;
-
-
+    display: grid;
 
     grid-template-columns:
 
-        220px 1fr;
+        18px minmax(0, 1fr);
 
+    gap: 11px;
 
-
-    gap:
-
-        24px;
-
-
-
-    align-items:
-
-        center;
+    padding-bottom: 17px;
 
 }
 
+.dashboard-timeline-row:last-child {
 
-
-.chart-circle-loading {
-
-    width:
-
-        190px;
-
-
-
-    height:
-
-        190px;
-
-
-
-    margin:
-
-        0 auto;
-
-
-
-    border-radius:
-
-        50%;
+    padding-bottom: 0;
 
 }
 
+.timeline-marker {
 
+    position: relative;
+
+    display: flex;
+
+    justify-content: center;
+
+}
+
+.timeline-marker::after {
+
+    content: "";
+
+    position: absolute;
+
+    top: 14px;
+
+    bottom: -17px;
+
+    width: 1px;
+
+    background: rgba(158, 209, 173, 0.13);
+
+}
+
+.dashboard-timeline-row:last-child
+
+.timeline-marker::after {
+
+    display: none;
+
+}
+
+.timeline-marker span {
+
+    position: relative;
+
+    z-index: 1;
+
+    width: 10px;
+
+    height: 10px;
+
+    margin-top: 5px;
+
+    border-radius: 50%;
+
+    background: var(--dash-gold);
+
+    box-shadow:
+
+        0 0 0 4px
+
+        rgba(225, 200, 117, 0.08);
+
+}
+
+.timeline-copy p {
+
+    margin: 0 0 4px;
+
+    color: #edf6ef;
+
+    font-size: 0.88rem;
+
+    font-weight: 720;
+
+    line-height: 1.45;
+
+}
+
+.timeline-copy small {
+
+    color: #8fa495;
+
+    font-size: 0.74rem;
+
+    line-height: 1.35;
+
+}
+
+.activity-empty-state {
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    min-height: 260px;
+
+    padding: 34px 24px;
+
+    text-align: center;
+
+}
+
+.activity-empty-icon {
+
+    display: grid;
+
+    place-items: center;
+
+    width: 56px;
+
+    height: 56px;
+
+    margin-bottom: 13px;
+
+    border: 1px solid var(--dash-border-strong);
+
+    border-radius: 16px;
+
+    background: rgba(103, 170, 126, 0.07);
+
+    color: var(--dash-green-soft);
+
+}
+
+.activity-empty-icon svg {
+
+    width: 26px;
+
+    height: 26px;
+
+}
+
+.activity-empty-state h3 {
+
+    margin: 0;
+
+    color: #f2f8f4;
+
+    font-size: 1.1rem;
+
+    font-weight: 800;
+
+}
+
+.activity-empty-state p {
+
+    max-width: 420px;
+
+    margin: 7px 0 0;
+
+    color: #95aa9b;
+
+    font-size: 0.84rem;
+
+    line-height: 1.55;
+
+}
+
+/* =========================================================
+
+   LOADING
+
+\========================================================= */
+
+.skeleton {
+
+    border-radius: 8px;
+
+    background:
+
+        linear-gradient(
+
+            90deg,
+
+            rgba(255, 255, 255, 0.055) 25%,
+
+            rgba(255, 255, 255, 0.12) 50%,
+
+            rgba(255, 255, 255, 0.055) 75%
+
+        );
+
+    background-size: 200% 100%;
+
+    animation:
+
+        shimmer 1.35s infinite linear;
+
+}
+
+.skeleton-workflow-card {
+
+    pointer-events: none;
+
+}
+
+.skeleton-square {
+
+    width: 42px;
+
+    height: 42px;
+
+    border-radius: 12px;
+
+}
+
+.skeleton-count {
+
+    width: 64px;
+
+    height: 35px;
+
+    margin-top: 17px;
+
+}
+
+.skeleton-heading {
+
+    width: 62%;
+
+    height: 14px;
+
+    margin-top: 16px;
+
+}
+
+.skeleton-line {
+
+    width: 82%;
+
+    height: 11px;
+
+    margin-top: 9px;
+
+}
+
+.skeleton-link {
+
+    width: 42%;
+
+    height: 10px;
+
+    margin-top: auto;
+
+}
+
+.chart-loading-layout {
+
+    display: grid;
+
+    grid-template-columns:
+
+        225px minmax(0, 1fr);
+
+    gap: 24px;
+
+    align-items: center;
+
+    padding: 24px;
+
+}
+
+.chart-skeleton {
+
+    width: 190px;
+
+    height: 190px;
+
+    margin: 0 auto;
+
+    border-radius: 50%;
+
+}
 
 .legend-loading {
 
-    display:
+    display: grid;
 
-        grid;
-
-
-
-    gap:
-
-        9px;
+    gap: 8px;
 
 }
 
+.legend-skeleton {
 
+    height: 50px;
 
-.legend-loading-row {
-
-    height:
-
-        50px;
-
-
-
-    border-radius:
-
-        14px;
+    border-radius: 10px;
 
 }
-
-
 
 .activity-loading {
 
-    display:
+    display: grid;
 
-        grid;
+    gap: 16px;
 
-
-
-    gap:
-
-        17px;
+    padding: 20px 22px 24px;
 
 }
 
+.activity-loading-row {
 
+    display: grid;
 
-.loading-event {
+    grid-template-columns:
 
-    display:
+        18px minmax(0, 1fr);
 
-        flex;
-
-
-
-    gap:
-
-        11px;
+    gap: 11px;
 
 }
 
+.activity-loading-row > div:last-child {
 
-
-.loading-dot {
-
-    width:
-
-        10px;
-
-
-
-    height:
-
-        10px;
-
-
-
-    margin-top:
-
-        4px;
-
-
-
-    border-radius:
-
-        50%;
+    min-width: 0;
 
 }
 
+.activity-dot-skeleton {
 
+    width: 10px;
 
-.loading-text {
+    height: 10px;
 
-    flex:
+    margin-top: 4px;
 
-        1;
-
-}
-
-
-
-.loading-title {
-
-    width:
-
-        78%;
-
-
-
-    height:
-
-        10px;
+    border-radius: 50%;
 
 }
 
+.activity-title-skeleton {
 
+    width: 78%;
 
-.loading-date {
-
-    width:
-
-        43%;
-
-
-
-    height:
-
-        8px;
-
-
-
-    margin-top:
-
-        7px;
+    height: 11px;
 
 }
 
+.activity-date-skeleton {
 
+    width: 44%;
 
-/* =====================================
+    height: 9px;
+
+    margin-top: 7px;
+
+}
+
+/* =========================================================
 
    ANIMATION
 
-===================================== */
+\========================================================= */
 
-
-
-@keyframes cardRise {
+@keyframes workflowCardIn {
 
     from {
 
-        opacity:
-
-            0;
-
-
+        opacity: 0;
 
         transform:
 
-            translateY(12px);
+            translateY(8px);
 
     }
 
-
-
     to {
 
-        opacity:
-
-            1;
-
-
+        opacity: 1;
 
         transform:
 
@@ -5059,8 +3559,6 @@ onMounted(
     }
 
 }
-
-
 
 @keyframes shimmer {
 
@@ -5072,8 +3570,6 @@ onMounted(
 
     }
 
-
-
     100% {
 
         background-position:
@@ -5084,7 +3580,17 @@ onMounted(
 
 }
 
+@keyframes spin {
 
+    to {
+
+        transform:
+
+            rotate(360deg);
+
+    }
+
+}
 
 .timeline-enter-active,
 
@@ -5092,215 +3598,205 @@ onMounted(
 
     transition:
 
-        all 0.25s ease;
+        all 0.22s ease;
 
 }
-
-
 
 .timeline-enter-from {
 
-    opacity:
-
-        0;
-
-
+    opacity: 0;
 
     transform:
 
-        translateX(-8px);
+        translateX(-6px);
 
 }
-
-
 
 .timeline-leave-to {
 
-    opacity:
-
-        0;
+    opacity: 0;
 
 }
 
+/* =========================================================
 
+   ACCESSIBILITY
 
-/* =====================================
+\========================================================= */
+
+.dashboard-refresh-button:focus-visible,
+
+.workflow-card:focus-visible {
+
+    outline:
+
+        2px solid
+
+        rgba(225, 200, 117, 0.82);
+
+    outline-offset: 3px;
+
+}
+
+/* =========================================================
 
    RESPONSIVE
 
-===================================== */
-
-
+\========================================================= */
 
 @media (max-width: 1180px) {
 
-    .queue-grid {
+    .dashboard-hero {
 
         grid-template-columns:
 
-            repeat(3,
+            minmax(0, 1fr)
 
-                minmax(0,
+            minmax(280px, 0.55fr);
 
-                    1fr));
+    }
+
+    .dashboard-analytics-grid {
+
+        grid-template-columns: 1fr;
 
     }
 
 }
 
+@media (max-width: 900px) {
 
-
-@media (max-width: 980px) {
-
-    .analytics-grid {
-
-        grid-template-columns:
-
-            1fr;
-
-    }
-
-}
-
-
-
-@media (max-width: 720px) {
-
-    .dashboard-page {
+    .findit-dashboard {
 
         padding:
 
-            20px 18px 32px;
+            22px 20px
+
+            32px;
 
     }
 
+    .dashboard-hero {
 
-
-    .queue-shell {
-
-        padding:
-
-            18px;
+        grid-template-columns: 1fr;
 
     }
 
-
-
-    .queue-grid {
+    .workflow-card-grid {
 
         grid-template-columns:
 
-            repeat(2,
-
-                minmax(0,
-
-                    1fr));
-
-    }
-
-
-
-    .chart-layout,
-
-    .chart-loading {
-
-        grid-template-columns:
-
-            1fr;
-
-    }
-
-
-
-    .section-heading,
-
-    .panel-header {
-
-        align-items:
-
-            flex-start;
+            repeat(2, minmax(0, 1fr));
 
     }
 
 }
 
+@media (max-width: 680px) {
 
+    .findit-dashboard {
+
+        padding:
+
+            16px 14px
+
+            26px;
+
+    }
+
+    .dashboard-hero {
+
+        padding: 22px;
+
+    }
+
+    .dashboard-hero h1 {
+
+        font-size: 1.9rem;
+
+    }
+
+    .dashboard-hero-copy > p {
+
+        font-size: 0.94rem;
+
+    }
+
+    .workflow-section {
+
+        padding: 18px;
+
+    }
+
+    .workflow-section-header,
+
+    .dashboard-panel-header {
+
+        align-items: flex-start;
+
+        flex-direction: column;
+
+    }
+
+    .workflow-card-grid {
+
+        grid-template-columns: 1fr;
+
+    }
+
+    .workflow-card {
+
+        min-height: 220px;
+
+    }
+
+    .reports-chart-layout,
+
+    .chart-loading-layout {
+
+        grid-template-columns: 1fr;
+
+    }
+
+}
 
 @media (max-width: 460px) {
 
-    .queue-grid {
+    .hero-metric-grid {
 
-        grid-template-columns:
-
-            1fr;
+        grid-template-columns: 1fr;
 
     }
 
+    .dashboard-refresh-button {
 
-
-    .queue-card {
-
-        min-height:
-
-            auto;
+        width: 100%;
 
     }
 
+    .dashboard-meta-chip:nth-child(2) {
 
-
-    .queue-copy p {
-
-        min-height:
-
-            0;
-
-    }
-
-
-
-    .panel {
-
-        padding:
-
-            20px;
-
-    }
-
-
-
-    .live-pill {
-
-        display:
-
-            none;
+        display: none;
 
     }
 
 }
 
-
-
 @media (prefers-reduced-motion: reduce) {
 
+    .workflow-card,
 
-
-    .queue-card,
-
-    .legend-item,
+    .dashboard-legend-item,
 
     .donut-segment,
 
-    .skeleton {
+    .skeleton,
 
-        animation:
+    .spinning {
 
-            none !important;
+        animation: none !important;
 
-
-
-        transition:
-
-            none !important;
+        transition: none !important;
 
     }
 

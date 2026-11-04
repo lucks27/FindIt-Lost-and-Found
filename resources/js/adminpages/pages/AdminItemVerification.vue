@@ -1,5 +1,5 @@
 <template>
-    <main class="admin-page-body">
+    <main class="admin-page-body item-verification-page">
         <header class="page-header">
             <div class="page-heading-copy">
                 <p class="page-kicker">Item Verification</p>
@@ -19,23 +19,16 @@
         <section class="filter-toolbar" aria-label="Verification filters">
             <label class="search-field">
                 <span class="sr-only">Search item verification records</span>
-                <input
-                    v-model.trim="query"
-                    type="search"
+                <input v-model.trim="query" type="search"
                     placeholder="Search item, finder, location, category, or status"
-                    aria-label="Search item verification records"
-                />
+                    aria-label="Search item verification records" />
             </label>
 
             <label class="category-field">
                 <span class="field-label">Category</span>
                 <select v-model="selectedCategory" aria-label="Filter by category">
                     <option value="">All categories</option>
-                    <option
-                        v-for="category in categoryOptions"
-                        :key="category.value"
-                        :value="category.value"
-                    >
+                    <option v-for="category in categoryOptions" :key="category.value" :value="category.value">
                         {{ category.label }}
                     </option>
                 </select>
@@ -44,40 +37,33 @@
             <div class="sort-control" aria-label="Verification order">
                 <span class="field-label">Order</span>
                 <div class="sort-buttons">
-                    <button
-                        type="button"
-                        class="sort-button"
-                        :class="{ active: sortOrder === 'newest' }"
-                        @click="sortOrder = 'newest'"
-                    >
+                    <button type="button" class="sort-button" :class="{ active: sortOrder === 'newest' }"
+                        @click="sortOrder = 'newest'">
                         Newest
                     </button>
-                    <button
-                        type="button"
-                        class="sort-button"
-                        :class="{ active: sortOrder === 'oldest' }"
-                        @click="sortOrder = 'oldest'"
-                    >
+                    <button type="button" class="sort-button" :class="{ active: sortOrder === 'oldest' }"
+                        @click="sortOrder = 'oldest'">
                         Oldest
                     </button>
                 </div>
             </div>
+
+            <button type="button" class="verification-print-button" :disabled="loading || !filteredVerifications.length"
+                title="Print all matching verification records or save them as a PDF" @click="printVerificationReport">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                    <path d="M6 14h12v7H6zM17 12h.01" />
+                </svg>
+                Print / Save PDF
+            </button>
         </section>
 
         <div v-if="errorMessage" class="inline-alert error-alert" role="alert">
             {{ errorMessage }}
         </div>
 
-        <section
-            v-if="loading"
-            class="verification-grid"
-            aria-label="Loading item verification records"
-        >
-            <article
-                v-for="i in ITEMS_PER_PAGE"
-                :key="`skeleton-${i}`"
-                class="verification-card skeleton-card"
-            >
+        <section v-if="loading" class="verification-grid" aria-label="Loading item verification records">
+            <article v-for="i in ITEMS_PER_PAGE" :key="`skeleton-${i}`" class="verification-card skeleton-card">
                 <div class="skeleton-card-top">
                     <div class="skeleton skeleton-image"></div>
                     <div class="skeleton-heading">
@@ -109,23 +95,13 @@
 
             <template v-else>
                 <section class="verification-grid" aria-label="Item verification records">
-                    <article
-                        v-for="item in paginatedVerifications"
-                        :key="item.id"
-                        class="verification-card"
-                    >
+                    <article v-for="item in paginatedVerifications" :key="item.id" class="verification-card">
                         <div class="verification-card-top">
-                            <button
-                                type="button"
-                                class="verification-image"
+                            <button type="button" class="verification-image"
                                 :aria-label="`Open details for ${item.report?.title || 'found item'}`"
-                                @click="openDetailModal(item)"
-                            >
-                                <img
-                                    :src="getReportImage(item.report)"
-                                    :alt="item.report?.title || 'Found item'"
-                                    :class="{ 'fallback-image': !hasReportImages(item.report) }"
-                                />
+                                @click="openDetailModal(item)">
+                                <img :src="getReportImage(item.report)" :alt="item.report?.title || 'Found item'"
+                                    :class="{ 'fallback-image': !hasReportImages(item.report) }" />
                             </button>
 
                             <div class="card-heading">
@@ -175,36 +151,20 @@
                         </div>
 
                         <div class="card-actions">
-                            <button
-                                type="button"
-                                class="action-btn view-btn"
-                                @click="openDetailModal(item)"
-                            >
+                            <button type="button" class="action-btn view-btn" @click="openDetailModal(item)">
                                 View Details
                             </button>
 
                             <template v-if="isActionable(item)">
-                                <button
-                                    type="button"
-                                    class="action-btn request-btn"
-                                    @click="openRequestFromCard(item)"
-                                >
+                                <button type="button" class="action-btn request-btn" @click="openRequestFromCard(item)">
                                     Request Details
                                 </button>
 
-                                <button
-                                    type="button"
-                                    class="action-btn approve-btn"
-                                    @click="verifyItem(item.id)"
-                                >
+                                <button type="button" class="action-btn approve-btn" @click="verifyItem(item.id)">
                                     Verify Item
                                 </button>
 
-                                <button
-                                    type="button"
-                                    class="action-btn reject-btn"
-                                    @click="rejectItem(item.id)"
-                                >
+                                <button type="button" class="action-btn reject-btn" @click="rejectItem(item.id)">
                                     Reject
                                 </button>
                             </template>
@@ -233,37 +193,21 @@
                     </p>
 
                     <div class="pagination-controls">
-                        <button
-                            type="button"
-                            class="pagination-button pagination-arrow"
-                            :disabled="currentPage === 1"
-                            aria-label="Previous page"
-                            @click="goPrevious"
-                        >
+                        <button type="button" class="pagination-button pagination-arrow" :disabled="currentPage === 1"
+                            aria-label="Previous page" @click="goPrevious">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="m15 6-6 6 6 6" />
                             </svg>
                         </button>
 
-                        <button
-                            v-for="page in visiblePageNumbers"
-                            :key="page"
-                            type="button"
-                            class="pagination-button page-number"
-                            :class="{ active: page === currentPage }"
-                            :aria-current="page === currentPage ? 'page' : undefined"
-                            @click="goToPage(page)"
-                        >
+                        <button v-for="page in visiblePageNumbers" :key="page" type="button"
+                            class="pagination-button page-number" :class="{ active: page === currentPage }"
+                            :aria-current="page === currentPage ? 'page' : undefined" @click="goToPage(page)">
                             {{ page }}
                         </button>
 
-                        <button
-                            type="button"
-                            class="pagination-button pagination-arrow"
-                            :disabled="currentPage === totalPages"
-                            aria-label="Next page"
-                            @click="goNext"
-                        >
+                        <button type="button" class="pagination-button pagination-arrow"
+                            :disabled="currentPage === totalPages" aria-label="Next page" @click="goNext">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="m9 6 6 6-6 6" />
                             </svg>
@@ -274,17 +218,9 @@
         </template>
 
         <transition name="modal-fade">
-            <div
-                v-if="selectedVerification"
-                class="modal-overlay"
-                @click.self="closeDetailModal"
-            >
-                <section
-                    class="modal-content"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="verification-modal-title"
-                >
+            <div v-if="selectedVerification" class="modal-overlay" @click.self="closeDetailModal">
+                <section class="modal-content" role="dialog" aria-modal="true"
+                    aria-labelledby="verification-modal-title">
                     <header class="modal-header">
                         <div class="modal-title-area">
                             <p class="modal-kicker">Physical Item Verification</p>
@@ -294,19 +230,12 @@
                         </div>
 
                         <div class="modal-header-right">
-                            <span
-                                class="status-badge modal-status"
-                                :class="statusClass(selectedVerification.status)"
-                            >
+                            <span class="status-badge modal-status" :class="statusClass(selectedVerification.status)">
                                 {{ formatStatus(selectedVerification.status) }}
                             </span>
 
-                            <button
-                                type="button"
-                                class="modal-close"
-                                aria-label="Close details"
-                                @click="closeDetailModal"
-                            >
+                            <button type="button" class="modal-close" aria-label="Close details"
+                                @click="closeDetailModal">
                                 <svg viewBox="0 0 24 24" aria-hidden="true">
                                     <path d="m6 6 12 12M18 6 6 18" />
                                 </svg>
@@ -315,17 +244,11 @@
                     </header>
 
                     <div class="modal-scroll">
-                        <div
-                            v-if="modalActionNotice"
-                            class="modal-inline-alert modal-success-alert"
-                        >
+                        <div v-if="modalActionNotice" class="modal-inline-alert modal-success-alert">
                             {{ modalActionNotice }}
                         </div>
 
-                        <div
-                            v-if="modalActionError"
-                            class="modal-inline-alert modal-error-alert"
-                        >
+                        <div v-if="modalActionError" class="modal-inline-alert modal-error-alert">
                             {{ modalActionError }}
                         </div>
 
@@ -348,50 +271,33 @@
                         <section class="modal-overview">
                             <div class="modal-media">
                                 <div class="modal-image-container">
-                                    <button
-                                        type="button"
-                                        class="modal-image-button"
-                                        aria-label="View full-size item image"
-                                        @click="openImagePreview(
+                                    <button type="button" class="modal-image-button"
+                                        aria-label="View full-size item image" @click="openImagePreview(
                                             getReportImages(selectedVerification.report),
                                             currentImageIndex
-                                        )"
-                                    >
-                                        <img
-                                            :src="getReportImage(
-                                                selectedVerification.report,
-                                                currentImageIndex
-                                            )"
-                                            :alt="selectedVerification.report?.title || 'Found item'"
-                                            class="modal-image"
-                                            :class="{
+                                        )">
+                                        <img :src="getReportImage(
+                                            selectedVerification.report,
+                                            currentImageIndex
+                                        )" :alt="selectedVerification.report?.title || 'Found item'"
+                                            class="modal-image" :class="{
                                                 'fallback-image':
                                                     !hasReportImages(selectedVerification.report)
-                                            }"
-                                        />
+                                            }" />
                                     </button>
                                 </div>
 
-                                <div
-                                    v-if="getReportImages(selectedVerification.report).length > 1"
-                                    class="image-thumbnails"
-                                >
-                                    <button
-                                        v-for="(image, index) in getReportImages(selectedVerification.report)"
-                                        :key="index"
-                                        type="button"
-                                        class="thumbnail-button"
+                                <div v-if="getReportImages(selectedVerification.report).length > 1"
+                                    class="image-thumbnails">
+                                    <button v-for="(image, index) in getReportImages(selectedVerification.report)"
+                                        :key="index" type="button" class="thumbnail-button"
                                         :class="{ active: currentImageIndex === index }"
-                                        @click="currentImageIndex = index"
-                                    >
-                                        <img
-                                            :src="getImageUrl(
-                                                image.file_path ||
-                                                image.path ||
-                                                image.url
-                                            )"
-                                            :alt="`Item image ${index + 1}`"
-                                        />
+                                        @click="currentImageIndex = index">
+                                        <img :src="getImageUrl(
+                                            image.file_path ||
+                                            image.path ||
+                                            image.url
+                                        )" :alt="`Item image ${index + 1}`" />
                                     </button>
                                 </div>
                             </div>
@@ -577,31 +483,21 @@
                             </div>
                         </section>
 
-                        <label
-                            v-if="isActionable(selectedVerification)"
-                            class="request-note-field"
-                        >
+                        <label v-if="isActionable(selectedVerification)" class="request-note-field">
                             <div class="request-note-heading">
                                 <span>Verification Notes</span>
                                 <small>Optional</small>
                             </div>
-                            <textarea
-                                v-model="verificationNote"
-                                rows="3"
-                                maxlength="1000"
-                                placeholder="Add notes about the physical item inspection..."
-                            ></textarea>
+                            <textarea v-model="verificationNote" rows="3" maxlength="1000"
+                                placeholder="Add notes about the physical item inspection..."></textarea>
                             <span class="character-count">
                                 {{ verificationNote.length }}/1000
                             </span>
                         </label>
 
                         <transition name="request-panel">
-                            <section
-                                v-if="showRequestDetailsForm"
-                                ref="requestDetailsPanel"
-                                class="request-details-panel"
-                            >
+                            <section v-if="showRequestDetailsForm" ref="requestDetailsPanel"
+                                class="request-details-panel">
                                 <div class="request-details-header">
                                     <div>
                                         <p class="request-kicker">Finder Clarification</p>
@@ -612,12 +508,8 @@
                                         </p>
                                     </div>
 
-                                    <button
-                                        type="button"
-                                        class="request-panel-close"
-                                        aria-label="Close request details"
-                                        @click="closeRequestDetails"
-                                    >
+                                    <button type="button" class="request-panel-close" aria-label="Close request details"
+                                        @click="closeRequestDetails">
                                         <svg viewBox="0 0 24 24" aria-hidden="true">
                                             <path d="m6 6 12 12M18 6 6 18" />
                                         </svg>
@@ -625,19 +517,11 @@
                                 </div>
 
                                 <div class="request-options">
-                                    <label
-                                        v-for="option in requestDetailOptions"
-                                        :key="option.value"
-                                        class="request-option"
-                                        :class="{
+                                    <label v-for="option in requestDetailOptions" :key="option.value"
+                                        class="request-option" :class="{
                                             selected: selectedRequestDetails.includes(option.value)
-                                        }"
-                                    >
-                                        <input
-                                            v-model="selectedRequestDetails"
-                                            type="checkbox"
-                                            :value="option.value"
-                                        />
+                                        }">
+                                        <input v-model="selectedRequestDetails" type="checkbox" :value="option.value" />
                                         <span class="custom-checkbox">
                                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                                 <path d="m5 12 4 4L19 6" />
@@ -655,12 +539,8 @@
                                         <span>Note to Finder</span>
                                         <small>Optional</small>
                                     </div>
-                                    <textarea
-                                        v-model="requestNote"
-                                        rows="4"
-                                        maxlength="500"
-                                        placeholder="Explain what additional item information is needed..."
-                                    ></textarea>
+                                    <textarea v-model="requestNote" rows="4" maxlength="500"
+                                        placeholder="Explain what additional item information is needed..."></textarea>
                                     <span class="character-count">
                                         {{ requestNote.length }}/500
                                     </span>
@@ -671,19 +551,12 @@
                                 </div>
 
                                 <div class="request-form-actions">
-                                    <button
-                                        type="button"
-                                        class="request-form-button cancel-request-button"
-                                        @click="closeRequestDetails"
-                                    >
+                                    <button type="button" class="request-form-button cancel-request-button"
+                                        @click="closeRequestDetails">
                                         Cancel
                                     </button>
-                                    <button
-                                        type="button"
-                                        class="request-form-button send-request-button"
-                                        :disabled="sendingRequestDetails"
-                                        @click="submitRequestDetails"
-                                    >
+                                    <button type="button" class="request-form-button send-request-button"
+                                        :disabled="sendingRequestDetails" @click="submitRequestDetails">
                                         {{
                                             sendingRequestDetails
                                                 ? 'Sending...'
@@ -695,42 +568,24 @@
                         </transition>
                     </div>
 
-                    <footer
-                        v-if="isActionable(selectedVerification)"
-                        class="modal-actions"
-                    >
-                        <button
-                            type="button"
-                            class="modal-action-button modal-request-button"
-                            :class="{ active: showRequestDetailsForm }"
-                            @click="toggleRequestDetails"
-                        >
+                    <footer v-if="isActionable(selectedVerification)" class="modal-actions">
+                        <button type="button" class="modal-action-button modal-request-button"
+                            :class="{ active: showRequestDetailsForm }" @click="toggleRequestDetails">
                             Request Details
                         </button>
 
-                        <button
-                            type="button"
-                            class="modal-action-button modal-reject-button"
-                            :disabled="rejectingItem"
-                            @click="rejectItem(selectedVerification.id)"
-                        >
+                        <button type="button" class="modal-action-button modal-reject-button" :disabled="rejectingItem"
+                            @click="rejectItem(selectedVerification.id)">
                             {{ rejectingItem ? 'Rejecting...' : 'Reject Item' }}
                         </button>
 
-                        <button
-                            type="button"
-                            class="modal-action-button modal-approve-button"
-                            :disabled="verifyingItem"
-                            @click="verifyItem(selectedVerification.id)"
-                        >
+                        <button type="button" class="modal-action-button modal-approve-button" :disabled="verifyingItem"
+                            @click="verifyItem(selectedVerification.id)">
                             {{ verifyingItem ? 'Verifying...' : 'Verify Item' }}
                         </button>
                     </footer>
 
-                    <footer
-                        v-else-if="isVerified(selectedVerification)"
-                        class="modal-actions approved-actions"
-                    >
+                    <footer v-else-if="isVerified(selectedVerification)" class="modal-actions approved-actions">
                         <div class="approved-footer-copy">
                             <span>Verified · Public Feed Eligible</span>
                             <small>
@@ -749,40 +604,18 @@
             </div>
         </transition>
 
-        <div
-            v-if="previewImageUrl"
-            class="image-preview-overlay"
-            @click.self="closeImagePreview"
-        >
-            <button
-                type="button"
-                class="image-preview-close"
-                aria-label="Close image preview"
-                @click="closeImagePreview"
-            >
+        <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
+            <button type="button" class="image-preview-close" aria-label="Close image preview"
+                @click="closeImagePreview">
                 ×
             </button>
-            <button
-                v-if="previewImages.length > 1"
-                type="button"
-                class="image-preview-nav prev"
-                aria-label="Previous image"
-                @click="showPreviousImage"
-            >
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav prev"
+                aria-label="Previous image" @click="showPreviousImage">
                 ‹
             </button>
-            <img
-                :src="previewImageUrl"
-                alt="Full-size item preview"
-                class="image-preview-image"
-            />
-            <button
-                v-if="previewImages.length > 1"
-                type="button"
-                class="image-preview-nav next"
-                aria-label="Next image"
-                @click="showNextImage"
-            >
+            <img :src="previewImageUrl" alt="Full-size item preview" class="image-preview-image" />
+            <button v-if="previewImages.length > 1" type="button" class="image-preview-nav next" aria-label="Next image"
+                @click="showNextImage">
                 ›
             </button>
         </div>
@@ -1587,6 +1420,210 @@ async function submitRequestDetails() {
             'Unable to request additional item details.'
     } finally {
         sendingRequestDetails.value = false
+    }
+}
+
+/**
+ * Print all non-archived verification records that match the visible filters
+ * and ordering, not only the current page. No extra API or PDF package needed.
+ * Private identifying details are deliberately excluded from bulk exports.
+ */
+function escapeVerificationPrint(value) {
+    return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character])
+}
+
+function verificationPrintValue(value) {
+    return escapeVerificationPrint(
+        value === null || value === undefined || value === '' ? 'Not provided' : value
+    )
+}
+
+function verificationPrintPhoto(item) {
+    if (!hasReportImages(item.report)) return ''
+
+    const raw = getReportImage(item.report)
+    if (!raw || /^(?:data:|blob:)/i.test(raw)) return ''
+
+    try {
+        const url = new URL(raw, window.location.href)
+        // Do not send student/report image URLs to third-party print destinations.
+        if (!['http:', 'https:'].includes(url.protocol)) return ''
+        if (url.host !== window.location.host) return ''
+        if (window.location.protocol === 'https:') url.protocol = 'https:'
+        return url.href
+    } catch {
+        return ''
+    }
+}
+
+function verificationPrintEntry(item, index) {
+    const report = item.report || {}
+    const image = verificationPrintPhoto(item)
+    const fields = [
+        ['Verification ID', item.id],
+        ['Report ID', item.report_id || report.id],
+        ['Verification status', formatStatus(item.status)],
+        ['Category', getCategoryName(item)],
+        ['Color', report.color],
+        ['Location found', report.location],
+        ['Date found', formatDate(report.date_occurred)],
+        ['Received for verification', formatDateTime(item.created_at)],
+        ['Verified at', item.verified_at ? formatDateTime(item.verified_at) : 'Not recorded'],
+        ['Finder student ID', getFinderField(item, 'student_id_number')],
+        ['Finder email', getFinderField(item, 'email')],
+        ['Department', getFinderField(item, 'department')],
+        ['Course', getFinderField(item, 'course')],
+        ['Year level', getFinderField(item, 'year_level')],
+    ]
+
+    const details = fields.map(([label, value]) => `
+        <div class="print-field"><dt>${escapeVerificationPrint(label)}</dt><dd>${verificationPrintValue(value)}</dd></div>
+    `).join('')
+
+    return `
+        <article class="verification-entry">
+            <div class="entry-heading">
+                <div><span class="entry-number">VERIFICATION ${index + 1}</span>
+                     <h2>${verificationPrintValue(report.title || `Report #${item.report_id || '—'}`)}</h2></div>
+                <span class="entry-status">${verificationPrintValue(formatStatus(item.status))}</span>
+            </div>
+            <div class="entry-body">
+                ${image
+            ? `<img class="item-photo" src="${escapeVerificationPrint(image)}" alt="Found item photo" />`
+            : '<div class="photo-placeholder">No item photo</div>'}
+                <div class="entry-main">
+                    <div class="finder-name"><span>FINDER / REPORTING STUDENT</span><strong>${verificationPrintValue(getFinderName(item))}</strong></div>
+                    <dl class="print-fields">${details}</dl>
+                </div>
+            </div>
+            <div class="entry-notes">
+                <p><strong>Item description:</strong> ${verificationPrintValue(report.description || 'No description provided.')}</p>
+                <p><strong>Verification notes:</strong> ${verificationPrintValue(item.notes || 'No verification notes recorded.')}</p>
+            </div>
+        </article>`
+}
+
+function buildPrintableVerificationHtml(records) {
+    const generated = new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
+    const search = query.value.trim()
+    const category = selectedCategory.value
+        ? (categoryOptions.value.find(option => option.value === selectedCategory.value)?.label || 'Selected category')
+        : 'All categories'
+    const order = sortOrder.value === 'oldest' ? 'Oldest first' : 'Newest first'
+
+    return `<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SNSU FindIt - Item Verification Report</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; color: #1e3e2b; background: #edf4ef; font: 12px/1.5 Arial, sans-serif; }
+        .print-controls { max-width: 910px; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 18px auto; padding: 0 12px; }
+        .print-controls p { margin: 0; color: #536b5b; }
+        .print-button { background: #246b49; color: #fff; border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 700; cursor: pointer; }
+        .document { width: min(910px, 100%); margin: 0 auto 26px; padding: 25px; border: 1px solid #d4e5d9; background: #fff; box-shadow: 0 6px 22px #12432a18; }
+        .document-header { padding-bottom: 14px; border-bottom: 3px solid #2a7851; }
+        .brand { color: #347f57; font-size: 10px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+        h1 { margin: 6px 0 3px; font-size: 23px; line-height: 1.2; color: #113d28; }
+        .subtitle { margin: 0; color: #657f6c; }
+        .summary { display: flex; gap: 7px 18px; flex-wrap: wrap; margin: 14px 0 20px; padding: 12px 14px; border: 1px solid #d5e8d9; border-radius: 8px; background: #f0f7f1; font-size: 11px; }
+        .verification-entry { margin-bottom: 17px; border: 1px solid #d4e3d8; border-radius: 9px; overflow: hidden; break-inside: avoid-page; page-break-inside: avoid; }
+        .entry-heading { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 11px 12px; border-bottom: 1px solid #d4e3d8; background: #eaf3ec; }
+        .entry-number { font-size: 9px; font-weight: 800; letter-spacing: .09em; color: #588b69; }
+        .entry-heading h2 { margin: 3px 0 0; font-size: 15px; overflow-wrap: anywhere; }
+        .entry-status { flex: 0 0 auto; max-width: 45%; padding: 5px 9px; border: 1px solid #bad8c2; border-radius: 20px; background: #dcefe1; color: #185d3b; font-size: 10px; font-weight: 700; text-align: center; }
+        .entry-body { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 15px; padding: 12px; }
+        .item-photo, .photo-placeholder { display: block; width: 132px; height: 132px; object-fit: contain; border: 1px solid #e1ece4; border-radius: 7px; background: #f3f8f4; }
+        .photo-placeholder { display: grid; place-items: center; padding: 9px; font-size: 10px; text-align: center; color: #7c8c80; }
+        .finder-name { display: grid; gap: 3px; margin: 0 0 9px; }
+        .finder-name span { font-size: 9px; color: #648b70; font-weight: 800; letter-spacing: .06em; }
+        .finder-name strong { font-size: 13px; }
+        .print-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 15px; margin: 0; }
+        .print-field { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px; padding: 3px 0; border-top: 1px solid #edf2ee; }
+        .print-field dt { color: #667b6c; }
+        .print-field dd { margin: 0; overflow-wrap: anywhere; font-weight: 600; }
+        .entry-notes { padding: 10px 12px; border-top: 1px solid #e1eae3; background: #fbfdfb; }
+        .entry-notes p { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .footer-note { margin: 18px 0 0; font-size: 10px; color: #667c6c; }
+        @page { size: A4; margin: 12mm; }
+        @media print {
+            html, body { background: #fff !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            .print-controls { display: none !important; }
+            .document { width: 100%; margin: 0; padding: 0; border: 0; box-shadow: none; }
+            .verification-entry { break-inside: avoid-page; page-break-inside: avoid; }
+        }
+        @media (max-width: 650px) {
+            .entry-body { grid-template-columns: 1fr; }
+            .print-fields { grid-template-columns: 1fr; }
+            .print-controls { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-controls">
+        <p>To download, choose <strong>Save as PDF</strong> as the print destination.</p>
+        <button type="button" class="print-button" onclick="window.print()">Print / Save PDF</button>
+    </div>
+    <main class="document">
+        <header class="document-header">
+            <div class="brand">SNSU FindIt · Administrator Report</div>
+            <h1>Found Item Verification Report</h1>
+            <p class="subtitle">Physical item verification records · Authorized administrative use only</p>
+        </header>
+        <div class="summary">
+            <span><strong>Generated:</strong> ${escapeVerificationPrint(generated)}</span>
+            <span><strong>Records:</strong> ${records.length}</span>
+            <span><strong>Category:</strong> ${escapeVerificationPrint(category)}</span>
+            <span><strong>Order:</strong> ${escapeVerificationPrint(order)}</span>
+            ${search ? `<span><strong>Search:</strong> ${escapeVerificationPrint(search)}</span>` : ''}
+        </div>
+        ${records.map(verificationPrintEntry).join('\n')}
+        <p class="footer-note">Confidential administrative report. Contains only the records currently available to the signed-in administrator. Private identifying details and verification evidence are intentionally excluded from this bulk report.</p>
+    </main>
+</body>
+</html>`
+}
+
+function printVerificationReport() {
+    const records = filteredVerifications.value
+    if (loading.value || !records.length) return
+
+    // Open synchronously from the user click to avoid popup blockers.
+    const reportWindow = window.open('', '_blank')
+    if (!reportWindow) {
+        errorMessage.value = 'Pop-up blocked. Allow pop-ups for FindIt to print or save the report as PDF.'
+        return
+    }
+
+    try {
+        reportWindow.opener = null
+        reportWindow.document.open()
+        reportWindow.document.write(buildPrintableVerificationHtml(records))
+        reportWindow.document.close()
+
+        const imageLoads = Array.from(reportWindow.document.images, image => {
+            if (image.complete) return Promise.resolve()
+            return new Promise(resolve => {
+                image.addEventListener('load', resolve, { once: true })
+                image.addEventListener('error', resolve, { once: true })
+            })
+        })
+        Promise.race([
+            Promise.all(imageLoads),
+            new Promise(resolve => window.setTimeout(resolve, 2500)),
+        ]).then(() => {
+            if (!reportWindow.closed) {
+                reportWindow.focus()
+                reportWindow.print()
+            }
+        })
+    } catch {
+        reportWindow.close()
+        errorMessage.value = 'Unable to create the item verification printable report.'
     }
 }
 
@@ -5854,11 +5891,9 @@ onMounted(
     border-radius: 18px !important;
 
     background:
-        linear-gradient(
-            180deg,
+        linear-gradient(180deg,
             #276647 0%,
-            #1f5a3e 100%
-        ) !important;
+            #1f5a3e 100%) !important;
 
     box-shadow:
         0 30px 90px rgba(0, 0, 0, 0.48),
@@ -5874,12 +5909,10 @@ onMounted(
         1px solid rgba(255, 255, 255, 0.12) !important;
 
     background:
-        linear-gradient(
-            135deg,
+        linear-gradient(135deg,
             #246b49 0%,
             #155033 55%,
-            #103c29 100%
-        ) !important;
+            #103c29 100%) !important;
 }
 
 .modal-kicker {
@@ -5949,11 +5982,9 @@ onMounted(
     border-radius: 12px !important;
 
     background:
-        linear-gradient(
-            135deg,
+        linear-gradient(135deg,
             rgba(13, 70, 45, 0.96),
-            rgba(15, 83, 52, 0.88)
-        ) !important;
+            rgba(15, 83, 52, 0.88)) !important;
 }
 
 .pickup-message-icon {
@@ -6145,7 +6176,7 @@ onMounted(
 }
 
 /* Make each label/value row visibly larger */
-.detail-list > div {
+.detail-list>div {
     grid-template-columns:
         120px minmax(0, 1fr) !important;
 
@@ -6218,7 +6249,7 @@ onMounted(
 }
 
 .evidence-block span,
-.description-panel > span {
+.description-panel>span {
     margin-bottom: 7px !important;
 
     color: #ead176 !important;
@@ -6366,11 +6397,9 @@ onMounted(
         1px solid rgba(255, 255, 255, 0.10) !important;
 
     background:
-        linear-gradient(
-            135deg,
+        linear-gradient(135deg,
             #155033,
-            #103c29
-        ) !important;
+            #103c29) !important;
 }
 
 .modal-action-button {
@@ -6499,7 +6528,7 @@ onMounted(
         grid-template-columns: 1fr !important;
     }
 
-    .detail-list > div {
+    .detail-list>div {
         grid-template-columns: 1fr !important;
         gap: 3px !important;
     }
@@ -6515,4 +6544,1656 @@ onMounted(
     }
 }
 
+
+
+
+/* =========================================================
+   ITEM VERIFICATION - DEEP GREEN PROFESSIONAL V4
+   Approved visual direction:
+   deep forest / emerald green, readable cream-white text,
+   restrained gold accents, larger typography, no white/light
+   main surfaces, and a large readable verification modal.
+   ========================================================= */
+
+.item-verification-page {
+    --iv4-green-975: #061f16;
+    --iv4-green-950: #082a1d;
+    --iv4-green-925: #0a3122;
+    --iv4-green-900: #0d3827;
+    --iv4-green-850: #12452f;
+    --iv4-green-800: #174f37;
+    --iv4-green-750: #1d5e41;
+    --iv4-green-700: #256b4b;
+    --iv4-green-650: #2f7d59;
+    --iv4-green-600: #3a8d63;
+    --iv4-green-550: #4c9b70;
+    --iv4-green-500: #62aa7e;
+    --iv4-line: rgba(218, 235, 223, 0.14);
+    --iv4-line-strong: rgba(225, 200, 117, 0.36);
+    --iv4-text: #f4f7f1;
+    --iv4-text-soft: #c9d8ce;
+    --iv4-text-muted: #9fb3a6;
+    --iv4-gold: #dfc56f;
+    --iv4-gold-soft: #edd994;
+    --iv4-danger: #cf5a54;
+
+    min-height: calc(100vh - 60px) !important;
+    padding: 22px !important;
+
+    background:
+        radial-gradient(circle at 12% 0%,
+            rgba(78, 157, 114, 0.22),
+            transparent 29%),
+        linear-gradient(180deg,
+            #123f2c 0%,
+            #0d3425 54%,
+            #092c1f 100%) !important;
+
+    color: var(--iv4-text) !important;
+
+    font-family:
+        "Segoe UI",
+        Inter,
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif !important;
+
+    font-size: 15px !important;
+    line-height: 1.55 !important;
+
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* =========================================================
+   PAGE HEADER
+   ========================================================= */
+
+.item-verification-page .page-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+
+    gap: 22px !important;
+
+    margin-bottom: 18px !important;
+    padding: 21px 23px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 17px !important;
+
+    background:
+        linear-gradient(145deg,
+            #1f6748 0%,
+            #174f37 58%,
+            #123f2d 100%) !important;
+
+    box-shadow:
+        0 16px 34px rgba(0, 0, 0, 0.18) !important;
+}
+
+.item-verification-page .page-kicker,
+.item-verification-page .modal-kicker,
+.item-verification-page .request-kicker {
+    margin-bottom: 5px !important;
+
+    color: var(--iv4-gold-soft) !important;
+
+    font-size: 11px !important;
+    font-weight: 850 !important;
+    letter-spacing: 0.14em !important;
+    text-transform: uppercase !important;
+}
+
+.item-verification-page .page-header h1 {
+    margin: 0 !important;
+
+    color: #ffffff !important;
+
+    font-size: clamp(1.85rem, 2.4vw, 2.4rem) !important;
+    font-weight: 850 !important;
+    line-height: 1.18 !important;
+    letter-spacing: -0.02em !important;
+}
+
+.item-verification-page .page-copy {
+    max-width: 790px !important;
+    margin-top: 8px !important;
+
+    color: #d3dfd6 !important;
+
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    line-height: 1.7 !important;
+}
+
+.item-verification-page .queue-count {
+    min-width: 108px !important;
+    padding: 14px 17px !important;
+
+    border: 1px solid rgba(225, 200, 117, 0.24) !important;
+    border-radius: 13px !important;
+
+    background:
+        linear-gradient(180deg,
+            rgba(225, 200, 117, 0.10),
+            rgba(255, 255, 255, 0.04)) !important;
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+.item-verification-page .queue-count strong {
+    color: var(--iv4-gold-soft) !important;
+
+    font-size: 1.5rem !important;
+    font-weight: 900 !important;
+}
+
+.item-verification-page .queue-count span {
+    margin-top: 4px !important;
+
+    color: #c5d3c9 !important;
+
+    font-size: 10px !important;
+    font-weight: 850 !important;
+    letter-spacing: 0.08em !important;
+}
+
+/* =========================================================
+   FILTER TOOLBAR
+   ========================================================= */
+
+.item-verification-page .filter-toolbar {
+    grid-template-columns:
+        minmax(320px, 1.5fr) minmax(230px, 0.85fr) minmax(230px, 0.85fr) !important;
+
+    gap: 13px !important;
+
+    margin-bottom: 20px !important;
+    padding: 15px 16px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 15px !important;
+
+    background:
+        linear-gradient(145deg,
+            #19593e 0%,
+            #134832 100%) !important;
+
+    box-shadow:
+        0 12px 26px rgba(0, 0, 0, 0.15) !important;
+}
+
+.item-verification-page .search-field,
+.item-verification-page .category-field,
+.item-verification-page .sort-control {
+    min-width: 0 !important;
+}
+
+.item-verification-page .field-label {
+    color: #c8d7cc !important;
+
+    font-size: 11px !important;
+    font-weight: 800 !important;
+}
+
+.item-verification-page .search-field input,
+.item-verification-page .category-field select {
+    height: 47px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
+    border-radius: 9px !important;
+
+    background-color: #0f3a29 !important;
+    color: #ffffff !important;
+
+    -webkit-text-fill-color: #ffffff !important;
+
+    font-size: 13px !important;
+    font-weight: 650 !important;
+}
+
+.item-verification-page .search-field input {
+    padding: 0 13px !important;
+}
+
+.item-verification-page .search-field input::placeholder {
+    color: #9fb3a6 !important;
+    opacity: 1 !important;
+}
+
+.item-verification-page .category-field select {
+    padding-left: 12px !important;
+
+    background-image:
+        linear-gradient(45deg,
+            transparent 50%,
+            #c5d5ca 50%),
+        linear-gradient(135deg,
+            #c5d5ca 50%,
+            transparent 50%) !important;
+}
+
+.item-verification-page .category-field select option {
+    background: #0f3a29 !important;
+    color: #ffffff !important;
+
+    -webkit-text-fill-color: #ffffff !important;
+}
+
+.item-verification-page .search-field input:hover,
+.item-verification-page .category-field select:hover {
+    border-color: rgba(225, 200, 117, 0.38) !important;
+}
+
+.item-verification-page .search-field input:focus,
+.item-verification-page .category-field select:focus {
+    border-color: var(--iv4-gold) !important;
+
+    box-shadow:
+        0 0 0 3px rgba(225, 200, 117, 0.12) !important;
+}
+
+.item-verification-page .sort-buttons {
+    gap: 7px !important;
+}
+
+.item-verification-page .sort-button {
+    height: 47px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 9px !important;
+
+    background: #0f3a29 !important;
+    color: #c9d8ce !important;
+
+    -webkit-text-fill-color: #c9d8ce !important;
+
+    font-size: 11.5px !important;
+    font-weight: 850 !important;
+}
+
+.item-verification-page .sort-button:hover:not(.active) {
+    border-color: rgba(225, 200, 117, 0.26) !important;
+
+    background: rgba(225, 200, 117, 0.07) !important;
+    color: var(--iv4-gold-soft) !important;
+
+    -webkit-text-fill-color: var(--iv4-gold-soft) !important;
+}
+
+.item-verification-page .sort-button.active {
+    border-color: rgba(225, 200, 117, 0.34) !important;
+
+    background:
+        linear-gradient(135deg,
+            #3f9363 0%,
+            #246b49 100%) !important;
+
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+
+    box-shadow:
+        0 6px 14px rgba(0, 0, 0, 0.16) !important;
+}
+
+/* =========================================================
+   ALERT / EMPTY STATE
+   ========================================================= */
+
+.item-verification-page .inline-alert {
+    padding: 12px 14px !important;
+
+    border-radius: 10px !important;
+
+    font-size: 12.5px !important;
+    line-height: 1.5 !important;
+}
+
+.item-verification-page .error-alert {
+    border-color: rgba(239, 131, 125, 0.34) !important;
+
+    background: rgba(112, 42, 38, 0.38) !important;
+    color: #ffd8d5 !important;
+}
+
+.item-verification-page .empty-state-card {
+    width: min(720px, 100%) !important;
+    min-height: 340px !important;
+
+    margin: 46px auto 0 !important;
+    padding: 44px 52px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 18px !important;
+
+    background:
+        linear-gradient(145deg,
+            #1b6043 0%,
+            #154f37 62%,
+            #123f2d 100%) !important;
+
+    text-align: center !important;
+
+    box-shadow:
+        0 18px 40px rgba(0, 0, 0, 0.18) !important;
+}
+
+.item-verification-page .empty-icon {
+    width: 80px !important;
+    height: 80px !important;
+
+    margin-bottom: 16px !important;
+
+    border: 1px solid rgba(225, 200, 117, 0.30) !important;
+    border-radius: 21px !important;
+
+    background: rgba(225, 200, 117, 0.09) !important;
+    color: var(--iv4-gold-soft) !important;
+
+    box-shadow:
+        0 8px 20px rgba(0, 0, 0, 0.12) !important;
+}
+
+.item-verification-page .empty-icon svg {
+    width: 38px !important;
+    height: 38px !important;
+}
+
+.item-verification-page .empty-state-card h2 {
+    margin: 0 0 10px !important;
+
+    color: #ffffff !important;
+
+    font-size: 1.5rem !important;
+    font-weight: 850 !important;
+}
+
+.item-verification-page .empty-state-card p {
+    max-width: 530px !important;
+    margin: 0 !important;
+
+    color: #c7d6cc !important;
+
+    font-size: 14px !important;
+    line-height: 1.7 !important;
+}
+
+/* =========================================================
+   VERIFICATION GRID / CARDS
+   ========================================================= */
+
+.item-verification-page .verification-grid {
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr)) !important;
+
+    gap: 18px !important;
+}
+
+.item-verification-page .verification-card {
+    position: relative !important;
+
+    padding: 16px !important;
+
+    overflow: hidden !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 15px !important;
+
+    background:
+        linear-gradient(145deg,
+            #1d6547 0%,
+            #174f38 62%,
+            #13442f 100%) !important;
+
+    box-shadow:
+        0 12px 28px rgba(0, 0, 0, 0.16) !important;
+}
+
+.item-verification-page .verification-card::before {
+    content: "";
+    position: absolute;
+    z-index: 2;
+    inset: 0 0 auto 0;
+    height: 3px;
+
+    background:
+        linear-gradient(90deg,
+            #65aa7d 0%,
+            #3e9163 68%,
+            #dfc56f 100%) !important;
+}
+
+.item-verification-page .verification-card:hover {
+    transform: translateY(-3px) !important;
+
+    border-color: rgba(225, 200, 117, 0.28) !important;
+
+    box-shadow:
+        0 18px 38px rgba(0, 0, 0, 0.20) !important;
+}
+
+.item-verification-page .verification-card-top {
+    grid-template-columns:
+        108px minmax(0, 1fr) !important;
+
+    gap: 14px !important;
+}
+
+.item-verification-page .verification-image {
+    width: 108px !important;
+    height: 108px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.11) !important;
+    border-radius: 11px !important;
+
+    background: #103927 !important;
+
+    box-shadow:
+        0 7px 18px rgba(0, 0, 0, 0.13) !important;
+}
+
+.item-verification-page .verification-image .fallback-image {
+    padding: 16px !important;
+
+    background: #103927 !important;
+}
+
+.item-verification-page .card-status-row {
+    margin-bottom: 10px !important;
+}
+
+.item-verification-page .verification-id {
+    color: #b9c9be !important;
+
+    font-size: 10.5px !important;
+    font-weight: 750 !important;
+}
+
+.item-verification-page .card-title {
+    margin: 0 0 9px !important;
+
+    color: #ffffff !important;
+
+    font-size: 16px !important;
+    font-weight: 850 !important;
+    line-height: 1.35 !important;
+}
+
+.item-verification-page .claimant-name span {
+    margin-bottom: 3px !important;
+
+    color: #aebfb4 !important;
+
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+}
+
+.item-verification-page .claimant-name strong {
+    color: #eef5ef !important;
+
+    font-size: 12.5px !important;
+    font-weight: 750 !important;
+}
+
+.item-verification-page .status-badge {
+    min-height: 27px !important;
+    padding: 0 10px !important;
+
+    font-size: 10px !important;
+    font-weight: 850 !important;
+}
+
+.item-verification-page .status-badge.pending {
+    border: 1px solid rgba(234, 216, 155, 0.30) !important;
+
+    background: rgba(225, 200, 117, 0.13) !important;
+    color: #f3dfa0 !important;
+}
+
+.item-verification-page .status-badge.approved {
+    border: 1px solid rgba(142, 214, 163, 0.28) !important;
+
+    background: rgba(91, 178, 119, 0.13) !important;
+    color: #c9f0d4 !important;
+}
+
+.item-verification-page .status-badge.rejected {
+    border: 1px solid rgba(239, 131, 125, 0.30) !important;
+
+    background: rgba(150, 54, 49, 0.22) !important;
+    color: #ffd0cd !important;
+}
+
+.item-verification-page .status-badge.details_requested {
+    border: 1px solid rgba(225, 200, 117, 0.28) !important;
+
+    background: rgba(225, 200, 117, 0.10) !important;
+    color: var(--iv4-gold-soft) !important;
+}
+
+.item-verification-page .status-badge.completed,
+.item-verification-page .status-badge.archived {
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
+
+    background: rgba(255, 255, 255, 0.06) !important;
+    color: #dfe9e2 !important;
+}
+
+.item-verification-page .card-information {
+    margin-top: 14px !important;
+    padding: 11px 12px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 11px !important;
+
+    background: rgba(6, 39, 25, 0.28) !important;
+}
+
+.item-verification-page .card-information>div {
+    grid-template-columns:
+        84px minmax(0, 1fr) !important;
+
+    gap: 10px !important;
+    padding: 6px 0 !important;
+
+    border-bottom:
+        1px solid rgba(255, 255, 255, 0.07) !important;
+}
+
+.item-verification-page .card-information>div:last-child {
+    border-bottom: 0 !important;
+}
+
+.item-verification-page .card-information dt {
+    color: #aabcae !important;
+
+    font-size: 10.5px !important;
+    font-weight: 750 !important;
+}
+
+.item-verification-page .card-information dd {
+    color: #eef5ef !important;
+
+    font-size: 12px !important;
+    font-weight: 700 !important;
+}
+
+.item-verification-page .ownership-preview {
+    min-height: 88px !important;
+
+    margin-top: 11px !important;
+    padding: 11px 12px !important;
+
+    border: 1px solid rgba(225, 200, 117, 0.14) !important;
+    border-radius: 10px !important;
+
+    background: rgba(225, 200, 117, 0.055) !important;
+}
+
+.item-verification-page .preview-heading {
+    margin-bottom: 6px !important;
+
+    color: var(--iv4-gold-soft) !important;
+
+    font-size: 10.5px !important;
+    font-weight: 850 !important;
+}
+
+.item-verification-page .ownership-preview p {
+    color: #e5eee7 !important;
+
+    font-size: 11.5px !important;
+    line-height: 1.55 !important;
+}
+
+.item-verification-page .card-actions {
+    gap: 8px !important;
+    padding-top: 13px !important;
+}
+
+.item-verification-page .action-btn {
+    min-height: 40px !important;
+    height: 40px !important;
+
+    border-radius: 9px !important;
+
+    font-size: 11px !important;
+    font-weight: 850 !important;
+}
+
+.item-verification-page .view-btn {
+    border-color: rgba(255, 255, 255, 0.14) !important;
+
+    background: #1a5b3f !important;
+    color: #ffffff !important;
+}
+
+.item-verification-page .view-btn:hover {
+    background: #256b4b !important;
+}
+
+.item-verification-page .request-btn {
+    border-color: rgba(225, 200, 117, 0.35) !important;
+
+    background: var(--iv4-gold) !important;
+    color: #3d3214 !important;
+}
+
+.item-verification-page .request-btn:hover {
+    background: #cfb357 !important;
+}
+
+.item-verification-page .approve-btn {
+    border-color: rgba(225, 200, 117, 0.26) !important;
+
+    background:
+        linear-gradient(135deg,
+            #3f9363,
+            #246b49) !important;
+
+    color: #ffffff !important;
+}
+
+.item-verification-page .approve-btn:hover {
+    background:
+        linear-gradient(135deg,
+            #49a16d,
+            #2f7d59) !important;
+}
+
+.item-verification-page .reject-btn {
+    border-color: var(--iv4-danger) !important;
+
+    background: var(--iv4-danger) !important;
+    color: #ffffff !important;
+}
+
+.item-verification-page .reject-btn:hover {
+    background: #bb4742 !important;
+}
+
+.item-verification-page .card-state-message {
+    min-height: 40px !important;
+
+    font-size: 11px !important;
+    font-weight: 800 !important;
+}
+
+/* =========================================================
+   PAGINATION
+   ========================================================= */
+
+.item-verification-page .pagination-bar {
+    margin-top: 20px !important;
+    padding: 12px 14px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    border-radius: 11px !important;
+
+    background:
+        rgba(7, 47, 29, 0.26) !important;
+
+    box-shadow: none !important;
+}
+
+.item-verification-page .pagination-info,
+.item-verification-page .pagination-info strong,
+.item-verification-page .pagination-info span {
+    color: #c8d7cc !important;
+
+    font-size: 11.5px !important;
+}
+
+.item-verification-page .pagination-button {
+    min-width: 34px !important;
+    height: 34px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.11) !important;
+    border-radius: 8px !important;
+
+    background: #174f37 !important;
+    color: #ffffff !important;
+
+    font-size: 10.5px !important;
+    font-weight: 850 !important;
+}
+
+.item-verification-page .pagination-button:hover:not(:disabled) {
+    border-color: rgba(225, 200, 117, 0.30) !important;
+
+    background: #1d6547 !important;
+}
+
+.item-verification-page .pagination-button.active {
+    border-color: rgba(225, 200, 117, 0.36) !important;
+
+    background:
+        linear-gradient(135deg,
+            #3f9363,
+            #246b49) !important;
+
+    color: #ffffff !important;
+}
+
+/* =========================================================
+   LARGE VERIFICATION MODAL
+   ========================================================= */
+
+.item-verification-page .modal-overlay {
+    padding: 18px !important;
+
+    background: rgba(4, 20, 13, 0.82) !important;
+
+    backdrop-filter: blur(7px) !important;
+}
+
+.item-verification-page .modal-content {
+    width: min(1280px, 95vw) !important;
+    max-width: 1280px !important;
+    max-height: 93vh !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-radius: 18px !important;
+
+    background:
+        linear-gradient(180deg,
+            #1f6748 0%,
+            #174f38 100%) !important;
+
+    color: var(--iv4-text) !important;
+
+    box-shadow:
+        0 30px 90px rgba(0, 0, 0, 0.50) !important;
+}
+
+.item-verification-page .modal-header {
+    min-height: 84px !important;
+
+    padding: 17px 21px !important;
+
+    border-bottom:
+        1px solid rgba(255, 255, 255, 0.10) !important;
+
+    background:
+        linear-gradient(135deg,
+            #2f7d59 0%,
+            #195338 58%,
+            #103c29 100%) !important;
+}
+
+.item-verification-page .modal-header h2 {
+    max-width: 720px !important;
+
+    color: #ffffff !important;
+
+    font-size: 21px !important;
+    font-weight: 850 !important;
+    line-height: 1.3 !important;
+}
+
+.item-verification-page .modal-header-right {
+    gap: 10px !important;
+}
+
+.item-verification-page .modal-status {
+    min-height: 29px !important;
+}
+
+.item-verification-page .modal-close {
+    width: 38px !important;
+    height: 38px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-radius: 10px !important;
+
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #ffffff !important;
+}
+
+.item-verification-page .modal-close:hover {
+    background: rgba(255, 255, 255, 0.14) !important;
+}
+
+.item-verification-page .modal-scroll {
+    padding: 18px 20px 22px !important;
+
+    background:
+        linear-gradient(180deg,
+            #1d6043 0%,
+            #174f38 100%) !important;
+}
+
+.item-verification-page .modal-scroll::-webkit-scrollbar-thumb {
+    background: rgba(225, 200, 117, 0.30) !important;
+}
+
+/* Alerts inside modal */
+.item-verification-page .modal-inline-alert {
+    padding: 11px 13px !important;
+
+    border-radius: 9px !important;
+
+    font-size: 12px !important;
+}
+
+.item-verification-page .modal-success-alert {
+    border-color: rgba(134, 239, 172, 0.35) !important;
+
+    background: rgba(34, 197, 94, 0.14) !important;
+    color: #dcfce7 !important;
+}
+
+.item-verification-page .modal-error-alert {
+    border-color: rgba(239, 131, 125, 0.34) !important;
+
+    background: rgba(112, 42, 38, 0.34) !important;
+    color: #ffe0dd !important;
+}
+
+/* Verified success callout */
+.item-verification-page .pickup-message-card {
+    margin-bottom: 15px !important;
+    padding: 14px 15px !important;
+
+    border: 1px solid rgba(225, 200, 117, 0.28) !important;
+    border-radius: 11px !important;
+
+    background:
+        linear-gradient(135deg,
+            rgba(55, 139, 89, 0.34),
+            rgba(26, 91, 63, 0.42)) !important;
+
+    color: #ffffff !important;
+}
+
+.item-verification-page .pickup-message-icon {
+    background: rgba(225, 200, 117, 0.10) !important;
+    color: var(--iv4-gold-soft) !important;
+}
+
+.item-verification-page .pickup-label {
+    color: var(--iv4-gold-soft) !important;
+
+    font-size: 10px !important;
+}
+
+.item-verification-page .pickup-message-card h3 {
+    color: #ffffff !important;
+
+    font-size: 13px !important;
+}
+
+.item-verification-page .pickup-message-card p {
+    color: #dbe7de !important;
+
+    font-size: 11.5px !important;
+}
+
+/* =========================================================
+   MODAL OVERVIEW
+   ========================================================= */
+
+.item-verification-page .modal-overview {
+    grid-template-columns:
+        310px minmax(0, 1fr) !important;
+
+    gap: 18px !important;
+    margin-bottom: 16px !important;
+}
+
+.item-verification-page .modal-image-container {
+    height: 255px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 12px !important;
+
+    background: #103927 !important;
+
+    box-shadow:
+        0 10px 24px rgba(0, 0, 0, 0.13) !important;
+}
+
+.item-verification-page .modal-image {
+    background: #103927 !important;
+}
+
+.item-verification-page .thumbnail-button {
+    width: 54px !important;
+    height: 54px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 8px !important;
+
+    background: #103927 !important;
+}
+
+.item-verification-page .thumbnail-button.active {
+    border-color: var(--iv4-gold) !important;
+
+    box-shadow:
+        0 0 0 2px rgba(225, 200, 117, 0.12) !important;
+}
+
+.item-verification-page .overview-information {
+    gap: 10px !important;
+}
+
+.item-verification-page .overview-field {
+    min-height: 78px !important;
+
+    padding: 12px 13px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 10px !important;
+
+    background: rgba(255, 255, 255, 0.045) !important;
+}
+
+.item-verification-page .overview-field span {
+    color: #b4c5ba !important;
+
+    font-size: 10.5px !important;
+    font-weight: 750 !important;
+}
+
+.item-verification-page .overview-field strong {
+    margin-top: 5px !important;
+
+    color: #ffffff !important;
+
+    font-size: 13px !important;
+    font-weight: 750 !important;
+    line-height: 1.45 !important;
+}
+
+/* =========================================================
+   FINDER / FOUND ITEM DETAIL PANELS
+   ========================================================= */
+
+.item-verification-page .detail-columns {
+    gap: 14px !important;
+    margin-bottom: 14px !important;
+}
+
+.item-verification-page .detail-panel,
+.item-verification-page .workflow-panel,
+.item-verification-page .description-panel,
+.item-verification-page .evidence-panel {
+    padding: 15px 16px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 12px !important;
+
+    background: rgba(7, 48, 30, 0.27) !important;
+}
+
+.item-verification-page .detail-panel-header {
+    gap: 9px !important;
+    margin-bottom: 12px !important;
+    padding-bottom: 9px !important;
+
+    border-bottom:
+        1px solid rgba(255, 255, 255, 0.07) !important;
+}
+
+.item-verification-page .detail-panel-header h3,
+.item-verification-page .evidence-heading h3 {
+    color: #ffffff !important;
+
+    font-size: 13px !important;
+    font-weight: 850 !important;
+}
+
+.item-verification-page .detail-icon {
+    width: 31px !important;
+    height: 31px !important;
+
+    border-radius: 8px !important;
+
+    background: rgba(225, 200, 117, 0.10) !important;
+    color: var(--iv4-gold-soft) !important;
+}
+
+.item-verification-page .detail-icon svg {
+    width: 15px !important;
+    height: 15px !important;
+}
+
+.item-verification-page .detail-list>div {
+    grid-template-columns:
+        118px minmax(0, 1fr) !important;
+
+    gap: 12px !important;
+    padding: 8px 0 !important;
+
+    border-top-color:
+        rgba(255, 255, 255, 0.07) !important;
+}
+
+.item-verification-page .detail-list dt {
+    color: #b4c5ba !important;
+
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+}
+
+.item-verification-page .detail-list dd {
+    color: #ffffff !important;
+
+    font-size: 12.5px !important;
+    font-weight: 650 !important;
+    line-height: 1.5 !important;
+}
+
+/* =========================================================
+   PHYSICAL COMPARISON / EVIDENCE
+   ========================================================= */
+
+.item-verification-page .evidence-panel {
+    margin-bottom: 14px !important;
+}
+
+.item-verification-page .evidence-heading {
+    gap: 10px !important;
+    margin-bottom: 12px !important;
+}
+
+.item-verification-page .evidence-heading p {
+    color: #c3d2c7 !important;
+
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+}
+
+.item-verification-page .evidence-grid {
+    gap: 10px !important;
+}
+
+.item-verification-page .evidence-block {
+    min-height: 112px !important;
+
+    padding: 12px 13px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 10px !important;
+
+    background: rgba(255, 255, 255, 0.035) !important;
+}
+
+.item-verification-page .primary-evidence {
+    border-color: rgba(225, 200, 117, 0.24) !important;
+
+    background: rgba(225, 200, 117, 0.055) !important;
+}
+
+.item-verification-page .private-evidence {
+    border-color: rgba(239, 131, 125, 0.24) !important;
+
+    background: rgba(112, 42, 38, 0.17) !important;
+}
+
+.item-verification-page .evidence-block span {
+    color: var(--iv4-gold-soft) !important;
+
+    font-size: 10.5px !important;
+    font-weight: 850 !important;
+}
+
+.item-verification-page .evidence-block p {
+    color: #f0f5f1 !important;
+
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+}
+
+.item-verification-page .private-evidence span,
+.item-verification-page .private-evidence p,
+.item-verification-page .private-evidence small {
+    color: #ffc2bd !important;
+}
+
+.item-verification-page .private-evidence small {
+    margin-top: 7px !important;
+
+    font-size: 10px !important;
+}
+
+/* =========================================================
+   VERIFICATION NOTE + REQUEST DETAILS
+   ========================================================= */
+
+.item-verification-page .request-note-field {
+    margin-top: 13px !important;
+}
+
+.item-verification-page .request-note-heading span {
+    color: #ffffff !important;
+
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+}
+
+.item-verification-page .request-note-heading small,
+.item-verification-page .character-count {
+    color: #aebfb4 !important;
+
+    font-size: 10px !important;
+}
+
+.item-verification-page .request-note-field textarea {
+    min-height: 104px !important;
+
+    padding: 11px 12px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 9px !important;
+
+    background: #0f3a29 !important;
+    color: #ffffff !important;
+
+    -webkit-text-fill-color: #ffffff !important;
+
+    font-size: 12.5px !important;
+    line-height: 1.55 !important;
+}
+
+.item-verification-page .request-note-field textarea::placeholder {
+    color: #9fb3a6 !important;
+}
+
+.item-verification-page .request-note-field textarea:focus {
+    border-color: var(--iv4-gold) !important;
+
+    box-shadow:
+        0 0 0 3px rgba(225, 200, 117, 0.12) !important;
+}
+
+.item-verification-page .request-details-panel {
+    margin-top: 15px !important;
+    padding: 15px !important;
+
+    border: 1px solid rgba(225, 200, 117, 0.26) !important;
+    border-radius: 12px !important;
+
+    background: rgba(225, 200, 117, 0.065) !important;
+}
+
+.item-verification-page .request-details-header h3 {
+    color: #ffffff !important;
+
+    font-size: 13px !important;
+    font-weight: 850 !important;
+}
+
+.item-verification-page .request-details-header p:not(.request-kicker) {
+    color: #c6d5cb !important;
+
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+}
+
+.item-verification-page .request-panel-close {
+    width: 31px !important;
+    height: 31px !important;
+
+    border-color: rgba(255, 255, 255, 0.12) !important;
+
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: #ffffff !important;
+}
+
+.item-verification-page .request-options {
+    gap: 9px !important;
+}
+
+.item-verification-page .request-option {
+    min-height: 70px !important;
+
+    padding: 11px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 9px !important;
+
+    background: rgba(255, 255, 255, 0.035) !important;
+}
+
+.item-verification-page .request-option:hover {
+    border-color: rgba(225, 200, 117, 0.20) !important;
+}
+
+.item-verification-page .request-option.selected {
+    border-color: rgba(225, 200, 117, 0.36) !important;
+
+    background: rgba(225, 200, 117, 0.09) !important;
+}
+
+.item-verification-page .custom-checkbox {
+    width: 20px !important;
+    height: 20px !important;
+
+    border-color: rgba(255, 255, 255, 0.18) !important;
+
+    background: rgba(4, 32, 20, 0.28) !important;
+}
+
+.item-verification-page .request-option.selected .custom-checkbox {
+    border-color: var(--iv4-gold) !important;
+
+    background: var(--iv4-gold) !important;
+    color: #17301d !important;
+}
+
+.item-verification-page .request-option-copy strong {
+    color: #ffffff !important;
+
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+}
+
+.item-verification-page .request-option-copy small {
+    color: #aebfb4 !important;
+
+    font-size: 10px !important;
+    line-height: 1.45 !important;
+}
+
+.item-verification-page .request-error {
+    color: #ffaaa5 !important;
+
+    font-size: 11px !important;
+}
+
+.item-verification-page .request-form-button {
+    min-width: 112px !important;
+    height: 38px !important;
+
+    border-radius: 8px !important;
+
+    font-size: 11px !important;
+    font-weight: 850 !important;
+}
+
+.item-verification-page .cancel-request-button {
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
+
+    background: #1a5b3f !important;
+    color: #ffffff !important;
+}
+
+.item-verification-page .send-request-button {
+    border: 1px solid rgba(225, 200, 117, 0.30) !important;
+
+    background: var(--iv4-gold) !important;
+    color: #3d3214 !important;
+}
+
+/* =========================================================
+   MODAL FOOTER ACTIONS
+   ========================================================= */
+
+.item-verification-page .modal-actions {
+    min-height: 74px !important;
+
+    padding: 13px 20px !important;
+
+    border-top:
+        1px solid rgba(255, 255, 255, 0.10) !important;
+
+    background:
+        linear-gradient(135deg,
+            #123f2d,
+            #0d3425) !important;
+}
+
+.item-verification-page .modal-action-button {
+    min-width: 138px !important;
+    min-height: 42px !important;
+    height: 42px !important;
+
+    border-radius: 9px !important;
+
+    font-size: 11.5px !important;
+    font-weight: 850 !important;
+}
+
+.item-verification-page .modal-request-button {
+    border-color: rgba(225, 200, 117, 0.30) !important;
+
+    background: var(--iv4-gold) !important;
+    color: #3d3214 !important;
+}
+
+.item-verification-page .modal-request-button.active {
+    box-shadow:
+        0 0 0 3px rgba(225, 200, 117, 0.15) !important;
+}
+
+.item-verification-page .modal-reject-button {
+    border-color: var(--iv4-danger) !important;
+
+    background: var(--iv4-danger) !important;
+    color: #ffffff !important;
+}
+
+.item-verification-page .modal-reject-button:hover:not(:disabled) {
+    background: #bb4742 !important;
+}
+
+.item-verification-page .modal-approve-button {
+    border-color: rgba(225, 200, 117, 0.26) !important;
+
+    background:
+        linear-gradient(135deg,
+            #3f9363,
+            #246b49) !important;
+
+    color: #ffffff !important;
+}
+
+.item-verification-page .modal-approve-button:hover:not(:disabled) {
+    background:
+        linear-gradient(135deg,
+            #49a16d,
+            #2f7d59) !important;
+}
+
+.item-verification-page .approved-footer-copy span {
+    color: var(--iv4-gold-soft) !important;
+
+    font-size: 12px !important;
+    font-weight: 850 !important;
+}
+
+.item-verification-page .approved-footer-copy small,
+.item-verification-page .completed-message {
+    color: #c5d4ca !important;
+
+    font-size: 10.5px !important;
+}
+
+.item-verification-page .completed-message strong {
+    color: #ffffff !important;
+}
+
+/* =========================================================
+   IMAGE PREVIEW
+   ========================================================= */
+
+.item-verification-page .image-preview-overlay {
+    background: rgba(2, 12, 7, 0.90) !important;
+
+    backdrop-filter: blur(5px) !important;
+}
+
+.item-verification-page .image-preview-image {
+    max-width: min(92vw, 1200px) !important;
+    max-height: 90vh !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 14px !important;
+
+    background: #103927 !important;
+
+    box-shadow:
+        0 24px 70px rgba(0, 0, 0, 0.48) !important;
+}
+
+.item-verification-page .image-preview-close,
+.item-verification-page .image-preview-nav {
+    border-color: rgba(255, 255, 255, 0.18) !important;
+
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #ffffff !important;
+}
+
+/* =========================================================
+   SKELETONS
+   ========================================================= */
+
+.item-verification-page .skeleton-card {
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+
+    background:
+        linear-gradient(145deg,
+            #1d6547,
+            #174f38) !important;
+}
+
+.item-verification-page .skeleton {
+    background:
+        linear-gradient(90deg,
+            rgba(255, 255, 255, 0.05) 25%,
+            rgba(255, 255, 255, 0.12) 50%,
+            rgba(255, 255, 255, 0.05) 75%) !important;
+
+    background-size: 200% 100% !important;
+}
+
+.item-verification-page .skeleton-card-top {
+    grid-template-columns:
+        108px 1fr !important;
+}
+
+.item-verification-page .skeleton-image {
+    width: 108px !important;
+    height: 108px !important;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1180px) {
+    .item-verification-page .verification-grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    .item-verification-page .filter-toolbar {
+        grid-template-columns:
+            minmax(280px, 1fr) minmax(220px, 0.75fr) !important;
+    }
+
+    .item-verification-page .sort-control {
+        grid-column: 1 / -1 !important;
+    }
+
+    .item-verification-page .modal-overview {
+        grid-template-columns:
+            270px minmax(0, 1fr) !important;
+    }
+}
+
+@media (max-width: 860px) {
+    .item-verification-page {
+        padding: 16px !important;
+    }
+
+    .item-verification-page .page-header {
+        align-items: flex-start !important;
+    }
+
+    .item-verification-page .filter-toolbar {
+        grid-template-columns: 1fr !important;
+    }
+
+    .item-verification-page .category-field,
+    .item-verification-page .sort-control {
+        grid-column: auto !important;
+    }
+
+    .item-verification-page .modal-content {
+        width: 96vw !important;
+    }
+
+    .item-verification-page .modal-overview {
+        grid-template-columns: 1fr !important;
+    }
+
+    .item-verification-page .modal-image-container {
+        height: 320px !important;
+    }
+
+    .item-verification-page .detail-columns {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .item-verification-page .page-header {
+        flex-direction: column !important;
+    }
+
+    .item-verification-page .queue-count {
+        width: 100% !important;
+    }
+
+    .item-verification-page .verification-grid,
+    .item-verification-page .overview-information,
+    .item-verification-page .evidence-grid,
+    .item-verification-page .request-options {
+        grid-template-columns: 1fr !important;
+    }
+
+    .item-verification-page .verification-card-top {
+        grid-template-columns:
+            96px minmax(0, 1fr) !important;
+    }
+
+    .item-verification-page .verification-image {
+        width: 96px !important;
+        height: 96px !important;
+    }
+
+    .item-verification-page .modal-overlay {
+        padding: 9px !important;
+    }
+
+    .item-verification-page .modal-actions {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+    }
+
+    .item-verification-page .modal-action-button {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .item-verification-page .pagination-bar {
+        align-items: stretch !important;
+        flex-direction: column !important;
+    }
+
+    .item-verification-page .pagination-controls {
+        justify-content: center !important;
+        flex-wrap: wrap !important;
+    }
+}
+
+@media (max-width: 460px) {
+    .item-verification-page .page-header h1 {
+        font-size: 1.45rem !important;
+    }
+
+    .item-verification-page .verification-card-top {
+        grid-template-columns: 1fr !important;
+    }
+
+    .item-verification-page .verification-image {
+        width: 100% !important;
+        height: 190px !important;
+    }
+
+    .item-verification-page .detail-list>div {
+        grid-template-columns: 1fr !important;
+
+        gap: 3px !important;
+    }
+
+    .item-verification-page .request-form-actions {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+    }
+
+    .item-verification-page .request-form-button {
+        width: 100% !important;
+    }
+}
+
+
+/* Print action is inside the visible filter toolbar, including smaller screens. */
+.item-verification-page .filter-toolbar {
+    grid-template-columns:
+        minmax(260px, 1.4fr) minmax(195px, 0.85fr) minmax(215px, 0.9fr) minmax(165px, auto) !important;
+    align-items: center !important;
+}
+
+.item-verification-page .verification-print-button {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+    min-height: 47px !important;
+    padding: 0 14px !important;
+    border: 1px solid rgba(225, 200, 117, 0.42) !important;
+    border-radius: 9px !important;
+    background: linear-gradient(135deg, #d9c17a 0%, #b99b4f 100%) !important;
+    color: #163a27 !important;
+    font: inherit !important;
+    font-size: 12px !important;
+    font-weight: 850 !important;
+    white-space: nowrap !important;
+    cursor: pointer !important;
+    transition: filter .16s ease, transform .16s ease !important;
+}
+
+.item-verification-page .verification-print-button svg {
+    width: 17px !important;
+    height: 17px !important;
+    flex: 0 0 17px !important;
+    fill: none !important;
+    stroke: currentColor !important;
+    stroke-width: 1.8 !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+}
+
+.item-verification-page .verification-print-button:hover:not(:disabled) {
+    filter: brightness(1.07);
+    transform: translateY(-1px);
+}
+
+.item-verification-page .verification-print-button:focus-visible {
+    outline: 3px solid rgba(225, 200, 117, .45) !important;
+    outline-offset: 2px !important;
+}
+
+.item-verification-page .verification-print-button:disabled {
+    opacity: .5 !important;
+    cursor: not-allowed !important;
+}
+
+@media (max-width: 1180px) {
+    .item-verification-page .filter-toolbar {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    }
+
+    .item-verification-page .sort-control {
+        grid-column: auto !important;
+    }
+}
+
+@media (max-width: 860px) {
+    .item-verification-page .filter-toolbar {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    .item-verification-page .verification-print-button {
+        width: 100% !important;
+    }
+}
 </style>

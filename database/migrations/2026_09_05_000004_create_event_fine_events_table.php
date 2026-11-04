@@ -5,61 +5,103 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
+    /**
+     * Create the event table or safely complete an earlier interrupted creation.
+     * A utf8mb4 VARCHAR(191) unique key is below MySQL's 1000-byte key limit.
+     */
     public function up(): void
     {
-        if (!Schema::hasTable('event_fine_events')) {
-            Schema::create('event_fine_events', function (Blueprint $table) {
+        $alreadyExists = Schema::hasTable('event_fine_events');
+
+        if (! $alreadyExists) {
+            Schema::create('event_fine_events', function (Blueprint $table): void {
                 $table->id();
-                $table->string('name')->unique();
-                $table->decimal('fine_amount', 10, 2);
+                $table->string('name', 191);
+                $table->decimal('fine_amount', 12, 2);
                 $table->boolean('is_active')->default(true);
-                $table->foreignId('created_by_admin_id')->nullable()->constrained('admin')->nullOnDelete();
+                $table->unsignedBigInteger('created_by_admin_id')->nullable();
                 $table->timestamps();
+            });
+        } else {
+            // MySQL can leave the table behind when adding an index fails.
+            // Ensure it is the expected table before changing anything.
+            foreach ([
+                'id', 'name', 'fine_amount', 'is_active',
+                'created_by_admin_id', 'created_at', 'updated_at',
+            ] as $column) {
+                if (! Schema::hasColumn('event_fine_events', $column)) {
+                    throw new RuntimeException(
+                        "Existing event_fine_events table is missing {$column}. " .
+                        'Stop and inspect the table before proceeding.'
+                    );
+                }
+            }
+        }
+
+        // Do not silently truncate user-entered event names.
+        if (DB::table('event_fine_events')
+            ->whereRaw('CHAR_LENGTH(`name`) > ?', [191])
+            ->exists()) {
+            throw new RuntimeException(
+                'Some existing event names exceed 191 characters. ' .
+                'Shorten them after reviewing the data, then rerun the migration.'
+            );
+        }
+
+        if ($alreadyExists) {
+            // Repairs the VARCHAR(255) created by the previously failed run.
+            Schema::table('event_fine_events', function (Blueprint $table): void {
+                $table->string('name', 191)->change();
             });
         }
 
-        if (!Schema::hasTable('event_fines')) {
-            return;
+        // An existing duplicate must be reviewed, not automatically deleted.
+        if (DB::table('event_fine_events')
+            ->select('name')
+            ->groupBy('name')
+            ->havingRaw('COUNT(*) > 1')
+            ->exists()) {
+            throw new RuntimeException(
+                'Duplicate event names exist. Resolve duplicates, then rerun.'
+            );
         }
 
-        Schema::table('event_fines', function (Blueprint $table) {
-            if (!Schema::hasColumn('event_fines', 'event_fine_event_id')) {
-                $table->foreignId('event_fine_event_id')->nullable()->constrained('event_fine_events')->nullOnDelete();
-            }
-            if (!Schema::hasColumn('event_fines', 'original_amount')) {
-                $table->decimal('original_amount', 10, 2)->nullable();
-            }
-            if (!Schema::hasColumn('event_fines', 'amount_to_pay')) {
-                $table->decimal('amount_to_pay', 10, 2)->nullable();
-            }
-            if (!Schema::hasColumn('event_fines', 'paid_amount')) {
-                $table->decimal('paid_amount', 10, 2)->default(0);
-            }
-            if (!Schema::hasColumn('event_fines', 'remaining_amount')) {
-                $table->decimal('remaining_amount', 10, 2)->nullable();
-            }
-        });
+        if (! $this->hasIndexOn('name', true)) {
+            Schema::table('event_fine_events', function (Blueprint $table): void {
+                $table->unique('name', 'event_fine_events_name_unique');
+            });
+        }
 
-        DB::table('event_fines')->whereNull('original_amount')->update([
-            'original_amount' => DB::raw('amount'),
-            'amount_to_pay' => DB::raw('amount'),
-            'remaining_amount' => DB::raw('amount'),
-        ]);
+        if (! $this->hasIndexOn('is_active')) {
+            Schema::table('event_fine_events', function (Blueprint $table): void {
+                $table->index('is_active', 'event_fine_events_is_active_index');
+            });
+        }
+
+        // We intentionally avoid guessing which admin table the current
+        // authentication guard uses. The nullable created_by_admin_id field
+        // works without adding an unverified foreign-key relationship.
+    }
+
+    private function hasIndexOn(string $column, bool $unique = false): bool
+    {
+        $index = DB::table('information_schema.STATISTICS')
+            ->where('TABLE_SCHEMA', DB::getDatabaseName())
+            ->where('TABLE_NAME', 'event_fine_events')
+            ->where('COLUMN_NAME', $column);
+
+        if ($unique) {
+            $index->where('NON_UNIQUE', 0);
+        }
+
+        return $index->exists();
     }
 
     public function down(): void
     {
-        if (Schema::hasTable('event_fines')) {
-            Schema::table('event_fines', function (Blueprint $table) {
-                foreach (['event_fine_event_id', 'original_amount', 'amount_to_pay', 'paid_amount', 'remaining_amount'] as $column) {
-                    if (Schema::hasColumn('event_fines', $column)) {
-                        $table->dropColumn($column);
-                    }
-                }
-            });
-        }
-
-        Schema::dropIfExists('event_fine_events');
+        // Deliberately non-destructive: the migration may have REPAIRED an
+        // existing table, and rolling it back must not delete event records.
     }
 };

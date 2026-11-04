@@ -55,7 +55,6 @@ class AdminAuthController extends Controller
         Auth::guard('admin')->login($admin);
         $request->session()->regenerate();
 
-        // Create a Sanctum API token for the admin
         $token = $admin->createToken('admin-token')->plainTextToken;
 
         return response()->json([
@@ -91,7 +90,9 @@ class AdminAuthController extends Controller
             'password.regex' => 'Password must be at least 6 characters and include at least one uppercase letter, one number, and one of these symbols: !, _, -, .',
         ]);
 
-        if (!str_ends_with(strtolower($validated['email']), '@ssct.edu.ph')) {
+        $email = strtolower(trim($validated['email']));
+
+        if (!str_ends_with($email, '@ssct.edu.ph')) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Only SSCT emails are allowed for student accounts.'
@@ -103,7 +104,7 @@ class AdminAuthController extends Controller
             'first_name' => trim($validated['first_name']),
             'middle_name' => trim((string) ($validated['middle_name'] ?? '')) !== '' ? trim($validated['middle_name']) : null,
             'last_name' => trim($validated['last_name']),
-            'email' => $validated['email'],
+            'email' => $email,
             'department' => $validated['department'],
             'course' => $validated['course'],
             'year_level' => $validated['year_level'],
@@ -138,7 +139,9 @@ class AdminAuthController extends Controller
             'email' => 'required|email|ends_with:@ssct.edu.ph|unique:students,email,' . $student->id,
         ]);
 
-        if (!str_ends_with(strtolower($validated['email']), '@ssct.edu.ph')) {
+        $email = strtolower(trim($validated['email']));
+
+        if (!str_ends_with($email, '@ssct.edu.ph')) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Only SSCT emails are allowed for student accounts.'
@@ -153,13 +156,49 @@ class AdminAuthController extends Controller
             'course' => $validated['course'],
             'year_level' => $validated['year_level'],
             'department' => $validated['department'],
-            'email' => $validated['email'],
+            'email' => $email,
         ]);
 
         return response()->json([
             'status' => 'success',
             'message' => 'Student record updated successfully.',
             'data' => $student->fresh(),
+        ]);
+    }
+
+    public function updateStudentPassword(Request $request, $id)
+    {
+        $admin = $this->adminUser();
+        if (!$this->isSuperAdmin($admin)) {
+            return $this->forbiddenResponse($request, 'Only the super admin can change student passwords.');
+        }
+
+        $student = Student::findOrFail($id);
+
+        $passwordRules = $this->strongPasswordRule();
+        $passwordRules[] = 'confirmed';
+
+        $validated = $request->validate([
+            'password' => $passwordRules,
+        ], [
+            'password.min' => 'Password must be at least 6 characters and include at least one uppercase letter, one number, and one of these symbols: !, _, -, .',
+            'password.regex' => 'Password must be at least 6 characters and include at least one uppercase letter, one number, and one of these symbols: !, _, -, .',
+            'password.confirmed' => 'The password confirmation does not match.',
+        ]);
+
+        $student->update([
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        // Revoke existing Sanctum tokens so an old logged-in session cannot
+        // continue using the account after an administrator resets its password.
+        if (method_exists($student, 'tokens')) {
+            $student->tokens()->delete();
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Student password changed successfully. Existing student sessions were signed out.',
         ]);
     }
 

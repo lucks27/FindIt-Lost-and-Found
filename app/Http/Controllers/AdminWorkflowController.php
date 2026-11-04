@@ -24,6 +24,8 @@ use App\Models\Student;
 use App\Models\StudentRecognitionRecord;
 use App\Models\SurrenderRequest;
 use App\Models\VisiblePostedItem;
+use App\Services\PotentialMatchService;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -225,7 +227,37 @@ class AdminWorkflowController extends Controller
         $items = $query
             ->with(['student', 'images'])
             ->latest()
-            ->get();
+            ->get()
+            ->map(function (Report $report) {
+                $data = $report->toArray();
+                $metadata = $report->metadata ?? [];
+                if (is_string($metadata)) {
+                    $metadata = json_decode($metadata, true) ?: [];
+                }
+                if (!is_array($metadata)) {
+                    $metadata = [];
+                }
+
+                // Expose an explicit Time Lost key to the Vue page.
+                // Do not substitute created_at (submission time).
+                $candidates = [
+                    $metadata['event_time'] ?? null,
+                    $metadata['time_lost'] ?? null,
+                    $report->getAttribute('time_lost'),
+                    $report->getAttribute('time_occurred'),
+                    // Legacy lost reports might have used time_found.
+                    $report->getAttribute('time_found'),
+                ];
+                $data['time_lost'] = null;
+                foreach ($candidates as $candidate) {
+                    if (is_string($candidate) && trim($candidate) !== '') {
+                        $data['time_lost'] = trim($candidate);
+                        break;
+                    }
+                }
+
+                return $data;
+            });
 
         return response()->json([
             'status' => 'success',
@@ -339,67 +371,162 @@ class AdminWorkflowController extends Controller
             ], 401);
         }
 
-        $report = Report::findOrFail($id);
+        return DB::transaction(function () use ($id, $admin) {
+            // Lock the report so an archive/restore request cannot race with
+            // another workflow action. The archive record is required.
+            $report = Report::query()->whereKey($id)->lockForUpdate()->firstOrFail();
+            $archiveItem = ArchiveItem::query()
+                ->where('report_id', $report->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        ArchiveItem::where('report_id', $report->id)->delete();
+            // Finalized item handovers are historical records, not restorable
+            // workflow items. Reject direct API calls as well as hiding the
+            // Restore control in AdminArchive.vue.
+            if (
+                $report->status === Report::STATUS_COMPLETED_RETURN ||
+                $archiveItem->status === Report::STATUS_COMPLETED_RETURN
+            ) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Completed return records cannot be restored to an active workflow.',
+                ], 422);
+            }
 
-        $report->update([
-            'status' => Report::initialStatusForType($report->type),
-            'archived_at' => null,
-            'completed_at' => null,
-        ]);
+            if ($archiveItem->archive_type === 'mobile_archive') {
+                $metadata = $report->metadata ?? [];
+                if (!is_array($metadata)) {
+                    $metadata = [];
+                }
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Item restored to its workflow queue.',
-            'data' => $report->fresh('student'),
-        ]);
+                // New mobile archives save the actual published state here.
+                // Older archives never recorded the previous visibility, so
+                // use a safe, private fallback instead of guessing Public.
+                $snapshot = $metadata['mobile_post_archive_snapshot'] ?? null;
+                $hasSnapshot = is_array($snapshot);
+                $restoredStatus = $hasSnapshot
+                    ? ($snapshot['status'] ?? null)
+                    : null;
+
+                if (
+                    !is_string($restoredStatus) ||
+                    !Report::isValidStatusForType($report->type, $restoredStatus) ||
+                    in_array($restoredStatus, [Report::STATUS_ARCHIVED, Report::STATUS_REJECTED, Report::STATUS_COMPLETED_RETURN], true)
+                ) {
+                    // A legacy mobile archive originated from a published
+                    // Lost/Found post, but its previous status was discarded.
+                    $restoredStatus = $report->type === Report::TYPE_FOUND
+                        ? Report::STATUS_VERIFIED
+                        : Report::STATUS_APPROVED;
+                    $hasSnapshot = false;
+                }
+
+                unset($metadata['mobile_post_archive_snapshot']);
+                $report->update([
+                    'status' => $restoredStatus,
+                    'archived_at' => null,
+                    // Do not erase completed_at, verification or claim history.
+                    'published_at' => $hasSnapshot
+                        ? ($snapshot['published_at'] ?? ($report->published_at ?? Carbon::now()))
+                        : ($report->published_at ?? Carbon::now()),
+                    'metadata' => $metadata,
+                ]);
+
+                $canBePublic = $report->isPubliclyVisible();
+                $restoreVisibility = $hasSnapshot
+                    && !empty($snapshot['is_visible'])
+                    && $canBePublic;
+
+                // The Mobile Posts page reads VisiblePostedItem, not Reports.
+                // Recreate the row that archiveMobilePost intentionally deleted.
+                VisiblePostedItem::updateOrCreate(
+                    ['report_id' => $report->id],
+                    [
+                        'post_type' => $hasSnapshot
+                            ? ($snapshot['post_type'] ?? 'public')
+                            : 'public',
+                        'is_visible' => $restoreVisibility,
+                        'posted_at' => $hasSnapshot
+                            ? ($snapshot['posted_at'] ?? Carbon::now())
+                            : Carbon::now(),
+                        'posted_by_admin_id' => $hasSnapshot
+                            ? ($snapshot['posted_by_admin_id'] ?? $admin->id)
+                            : $admin->id,
+                    ]
+                );
+
+                $archiveItem->delete();
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => $hasSnapshot
+                        ? 'Mobile post restored with its previous visibility.'
+                        : 'Mobile post restored as Private. Set it to Public in Mobile Posts if appropriate.',
+                    'data' => $report->fresh('student'),
+                    'restored_to' => 'mobile_posts',
+                    'is_visible' => $restoreVisibility,
+                ]);
+            }
+
+            // Keep the existing behavior for archives originating from other
+            // workflows (completed, rejected and other non-mobile sources).
+            $archiveItem->delete();
+            $report->update([
+                'status' => Report::initialStatusForType($report->type),
+                'archived_at' => null,
+                'completed_at' => null,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Item restored to its workflow queue.',
+                'data' => $report->fresh('student'),
+            ]);
+        });
     }
 
     public function publishMobileItem($id)
     {
         $admin = Auth::guard('admin')->user();
-
         if (!$admin) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized.',
-            ], 401);
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $report = Report::findOrFail($id);
+        return DB::transaction(function () use ($admin, $id) {
+            // Lock this report to serialize any concurrent publishing attempts.
+            $report = Report::query()->whereKey($id)->lockForUpdate()->firstOrFail();
+            $eligible =
+                ($report->type === Report::TYPE_LOST && $report->status === Report::STATUS_APPROVED) ||
+                ($report->type === Report::TYPE_FOUND && $report->status === Report::STATUS_VERIFIED);
 
-        $isVisible =
-            ($report->type === Report::TYPE_LOST && $report->status === Report::STATUS_APPROVED)
-            ||
-            ($report->type === Report::TYPE_FOUND && $report->status === Report::STATUS_VERIFIED);
+            if (!$eligible) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'This report must be approved or verified before it can be posted to mobile.',
+                ], 422);
+            }
 
-        if (!$isVisible) {
+            $report->update(['published_at' => Carbon::now()]);
+            VisiblePostedItem::updateOrCreate(
+                ['report_id' => $report->id],
+                [
+                    'post_type' => 'public',
+                    'is_visible' => true,
+                    'posted_at' => Carbon::now(),
+                    'posted_by_admin_id' => $admin->id,
+                ]
+            );
+
+            // Found reports receive the first installment only once.
+            $award = $this->awardFoundPublicationRecognitionPoints($report, $admin);
+
             return response()->json([
-                'status' => 'error',
-                'message' => 'This report must be approved or verified before it can be posted to mobile.',
-            ], 422);
-        }
-
-        $report->update([
-            'published_at' => Carbon::now(),
-        ]);
-
-        VisiblePostedItem::updateOrCreate(
-            ['report_id' => $report->id],
-            [
-                'post_type' => 'public',
-                'is_visible' => true,
-                'posted_at' => Carbon::now(),
-                'posted_by_admin_id' => $admin->id,
-            ]
-        );
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Item posted to mobile successfully.',
-            'data' => $report->fresh('student'),
-        ]);
+                'status' => 'success',
+                'message' => 'Item posted to mobile successfully.',
+                'data' => $report->fresh('student'),
+                'publication_reward' => $award,
+            ]);
+        });
     }
 
     public function toggleMobilePostVisibility(Request $request, $id)
@@ -456,32 +583,66 @@ class AdminWorkflowController extends Controller
             ], 401);
         }
 
-        $report = Report::findOrFail($id);
+        return DB::transaction(function () use ($id, $admin) {
+            $report = Report::query()->whereKey($id)->lockForUpdate()->firstOrFail();
+            $visibleItem = VisiblePostedItem::query()
+                ->where('report_id', $report->id)
+                ->lockForUpdate()
+                ->first();
 
-        VisiblePostedItem::where('report_id', $report->id)->delete();
+            if (!$visibleItem) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'This report is no longer listed in Mobile Posts. Refresh the page.',
+                ], 422);
+            }
 
-        $report->update([
-            'status' => Report::STATUS_ARCHIVED,
-            'published_at' => null,
-            'archived_at' => Carbon::now(),
-        ]);
-
-        $archiveItem = ArchiveItem::updateOrCreate(
-            ['report_id' => $report->id],
-            [
+            // Keep the original status, publication date and visibility in
+            // the existing reports.metadata JSON. No migration is required.
+            // This lets Restore undo the mobile archive without restarting
+            // Lost/Found approval, USC verification or claim workflows.
+            $metadata = $report->metadata ?? [];
+            if (!is_array($metadata)) {
+                $metadata = [];
+            }
+            $metadata['mobile_post_archive_snapshot'] = [
                 'status' => $report->status,
-                'archive_type' => 'mobile_archive',
-                'reason' => 'Archived from mobile posts by admin.',
-                'archived_by_admin_id' => $admin->id,
-                'archived_at' => Carbon::now(),
-            ]
-        );
+                'published_at' => $report->published_at?->toISOString(),
+                'post_type' => $visibleItem->post_type ?: 'public',
+                'is_visible' => (bool) $visibleItem->is_visible,
+                'posted_at' => $visibleItem->posted_at
+                    ? Carbon::parse($visibleItem->posted_at)->toISOString()
+                    : null,
+                'posted_by_admin_id' => $visibleItem->posted_by_admin_id,
+            ];
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Item archived from mobile posts.',
-            'data' => $archiveItem,
-        ]);
+            $archivedAt = Carbon::now();
+            $report->update([
+                'status' => Report::STATUS_ARCHIVED,
+                'published_at' => null,
+                'archived_at' => $archivedAt,
+                'metadata' => $metadata,
+            ]);
+
+            $visibleItem->delete();
+
+            $archiveItem = ArchiveItem::updateOrCreate(
+                ['report_id' => $report->id],
+                [
+                    'status' => Report::STATUS_ARCHIVED,
+                    'archive_type' => 'mobile_archive',
+                    'reason' => 'Archived from mobile posts by admin.',
+                    'archived_by_admin_id' => $admin->id,
+                    'archived_at' => $archivedAt,
+                ]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Item archived from mobile posts.',
+                'data' => $archiveItem,
+            ]);
+        });
     }
 
     public function indexAdminNotifications(Request $request)
@@ -625,6 +786,7 @@ class AdminWorkflowController extends Controller
         }
 
         $categories = ItemCategory::query()
+            ->where('is_active', true)
             ->orderBy('name')
             ->get();
 
@@ -632,6 +794,68 @@ class AdminWorkflowController extends Controller
             'status' => 'success',
             'data' => $categories,
         ]);
+    }
+
+    /**
+     * Read the actual found time from the report, when it was saved.
+     * Never replace a missing found time with created_at or updated_at.
+     */
+    private function reportTimeFound(Report $report): ?string
+    {
+        $attributes = $report->getAttributes();
+        $serialized = $report->toArray();
+        $candidateFields = [
+            'time_found',
+            'event_time', // Older mobile reports saved metadata[event_time].
+            'found_time',
+            'time_occurred',
+            'occurred_time',
+            'found_at',
+            'found_datetime',
+            'date_time_found',
+        ];
+
+        foreach ($candidateFields as $field) {
+            if (array_key_exists($field, $serialized)) {
+                $value = $serialized[$field];
+            } elseif (array_key_exists($field, $attributes)) {
+                // Read original model attributes, including hidden fields.
+                $value = $report->getAttribute($field);
+            } else {
+                continue;
+            }
+
+            if ($value instanceof \DateTimeInterface) {
+                return $value->format('Y-m-d\TH:i:sP');
+            }
+
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        // Some report submissions save extra fields in JSON metadata.
+        $metadata = $report->metadata;
+
+        if (is_string($metadata)) {
+            $metadata = json_decode($metadata, true);
+        }
+
+        if (is_array($metadata)) {
+            foreach ($candidateFields as $field) {
+                $value = data_get($metadata, $field);
+
+                if ($value instanceof \DateTimeInterface) {
+                    return $value->format('Y-m-d\TH:i:sP');
+                }
+
+                if (is_string($value) && trim($value) !== '') {
+                    return trim($value);
+                }
+            }
+        }
+
+        return null;
     }
 
     public function indexSurrenderRequests(Request $request)
@@ -680,6 +904,7 @@ class AdminWorkflowController extends Controller
 
                 if ($surrender->report) {
                     $payload['report']['category'] = $surrender->report->category;
+                    $payload['report']['time_found'] = $this->reportTimeFound($surrender->report);
                 }
 
                 return $payload;
@@ -716,6 +941,7 @@ class AdminWorkflowController extends Controller
                     'report' => [
                         ...$report->toArray(),
                         'category' => $report->category,
+                        'time_found' => $this->reportTimeFound($report),
                     ],
                     'student' => $report->student?->toArray(),
                     'receivedByAdmin' => null,
@@ -761,51 +987,340 @@ class AdminWorkflowController extends Controller
         }
 
         $items = EventFine::query()
-            ->with(['student', 'event', 'report', 'issuedByAdmin'])
+            ->with([
+                'student',
+                'event',
+                'report',
+                'issuedByAdmin',
+            ])
             ->where('status', '!=', 'paid')
             ->latest()
             ->get();
 
         $grouped = $items
-            ->groupBy(fn (EventFine $fine) => $fine->student_id ?? $fine->student?->id ?? $fine->school_id ?? $fine->id)
+            ->groupBy(
+                fn (EventFine $fine) =>
+                    $fine->student_id
+                    ?? $fine->student?->id
+                    ?? $fine->school_id
+                    ?? $fine->id
+            )
             ->map(function ($group, $key) {
                 $lead = $group->first();
                 $student = $lead?->student;
-                $originalAmount = (float) $group->sum(fn ($fine) => (float) ($fine->original_amount ?? $fine->amount ?? 0));
-                $remainingAmount = (float) $group->sum(fn ($fine) => (float) ($fine->remaining_amount ?? max(0, (float) ($fine->original_amount ?? $fine->amount ?? 0) - (float) ($fine->paid_amount ?? 0))));
-                $paidAmount = (float) $group->sum(fn ($fine) => (float) ($fine->paid_amount ?? 0));
-                $status = strtolower((string) ($lead->status ?? 'pending'));
+
+                $originalAmount = (float) $group->sum(
+                    fn ($fine) =>
+                        (float) (
+                            $fine->original_amount
+                            ?? $fine->amount
+                            ?? 0
+                        )
+                );
+
+                $remainingAmount = (float) $group->sum(
+                    fn ($fine) =>
+                        (float) (
+                            $fine->remaining_amount
+                            ?? max(
+                                0,
+                                (float) (
+                                    $fine->original_amount
+                                    ?? $fine->amount
+                                    ?? 0
+                                )
+                                -
+                                (float) (
+                                    $fine->paid_amount
+                                    ?? 0
+                                )
+                            )
+                        )
+                );
+
+                $paidAmount = (float) $group->sum(
+                    fn ($fine) =>
+                        (float) (
+                            $fine->paid_amount
+                            ?? 0
+                        )
+                );
+
+                $status = strtolower(
+                    (string) (
+                        $lead->status
+                        ?? 'pending'
+                    )
+                );
 
                 if ($status === 'rejected') {
                     $status = 'rejected';
                 } elseif ($remainingAmount <= 0) {
                     $status = 'paid';
-                } elseif ($group->contains(fn ($fine) => strtolower((string) ($fine->status ?? '')) === 'partially paid')) {
+                } elseif (
+                    $group->contains(
+                        fn ($fine) =>
+                            strtolower(
+                                (string) (
+                                    $fine->status
+                                    ?? ''
+                                )
+                            )
+                            ===
+                            'partially paid'
+                    )
+                ) {
                     $status = 'partially paid';
-                } elseif ($group->contains(fn ($fine) => strtolower((string) ($fine->status ?? '')) === 'approved')) {
+                } elseif (
+                    $group->contains(
+                        fn ($fine) =>
+                            strtolower(
+                                (string) (
+                                    $fine->status
+                                    ?? ''
+                                )
+                            )
+                            ===
+                            'approved'
+                    )
+                ) {
                     $status = 'approved';
                 } else {
                     $status = 'pending';
                 }
 
+                /*
+                |--------------------------------------------------------------------------
+                | RECOGNITION POINT SUMMARY
+                |--------------------------------------------------------------------------
+                |
+                | Credit transactions are earned points.
+                | Debit transactions are stored as negative points.
+                |
+                */
+
+                $totalEarnedPoints = 0;
+                $pointsUsed = 0;
+                $availablePoints = 0;
+
+                if ($student) {
+                    $transactions =
+                        PointTransaction::query()
+                            ->where(
+                                'student_id',
+                                $student->id
+                            )
+                            ->get([
+                                'points',
+                                'direction',
+                            ]);
+
+                    $totalEarnedPoints =
+                        (int)
+                        $transactions
+                            ->filter(
+                                fn ($transaction) =>
+                                    strtolower(
+                                        (string)
+                                        $transaction->direction
+                                    )
+                                    ===
+                                    'credit'
+                                    &&
+                                    (int)
+                                    $transaction->points > 0
+                            )
+                            ->sum('points');
+
+                    $pointsUsed =
+                        (int)
+                        $transactions
+                            ->filter(
+                                fn ($transaction) =>
+                                    strtolower(
+                                        (string)
+                                        $transaction->direction
+                                    )
+                                    ===
+                                    'debit'
+                                    ||
+                                    (int)
+                                    $transaction->points < 0
+                            )
+                            ->sum(
+                                fn ($transaction) =>
+                                    abs(
+                                        (int)
+                                        $transaction->points
+                                    )
+                            );
+
+                    $availablePoints =
+                        max(
+                            0,
+                            (int)
+                            $transactions->sum('points')
+                        );
+                }
+
+                $latestConversion =
+                    $student
+                        ? EventFineConversion::query()
+                            ->where(
+                                'student_id',
+                                $student->id
+                            )
+                            ->latest('id')
+                            ->first()
+                        : null;
+
                 return [
-                    'id' => $key,
-                    'student_id' => $student?->id ?? $lead?->student_id,
-                    'student_name' => $student?->name ?? $lead?->student_name,
-                    'school_id' => $student?->student_id_number ?? $lead?->school_id,
-                    'event_name' => $group->count() > 1
-                        ? 'Combined fine balance'
-                        : ($lead?->event_name ?? 'Student fine balance'),
-                    'amount' => round($originalAmount, 2),
-                    'original_amount' => round($originalAmount, 2),
-                    'amount_to_pay' => round($originalAmount, 2),
-                    'paid_amount' => round($paidAmount, 2),
-                    'remaining_amount' => round($remainingAmount, 2),
-                    'status' => $status,
-                    'student' => $student ? $student->toArray() : null,
-                    'reason' => $lead?->reason,
-                    'due_at' => $lead?->due_at,
-                    'issued_by_admin_id' => $lead?->issued_by_admin_id,
+                    'id' =>
+                        $key,
+
+                    'student_id' =>
+                        $student?->id
+                        ?? $lead?->student_id,
+
+                    'student_name' =>
+                        $student?->name
+                        ?? $lead?->student_name,
+
+                    'school_id' =>
+                        $student?->student_id_number
+                        ?? $lead?->school_id,
+
+                    'event_name' =>
+                        $group->count() > 1
+                            ? 'Combined fine balance'
+                            : (
+                                $lead?->event_name
+                                ?? 'Student fine balance'
+                            ),
+
+                    'amount' =>
+                        round(
+                            $originalAmount,
+                            2
+                        ),
+
+                    'original_amount' =>
+                        round(
+                            $originalAmount,
+                            2
+                        ),
+
+                    'amount_to_pay' =>
+                        round(
+                            $originalAmount,
+                            2
+                        ),
+
+                    'paid_amount' =>
+                        round(
+                            $paidAmount,
+                            2
+                        ),
+
+                    'remaining_amount' =>
+                        round(
+                            $remainingAmount,
+                            2
+                        ),
+
+                    'status' =>
+                        $status,
+
+                    'student' =>
+                        $student
+                            ? $student->toArray()
+                            : null,
+
+                    'reason' =>
+                        $lead?->reason,
+
+                    'due_at' =>
+                        $lead?->due_at,
+
+                    'issued_by_admin_id' =>
+                        $lead?->issued_by_admin_id,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Revised SNSU event-fine conversion fields
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'total_recognition_points_earned' =>
+                        $totalEarnedPoints,
+
+                    'points_used' =>
+                        $pointsUsed,
+
+                    'remaining_available_points' =>
+                        $availablePoints,
+
+                    'conversion_rate' =>
+                        self::POINTS_PER_PESO,
+
+                    'latest_conversion' =>
+                        $latestConversion
+                            ? [
+                                'id' =>
+                                    $latestConversion->id,
+
+                                'requested_points' =>
+                                    (int)
+                                    (
+                                        $latestConversion
+                                            ->requested_points
+                                        ?? 0
+                                    ),
+
+                                'converted_points' =>
+                                    (int)
+                                    (
+                                        $latestConversion
+                                            ->converted_points
+                                        ?? 0
+                                    ),
+
+                                'credit_amount' =>
+                                    (float)
+                                    (
+                                        $latestConversion
+                                            ->credit_amount
+                                        ??
+                                        $latestConversion
+                                            ->peso_value_converted
+                                        ??
+                                        0
+                                    ),
+
+                                'remaining_balance' =>
+                                    (float)
+                                    (
+                                        $latestConversion
+                                            ->remaining_balance
+                                        ?? 0
+                                    ),
+
+                                'status' =>
+                                    $latestConversion->status,
+
+                                'reviewed_by_admin_id' =>
+                                    $latestConversion
+                                        ->reviewed_by_admin_id,
+
+                                'reviewed_at' =>
+                                    $latestConversion
+                                        ->reviewed_at,
+
+                                'created_at' =>
+                                    $latestConversion
+                                        ->created_at,
+                            ]
+                            : null,
                 ];
             })
             ->values();
@@ -816,6 +1331,12 @@ class AdminWorkflowController extends Controller
         ]);
     }
 
+
+    /**
+     * Assign an existing USC event fine to one student.
+     * This creates an unpaid fine only; students later request point conversion.
+     * The conversion approval workflow handles any point deduction.
+     */
     public function storeEventFine(Request $request)
     {
         $admin = Auth::guard('admin')->user();
@@ -828,111 +1349,273 @@ class AdminWorkflowController extends Controller
         }
 
         $validated = $request->validate([
-            'student_id' => 'required|exists:students,id',
-            'event_fine_event_id' => 'required|exists:event_fine_events,id',
-            'amount_to_pay' => 'required|numeric|min:0.01',
+            'student_id' => 'required|integer|exists:students,id',
+            'event_fine_event_id' => 'required|integer|exists:event_fine_events,id',
+            'amount_to_pay' => 'required|numeric|decimal:0,2|min:0.01|max:99999999.99',
             'reason' => 'nullable|string|max:2000',
-            'due_at' => 'nullable|date',
+            'due_at' => 'nullable|date_format:Y-m-d',
         ]);
 
-        $event = EventFineEvent::findOrFail($validated['event_fine_event_id']);
-        $student = Student::findOrFail($validated['student_id']);
+        return DB::transaction(function () use ($request, $admin, $validated) {
+            // Lock the student for a consistent duplicate check across concurrent admins.
+            $student = Student::query()->whereKey($validated['student_id'])
+                ->lockForUpdate()->firstOrFail();
 
-        if ((float) $validated['amount_to_pay'] > (float) $event->fine_amount) {
+            // Archived events must never be used for NEW fine assignments.
+            $event = EventFineEvent::query()
+                ->whereKey($validated['event_fine_event_id'])
+                ->where('is_active', true)
+                ->first();
+
+            if (!$event) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'This USC event is no longer active. Please select another event.',
+                ], 422);
+            }
+
+            $amount = round((float) $validated['amount_to_pay'], 2);
+            if ($amount > (float) $event->fine_amount) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'The assigned amount cannot exceed the event standard fine.',
+                ], 422);
+            }
+
+            $alreadyAssigned = EventFine::query()
+                ->where('student_id', $student->id)
+                ->where('event_fine_event_id', $event->id)
+                ->where('remaining_amount', '>', 0)
+                ->whereNotIn('status', ['paid', 'rejected'])
+                ->exists();
+
+            if ($alreadyAssigned) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'This student already has an unpaid fine for this event. Please review the existing fine instead of assigning it again.',
+                ], 409);
+            }
+
+            // Populate the existing Laravel fine fields, including the legacy
+            // due_date and created_by_admin_id fields if this project has them.
+            // Use the database query builder so the assignment does not rely on
+            // an old EventFine::$fillable list missing a newly added column.
+            $columns = array_flip(Schema::getColumnListing('event_fines'));
+            $candidate = [
+                'student_id' => $student->id,
+                'student_name' => $student->name,
+                'school_id' => $student->student_id_number,
+                'event_fine_event_id' => $event->id,
+                'event_name' => $event->name,
+                'description' => $validated['reason'] ?? null,
+                'amount' => $amount,
+                'original_amount' => $amount,
+                'amount_to_pay' => $amount,
+                'paid_amount' => 0,
+                'paid' => 0,
+                'remaining_amount' => $amount,
+                'reason' => $validated['reason'] ?? null,
+                'due_at' => $validated['due_at'] ?? null,
+                'due_date' => $validated['due_at'] ?? null,
+                'reference_number' => 'EF-' . now()->format('ymd') . '-' . strtoupper(Str::random(10)),
+                'status' => 'pending',
+                'issued_by_admin_id' => $admin->id,
+                'created_by_admin_id' => $admin->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+
+            $fineId = DB::table('event_fines')->insertGetId(
+                array_intersect_key($candidate, $columns)
+            );
+            $fine = EventFine::with('student')->findOrFail($fineId);
+
+            // The student receives the new unpaid balance in their mobile app.
+            // This notification belongs to the student, not the admin.
+            Notification::create([
+                'student_id' => $student->id,
+                'recipient_id' => $student->id,
+                'recipient_role' => 'student',
+                'type' => 'event_fine_assigned',
+                'title' => 'USC Event Fine Assigned',
+                'message' => 'A ₱' . number_format($amount, 2) . " fine for '{$event->name}' was assigned to your account. Open Payment Requests to review it.",
+                'action' => 'fine_request',
+                'status' => 'pending',
+                'subject_type' => EventFine::class,
+                'subject_id' => $fineId,
+                'data' => [
+                    'event_fine_id' => $fineId,
+                    'event_fine_event_id' => $event->id,
+                    'event_name' => $event->name,
+                    'fine_amount' => $amount,
+                ],
+                'is_read' => false,
+            ]);
+
             return response()->json([
-                'status' => 'error',
-                'message' => 'The amount to pay cannot be greater than the event fine.',
-            ], 422);
-        }
-
-        $fine = EventFine::create([
-            'student_id' => $validated['student_id'],
-            'student_name' => $student->name,
-            'school_id' => $student->student_id_number,
-            'event_fine_event_id' => $event->id,
-            'event_name' => $event->name,
-            'amount' => $validated['amount_to_pay'],
-            'original_amount' => $event->fine_amount,
-            'amount_to_pay' => $validated['amount_to_pay'],
-            'paid_amount' => 0,
-            'paid' => 0,
-            'remaining_amount' => $event->fine_amount,
-            'reason' => $validated['reason'] ?? null,
-            'due_at' => $validated['due_at'] ?? null,
-            'reference_number' => 'EF-' . now()->format('ymd') . '-' . strtoupper(Str::random(6)),
-            'status' => 'pending',
-            'issued_by_admin_id' => $admin->id,
-        ]);
-
-        Notification::create([
-            'type' => 'fine_request',
-            'title' => 'New Fine Request',
-            'message' => "A fine request for {$student->name} is waiting for review.",
-            'action' => 'fine_request',
-            'status' => 'pending',
-            'recipient_role' => 'admin',
-            'subject_type' => EventFine::class,
-            'subject_id' => $fine->id,
-            'is_read' => false,
-        ]);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Event fine request created.',
-            'data' => $fine->load('student'),
-        ], 201);
+                'status' => 'success',
+                'message' => 'Student fine assigned successfully.',
+                'data' => $fine,
+            ], 201);
+        });
     }
 
+    /**
+     * Admin event catalog. Archived events remain in the database so historical
+     * student fines and conversions never lose their original event data.
+     */
     public function indexEventFineEvents(Request $request)
     {
         if (!Auth::guard('admin')->user()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized.',
-            ], 401);
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
         return response()->json([
             'status' => 'success',
-            'data' => EventFineEvent::query()
+            'data' => DB::table('event_fine_events')
                 ->where('is_active', true)
-                ->latest()
+                ->orderByDesc('created_at')
                 ->get(),
         ]);
+    }
+
+    public function showEventFineEvent(Request $request, $id)
+    {
+        if (!Auth::guard('admin')->user()) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $event = DB::table('event_fine_events')->where('id', $id)->where('is_active', true)->first();
+        if (!$event) {
+            return response()->json(['status' => 'error', 'message' => 'Event not found.'], 404);
+        }
+
+        return response()->json(['status' => 'success', 'data' => $event]);
     }
 
     public function storeEventFineEvent(Request $request)
     {
         $admin = Auth::guard('admin')->user();
-
         if (!$admin) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized.',
-            ], 401);
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'fine_amount' => 'required|numeric|min:0.01',
+            'name' => 'required|string|max:191',
+            'fine_amount' => 'required|numeric|min:0.01|max:9999999999.99',
+            'event_date' => 'required|date_format:Y-m-d',
+            'event_time' => 'required|date_format:H:i',
+            'venue' => 'required|string|max:191',
         ]);
+        $validated['name'] = trim($validated['name']);
+        $validated['venue'] = trim($validated['venue']);
+        if ($validated['name'] === '' || $validated['venue'] === '') {
+            return response()->json(['status' => 'error', 'message' => 'Event name and venue cannot be blank.'], 422);
+        }
 
-        $event = EventFineEvent::firstOrCreate(
-            ['name' => $validated['name']],
-            [
-                'fine_amount' => $validated['fine_amount'],
-                'is_active' => true,
+        // Reactivate a previously archived event instead of creating a duplicate.
+        // Preserve its ID so any existing related fine references remain valid.
+        $existing = DB::table('event_fine_events')->where('name', $validated['name'])->first();
+        if ($existing && $existing->is_active) {
+            return response()->json(['status' => 'error', 'message' => 'An active event with this name already exists.'], 422);
+        }
+
+        $values = [
+            'name' => $validated['name'],
+            'fine_amount' => $validated['fine_amount'],
+            'event_date' => $validated['event_date'],
+            'event_time' => $validated['event_time'],
+            'venue' => $validated['venue'],
+            'is_active' => true,
+            'updated_at' => now(),
+        ];
+
+        if ($existing) {
+            DB::table('event_fine_events')->where('id', $existing->id)->update($values);
+            $id = $existing->id;
+        } else {
+            $id = DB::table('event_fine_events')->insertGetId(array_merge($values, [
                 'created_by_admin_id' => $admin->id,
-            ]
-        );
+                'created_at' => now(),
+            ]));
+        }
 
         return response()->json([
             'status' => 'success',
-            'message' => $event->wasRecentlyCreated
-                ? 'Event fine option created.'
-                : 'Event name already exists. Existing event returned.',
-            'data' => $event,
-        ], $event->wasRecentlyCreated ? 201 : 200);
+            'message' => $existing ? 'Archived event restored.' : 'Event created successfully.',
+            'data' => DB::table('event_fine_events')->where('id', $id)->first(),
+        ], $existing ? 200 : 201);
+    }
+
+    public function updateEventFineEvent(Request $request, $id)
+    {
+        if (!Auth::guard('admin')->user()) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $event = DB::table('event_fine_events')->where('id', $id)->where('is_active', true)->first();
+        if (!$event) {
+            return response()->json(['status' => 'error', 'message' => 'Event not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:191',
+            'fine_amount' => 'required|numeric|min:0.01|max:9999999999.99',
+            'event_date' => 'required|date_format:Y-m-d',
+            'event_time' => 'required|date_format:H:i',
+            'venue' => 'required|string|max:191',
+        ]);
+        $validated['name'] = trim($validated['name']);
+        $validated['venue'] = trim($validated['venue']);
+        if ($validated['name'] === '' || $validated['venue'] === '') {
+            return response()->json(['status' => 'error', 'message' => 'Event name and venue cannot be blank.'], 422);
+        }
+
+        $duplicate = DB::table('event_fine_events')
+            ->where('name', $validated['name'])
+            ->where('id', '!=', $id)
+            ->exists();
+        if ($duplicate) {
+            return response()->json(['status' => 'error', 'message' => 'An event with this name already exists.'], 422);
+        }
+
+        DB::table('event_fine_events')->where('id', $id)->update([
+            'name' => $validated['name'],
+            'fine_amount' => $validated['fine_amount'],
+            'event_date' => $validated['event_date'],
+            'event_time' => $validated['event_time'],
+            'venue' => $validated['venue'],
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Event updated successfully.',
+            'data' => DB::table('event_fine_events')->where('id', $id)->first(),
+        ]);
+    }
+
+    public function deleteEventFineEvent(Request $request, $id)
+    {
+        if (!Auth::guard('admin')->user()) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
+        }
+
+        $event = DB::table('event_fine_events')->where('id', $id)->where('is_active', true)->first();
+        if (!$event) {
+            return response()->json(['status' => 'error', 'message' => 'Event not found.'], 404);
+        }
+
+        // Soft archive: preserve all student fine records linked to this event.
+        DB::table('event_fine_events')->where('id', $id)->update([
+            'is_active' => false,
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Event removed from the active list. Existing fines are preserved.',
+        ]);
     }
 
     public function indexAdminSettings(Request $request)
@@ -1109,15 +1792,19 @@ class AdminWorkflowController extends Controller
         ]);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | POINT RULES ARE THE ADMIN-OWNED ITEM CATEGORY SOURCE OF TRUTH
+    |--------------------------------------------------------------------------
+    | Keep item_categories in sync so category IDs are valid when students
+    | submit reports and when admins use the All Categories dropdown.
+    | Deactivating a removed category preserves links from older reports.
+    */
     public function storePointRule(Request $request)
     {
         $admin = Auth::guard('admin')->user();
-
         if (!$admin) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized.',
-            ], 401);
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
         $validated = $request->validate([
@@ -1126,47 +1813,52 @@ class AdminWorkflowController extends Controller
             'base_points' => 'required|integer|min:0',
         ]);
 
-        $pointRuleData = [
-            'updated_by_admin_id' => $admin->id,
-            'category_name' => $validated['category_name'],
-            'base_points' => $validated['base_points'],
-        ];
+        $name = trim($validated['category_name']);
+        $slug = Str::slug($name);
+        if ($slug === '') {
+            return response()->json(['status' => 'error', 'message' => 'Use a valid category name.'], 422);
+        }
 
-        if (Schema::hasColumn('point_rules', 'category_id')) {
-            $category = ItemCategory::firstOrCreate(
-                ['slug' => Str::slug($validated['category_name'])],
-                [
-                    'name' => $validated['category_name'],
-                    'description' => $validated['description'] ?? null,
-                    'is_active' => true,
-                ]
+        if (PointRule::query()->whereRaw('LOWER(category_name) = ?', [Str::lower($name)])->exists()) {
+            return response()->json(['status' => 'error', 'message' => 'A point rule already exists for this category.'], 422);
+        }
+
+        $existingCategory = ItemCategory::query()->where('slug', $slug)->first();
+        if ($existingCategory && Schema::hasColumn('point_rules', 'category_id') &&
+            PointRule::query()->where('category_id', $existingCategory->id)->exists()) {
+            return response()->json(['status' => 'error', 'message' => 'A point rule already exists for this category.'], 422);
+        }
+
+        $item = DB::transaction(function () use ($validated, $name, $slug, $admin) {
+            $category = ItemCategory::query()->firstOrCreate(
+                ['slug' => $slug],
+                ['name' => $name, 'description' => $validated['description'] ?? null, 'is_active' => true]
             );
 
-            if (array_key_exists('description', $validated)) {
-                $category->update([
-                    'description' => $validated['description'],
-                ]);
+            // Re-enable categories whose old point rule was deleted.
+            $category->update([
+                'name' => $name,
+                'description' => $validated['description'] ?? null,
+                'is_active' => true,
+            ]);
+
+            $attributes = [
+                'category_name' => $name,
+                'base_points' => $validated['base_points'],
+                'updated_by_admin_id' => $admin->id,
+            ];
+            if (Schema::hasColumn('point_rules', 'category_id')) {
+                $attributes['category_id'] = $category->id;
             }
-
-            if (PointRule::where('category_id', $category->id)->exists()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'A point rule already exists for this category.',
-                ], 422);
+            if (Schema::hasColumn('point_rules', 'item_category')) {
+                $attributes['item_category'] = $name;
             }
-
-            $pointRuleData['category_id'] = $category->id;
-        }
-
-        if (Schema::hasColumn('point_rules', 'item_category')) {
-            $pointRuleData['item_category'] = $validated['category_name'];
-        }
-
-        $item = PointRule::create($pointRuleData);
+            return PointRule::create($attributes);
+        });
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Point rule created successfully.',
+            'message' => 'Point rule and mobile category created.',
             'data' => $item,
         ], 201);
     }
@@ -1174,45 +1866,78 @@ class AdminWorkflowController extends Controller
     public function updatePointRule(Request $request, $id)
     {
         $admin = Auth::guard('admin')->user();
-
         if (!$admin) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized.',
-            ], 401);
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
         $item = PointRule::findOrFail($id);
-
         $validated = $request->validate([
             'category_name' => 'sometimes|required|string|max:120',
             'description' => 'sometimes|nullable|string|max:1000',
             'base_points' => 'sometimes|required|integer|min:0',
         ]);
 
-        $pointRuleData = [
-            ...$validated,
-            ...(array_key_exists('category_name', $validated)
-                ? ['item_category' => $validated['category_name']]
-                : []),
-            'updated_by_admin_id' => $admin->id,
-        ];
-
-        if (!Schema::hasColumn('point_rules', 'item_category')) {
-            unset($pointRuleData['item_category']);
+        $name = trim((string) ($validated['category_name'] ?? $item->category_name ?? $item->item_category));
+        $slug = Str::slug($name);
+        if (!$name || !$slug) {
+            return response()->json(['status' => 'error', 'message' => 'Use a valid category name.'], 422);
         }
 
-        if (array_key_exists('description', $validated) && $item->category) {
-            $item->category->update([
-                'description' => $validated['description'],
-            ]);
+        if (PointRule::query()->where('id', '!=', $item->id)
+            ->whereRaw('LOWER(category_name) = ?', [Str::lower($name)])->exists()) {
+            return response()->json(['status' => 'error', 'message' => 'Another point rule already uses this category.'], 422);
         }
 
-        $item->update($pointRuleData);
+        $existingCategory = ItemCategory::query()->where('slug', $slug)->first();
+        if ($existingCategory && $item->category_id != $existingCategory->id &&
+            Schema::hasColumn('point_rules', 'category_id') &&
+            PointRule::query()->where('id', '!=', $item->id)
+                ->where('category_id', $existingCategory->id)->exists()) {
+            return response()->json(['status' => 'error', 'message' => 'Another point rule already uses this category.'], 422);
+        }
+
+        $item = DB::transaction(function () use ($item, $validated, $name, $slug, $admin, $existingCategory) {
+            $category = $item->category;
+            if (!$category) {
+                $category = ItemCategory::query()->where('slug', Str::slug((string) ($item->category_name ?: $item->item_category)))->first();
+            }
+
+            if ($category && $existingCategory && $category->id !== $existingCategory->id) {
+                // Do not rewrite a different category's existing historical records.
+                $category->update(['is_active' => false]);
+                $category = $existingCategory;
+            }
+
+            if (!$category) {
+                $category = ItemCategory::query()->firstOrCreate(
+                    ['slug' => $slug],
+                    ['name' => $name, 'description' => $validated['description'] ?? null, 'is_active' => true]
+                );
+            }
+
+            $categoryUpdates = ['name' => $name, 'slug' => $slug, 'is_active' => true];
+            if (array_key_exists('description', $validated)) {
+                $categoryUpdates['description'] = $validated['description'];
+            }
+            $category->update($categoryUpdates);
+
+            $attributes = ['category_name' => $name, 'updated_by_admin_id' => $admin->id];
+            if (array_key_exists('base_points', $validated)) {
+                $attributes['base_points'] = $validated['base_points'];
+            }
+            if (Schema::hasColumn('point_rules', 'category_id')) {
+                $attributes['category_id'] = $category->id;
+            }
+            if (Schema::hasColumn('point_rules', 'item_category')) {
+                $attributes['item_category'] = $name;
+            }
+            $item->update($attributes);
+            return $item->fresh();
+        });
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Point rule updated successfully.',
+            'message' => 'Point rule and mobile category updated.',
             'data' => $item,
         ]);
     }
@@ -1220,20 +1945,33 @@ class AdminWorkflowController extends Controller
     public function destroyPointRule($id)
     {
         $admin = Auth::guard('admin')->user();
-
         if (!$admin) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized.',
-            ], 401);
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        $item = PointRule::findOrFail($id);
-        $item->delete();
+        DB::transaction(function () use ($id) {
+            $item = PointRule::findOrFail($id);
+            $category = $item->category;
+            if (!$category) {
+                $category = ItemCategory::query()->where('slug', Str::slug((string) ($item->category_name ?: $item->item_category)))->first();
+            }
+            $item->delete();
+
+            if ($category) {
+                $stillInUse = PointRule::query()->whereRaw('LOWER(category_name) = ?', [Str::lower($category->name)])->exists();
+                if (Schema::hasColumn('point_rules', 'category_id')) {
+                    $stillInUse = $stillInUse || PointRule::query()->where('category_id', $category->id)->exists();
+                }
+                if (!$stillInUse) {
+                    // Preserve category IDs referenced by historical reports.
+                    $category->update(['is_active' => false]);
+                }
+            }
+        });
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Point rule deleted successfully.',
+            'message' => 'Point rule deleted. Category removed from future report choices.',
         ]);
     }
 
@@ -1394,7 +2132,13 @@ class AdminWorkflowController extends Controller
         }
 
         $items = ClaimReview::query()
-            ->with(['report.student', 'claimantStudent', 'reviewedByAdmin'])
+            ->with([
+                'report.student',
+                'report.images',
+                'report.categoryRelation',
+                'claimantStudent',
+                'reviewedByAdmin',
+            ])
             ->latest()
             ->get();
 
@@ -1586,41 +2330,102 @@ class AdminWorkflowController extends Controller
             ], 422);
         }
 
-        $report->update([
-            'status' => Report::STATUS_APPROVED,
-            'approved_by_admin_id' => $admin->id,
-            'approved_at' => Carbon::now(),
-            'published_at' => Carbon::now(),
-        ]);
+        if (
+            !in_array(
+                $report->status,
+                [
+                    Report::STATUS_PENDING_APPROVAL,
+                    'correction_requested',
+                ],
+                true
+            )
+        ) {
+            return response()->json([
+                'status' => 'error',
+                'message' =>
+                    'This lost-item report is not waiting for approval.',
+            ], 422);
+        }
 
-        VisiblePostedItem::updateOrCreate(
-            ['report_id' => $report->id],
-            [
-                'post_type' => 'public',
-                'is_visible' => true,
-                'posted_at' => Carbon::now(),
-                'posted_by_admin_id' => $admin->id,
-            ]
+        $metadata = $report->metadata ?? [];
+
+        unset(
+            $metadata['correction_requested'],
+            $metadata['correction_request'],
+            $metadata['correction_requested_at'],
+            $metadata['correction_requested_by_admin_id'],
+            $metadata['correction_resubmitted_at']
         );
 
-        Notification::create([
-            'student_id' => $report->student_id,
-            'type' => 'lost_report_approved',
-            'title' => 'Lost Report Approved',
-            'message' => "Your lost-item report '{$report->title}' was approved and is now visible in the student feed.",
-            'action' => 'lost_report_approved',
-            'status' => 'pending',
-            'recipient_id' => $report->student_id,
-            'recipient_role' => 'student',
-            'subject_type' => Report::class,
-            'subject_id' => $report->id,
-            'is_read' => false,
-        ]);
+        DB::transaction(function () use (
+            $report,
+            $admin,
+            $metadata
+        ) {
+            $report->update([
+                'status' => Report::STATUS_APPROVED,
+                'approved_by_admin_id' => $admin->id,
+                'approved_at' => Carbon::now(),
+                'rejected_by_admin_id' => null,
+                'rejected_at' => null,
+                'published_at' => Carbon::now(),
+                'metadata' => $metadata,
+            ]);
+
+            VisiblePostedItem::updateOrCreate(
+                ['report_id' => $report->id],
+                [
+                    'post_type' => 'public',
+                    'is_visible' => true,
+                    'posted_at' => Carbon::now(),
+                    'posted_by_admin_id' => $admin->id,
+                ]
+            );
+
+            ArchiveItem::where(
+                'report_id',
+                $report->id
+            )->delete();
+
+            $this->createStudentNotification([
+                'student_id' => $report->student_id,
+                'type' => 'lost_report_approved',
+                'title' => 'Lost Report Approved',
+                'message' =>
+                    "Your lost-item report '{$report->title}' was approved and is now visible in the student feed.",
+                'action' => 'lost_report_approved',
+                'status' => 'pending',
+                'recipient_id' => $report->student_id,
+                'recipient_role' => 'student',
+                'subject_type' => Report::class,
+                'subject_id' => $report->id,
+                'data' => [
+                    'report_id' => $report->id,
+                ],
+                'is_read' => false,
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | AUTOMATIC LOST/FOUND MATCH SCAN
+            |--------------------------------------------------------------------------
+            */
+
+            $this->generatePotentialMatchesForReport(
+                $report,
+                $admin
+            );
+        });
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Report approved and posted to mobile successfully.',
-            'data' => $report->fresh('student'),
+            'message' =>
+                'Report approved and posted to mobile successfully.',
+            'data' => $report->fresh([
+                'student',
+                'images',
+                'visiblePost',
+            ]),
         ]);
     }
 
@@ -1637,39 +2442,75 @@ class AdminWorkflowController extends Controller
 
         $report = Report::findOrFail($id);
 
-        $report->update([
-            'status' => Report::STATUS_REJECTED,
-            'rejected_by_admin_id' => $admin->id,
-            'rejected_at' => Carbon::now(),
-            'published_at' => null,
-        ]);
+        if ($report->type !== Report::TYPE_LOST) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Only lost-item reports can be rejected here.',
+            ], 422);
+        }
 
-        VisiblePostedItem::where('report_id', $report->id)->delete();
+        if (
+            !in_array(
+                $report->status,
+                [
+                    Report::STATUS_PENDING_APPROVAL,
+                    'correction_requested',
+                ],
+                true
+            )
+        ) {
+            return response()->json([
+                'status' => 'error',
+                'message' =>
+                    'This lost-item report is not waiting for USC review.',
+            ], 422);
+        }
 
-        $this->syncArchiveRecord(
+        DB::transaction(function () use (
             $report,
-            'rejected',
-            'Rejected by admin review.'
-        );
+            $admin
+        ) {
+            $report->update([
+                'status' => Report::STATUS_REJECTED,
+                'rejected_by_admin_id' => $admin->id,
+                'rejected_at' => Carbon::now(),
+                'published_at' => null,
+            ]);
 
-        Notification::create([
-            'student_id' => $report->student_id,
-            'type' => 'lost_report_rejected',
-            'title' => 'Lost Report Rejected',
-            'message' => "Your lost-item report '{$report->title}' was rejected by USC.",
-            'action' => 'lost_report_rejected',
-            'status' => 'pending',
-            'recipient_id' => $report->student_id,
-            'recipient_role' => 'student',
-            'subject_type' => Report::class,
-            'subject_id' => $report->id,
-            'is_read' => false,
-        ]);
+            VisiblePostedItem::where(
+                'report_id',
+                $report->id
+            )->delete();
+
+            $this->syncArchiveRecord(
+                $report,
+                'rejected',
+                'Rejected by admin review.'
+            );
+
+            $this->createStudentNotification([
+                'student_id' => $report->student_id,
+                'type' => 'lost_report_rejected',
+                'title' => 'Lost Report Rejected',
+                'message' =>
+                    "Your lost-item report '{$report->title}' was rejected by USC.",
+                'action' => 'lost_report_rejected',
+                'status' => 'pending',
+                'recipient_id' => $report->student_id,
+                'recipient_role' => 'student',
+                'subject_type' => Report::class,
+                'subject_id' => $report->id,
+                'data' => [
+                    'report_id' => $report->id,
+                ],
+                'is_read' => false,
+            ]);
+        });
 
         return response()->json([
             'status' => 'success',
             'message' => 'Report rejected successfully.',
-            'data' => $report,
+            'data' => $report->fresh(),
         ]);
     }
 
@@ -1685,25 +2526,96 @@ class AdminWorkflowController extends Controller
         }
 
         $validated = $request->validate([
-            'message' => 'nullable|string|max:1000',
+            'message' => 'required|string|max:1000',
         ]);
 
         $report = Report::findOrFail($id);
 
-        $report->update([
-            'status' => 'correction_requested',
-            'metadata' => array_merge(
-                $report->metadata ?? [],
+        if ($report->type !== Report::TYPE_LOST) {
+            return response()->json([
+                'status' => 'error',
+                'message' =>
+                    'Only lost-item reports can receive correction requests here.',
+            ], 422);
+        }
+
+        if (
+            !in_array(
+                $report->status,
                 [
-                    'correction_request' => $validated['message'] ?? '',
-                ]
-            ),
-        ]);
+                    Report::STATUS_PENDING_APPROVAL,
+                    'correction_requested',
+                ],
+                true
+            )
+        ) {
+            return response()->json([
+                'status' => 'error',
+                'message' =>
+                    'This lost-item report is not waiting for USC review.',
+            ], 422);
+        }
+
+        $message = trim(
+            $validated['message']
+        );
+
+        $metadata = array_merge(
+            $report->metadata ?? [],
+            [
+                'correction_requested' => true,
+                'correction_request' => $message,
+                'correction_requested_at' =>
+                    now()->toIso8601String(),
+                'correction_requested_by_admin_id' =>
+                    $admin->id,
+            ]
+        );
+
+        DB::transaction(function () use (
+            $report,
+            $message,
+            $metadata
+        ) {
+            $report->update([
+                'status' => Report::STATUS_PENDING_APPROVAL,
+                'metadata' => $metadata,
+                'published_at' => null,
+            ]);
+
+            VisiblePostedItem::where(
+                'report_id',
+                $report->id
+            )->delete();
+
+            $this->createStudentNotification([
+                'student_id' => $report->student_id,
+                'type' => 'lost_report_correction_requested',
+                'title' => 'Lost Report Needs More Information',
+                'message' =>
+                    "USC requested an update to your lost-item report '{$report->title}': {$message}",
+                'action' => 'lost_report_correction_requested',
+                'status' => 'pending',
+                'recipient_id' => $report->student_id,
+                'recipient_role' => 'student',
+                'subject_type' => Report::class,
+                'subject_id' => $report->id,
+                'data' => [
+                    'report_id' => $report->id,
+                    'correction_request' => $message,
+                ],
+                'is_read' => false,
+            ]);
+        });
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Correction requested successfully.',
-            'data' => $report,
+            'message' =>
+                'Correction request sent to the student successfully.',
+            'data' => $report->fresh([
+                'student',
+                'images',
+            ]),
         ]);
     }
 
@@ -1822,7 +2734,7 @@ class AdminWorkflowController extends Controller
 
                 VisiblePostedItem::where('report_id', $report->id)->delete();
 
-                Notification::create([
+                $this->createStudentNotification([
                     'student_id' => $report->student_id,
                     'type' => 'found_item_received',
                     'title' => 'Found Item Received by USC',
@@ -1907,50 +2819,149 @@ class AdminWorkflowController extends Controller
             ], 401);
         }
 
-        $surrender = $this->resolveSurrenderRequest($id);
+        try {
+            return DB::transaction(
+                function () use (
+                    $id,
+                    $admin
+                ) {
+                    $resolved =
+                        $this->resolveSurrenderRequest(
+                            $id
+                        );
 
-        $surrender->update([
-            'status' => 'rejected',
-        ]);
+                    $surrender =
+                        SurrenderRequest::query()
+                            ->whereKey(
+                                $resolved->id
+                            )
+                            ->lockForUpdate()
+                            ->firstOrFail();
 
-        $report = $surrender->report()->first();
+                    $report =
+                        $surrender
+                            ->report()
+                            ->lockForUpdate()
+                            ->firstOrFail();
 
-        if ($report) {
-            $report->update([
-                'status' => Report::STATUS_REJECTED,
-                'rejected_by_admin_id' => $admin->id,
-                'rejected_at' => Carbon::now(),
-                'published_at' => null,
-            ]);
+                    if (
+                        $report->type !==
+                        Report::TYPE_FOUND
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'Only found-item surrender requests can be rejected here.',
+                        ], 422);
+                    }
 
-            VisiblePostedItem::where('report_id', $report->id)->delete();
+                    if (
+                        $report->status !==
+                        Report::STATUS_PENDING_SURRENDER
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'This found item is no longer waiting for surrender.',
+                        ], 422);
+                    }
 
-            $this->syncArchiveRecord(
-                $report,
-                'rejected',
-                'Rejected surrender request.'
+                    if (
+                        $surrender->received_at ||
+                        $surrender->received_by_admin_id ||
+                        $surrender->status === 'received'
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'A received physical item cannot be rejected from the surrender queue.',
+                        ], 409);
+                    }
+
+                    $surrender->update([
+                        'status' => 'rejected',
+                    ]);
+
+                    $report->update([
+                        'status' =>
+                            Report::STATUS_REJECTED,
+                        'rejected_by_admin_id' =>
+                            $admin->id,
+                        'rejected_at' =>
+                            Carbon::now(),
+                        'published_at' =>
+                            null,
+                    ]);
+
+                    VisiblePostedItem::where(
+                        'report_id',
+                        $report->id
+                    )->delete();
+
+                    $this->syncArchiveRecord(
+                        $report,
+                        'rejected',
+                        'Rejected surrender request.'
+                    );
+
+                    $this->createStudentNotification([
+                        'student_id' =>
+                            $report->student_id,
+                        'type' =>
+                            'found_surrender_rejected',
+                        'title' =>
+                            'Found Item Surrender Rejected',
+                        'message' =>
+                            "USC rejected the surrender request for '{$report->title}'.",
+                        'action' =>
+                            'found_surrender_rejected',
+                        'status' =>
+                            'pending',
+                        'recipient_id' =>
+                            $report->student_id,
+                        'recipient_role' =>
+                            'student',
+                        'subject_type' =>
+                            SurrenderRequest::class,
+                        'subject_id' =>
+                            $surrender->id,
+                        'data' => [
+                            'report_id' =>
+                                $report->id,
+                        ],
+                        'is_read' =>
+                            false,
+                    ]);
+
+                    return response()->json([
+                        'status' => 'success',
+                        'message' =>
+                            'Surrender request rejected.',
+                        'data' =>
+                            $surrender->fresh([
+                                'report.student',
+                                'report.images',
+                                'student',
+                            ]),
+                    ]);
+                }
+            );
+        } catch (\Throwable $exception) {
+            Log::error(
+                'Reject surrender failed',
+                [
+                    'surrender_id' => $id,
+                    'message' =>
+                        $exception->getMessage(),
+                ]
             );
 
-            Notification::create([
-                'student_id' => $report->student_id,
-                'type' => 'found_surrender_rejected',
-                'title' => 'Found Item Surrender Rejected',
-                'message' => "USC rejected the surrender request for '{$report->title}'.",
-                'action' => 'found_surrender_rejected',
-                'status' => 'pending',
-                'recipient_id' => $report->student_id,
-                'recipient_role' => 'student',
-                'subject_type' => SurrenderRequest::class,
-                'subject_id' => $surrender->id,
-                'is_read' => false,
-            ]);
+            return response()->json([
+                'status' => 'error',
+                'message' =>
+                    $exception->getMessage(),
+            ], 422);
         }
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Surrender request rejected.',
-            'data' => $surrender,
-        ]);
     }
 
     public function requestSurrenderDetails(Request $request, $id)
@@ -1964,61 +2975,243 @@ class AdminWorkflowController extends Controller
             ], 401);
         }
 
-        $validated = $request->validate([
-            'requested_details' => 'nullable|array',
-            'requested_details.*' => 'string|max:100',
-            'note' => 'nullable|string|max:1000',
-            'message' => 'nullable|string|max:1000',
-        ]);
+        $validated =
+            $request->validate([
+                'requested_details' =>
+                    'nullable|array',
 
-        $surrender = $this->resolveSurrenderRequest($id);
-        $requestedDetails = $validated['requested_details'] ?? [];
-        $message = $validated['note'] ?? $validated['message'] ?? '';
+                'requested_details.*' =>
+                    'string|max:100',
 
-        if ($requestedDetails) {
-            $message = trim(
-                $message
-                . ($message ? "\n" : '')
-                . 'Please provide: '
-                . implode(', ', $requestedDetails)
-            );
-        }
+                'note' =>
+                    'nullable|string|max:1000',
 
-        $message = $message ?: 'Please provide more details for this surrender request.';
-
-        $surrender->update([
-            'notes' => trim(
-                ($surrender->notes ? $surrender->notes . "\n" : '')
-                . $message
-            ),
-        ]);
-
-        $report = $surrender->report;
-
-        if ($report?->student_id) {
-            Notification::create([
-                'student_id' => $report->student_id,
-                'type' => 'surrender_details_requested',
-                'title' => 'More Details Needed',
-                'message' => $message,
-                'action' => 'surrender_details_requested',
-                'status' => 'pending',
-                'recipient_id' => $report->student_id,
-                'recipient_role' => 'student',
-                'subject_type' => SurrenderRequest::class,
-                'subject_id' => $surrender->id,
-                'is_read' => false,
+                'message' =>
+                    'nullable|string|max:1000',
             ]);
-        }
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'More details requested successfully.',
-            'data' => $surrender->fresh(),
-        ]);
+        try {
+            return DB::transaction(
+                function () use (
+                    $request,
+                    $id,
+                    $admin,
+                    $validated
+                ) {
+                    $resolved =
+                        $this->resolveSurrenderRequest(
+                            $id
+                        );
+
+                    $surrender =
+                        SurrenderRequest::query()
+                            ->whereKey(
+                                $resolved->id
+                            )
+                            ->lockForUpdate()
+                            ->firstOrFail();
+
+                    $report =
+                        $surrender
+                            ->report()
+                            ->lockForUpdate()
+                            ->firstOrFail();
+
+                    if (
+                        $report->type !==
+                        Report::TYPE_FOUND ||
+                        $report->status !==
+                            Report::STATUS_PENDING_SURRENDER
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'This found item is no longer waiting for surrender details.',
+                        ], 422);
+                    }
+
+                    if (
+                        $surrender->received_at ||
+                        $surrender->received_by_admin_id ||
+                        $surrender->status === 'received'
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'This physical item has already been received by USC.',
+                        ], 409);
+                    }
+
+                    $requestedDetails =
+                        $validated[
+                            'requested_details'
+                        ]
+                        ?? [];
+
+                    $message =
+                        $validated['note']
+                        ??
+                        $validated['message']
+                        ??
+                        '';
+
+                    if ($requestedDetails) {
+                        $message =
+                            trim(
+                                $message
+                                .
+                                ($message ? "\n" : '')
+                                .
+                                'Please provide: '
+                                .
+                                implode(
+                                    ', ',
+                                    $requestedDetails
+                                )
+                            );
+                    }
+
+                    $message =
+                        $message
+                        ?:
+                        'Please provide more details for this surrender request.';
+
+                    $surrender->update([
+                        'notes' =>
+                            trim(
+                                (
+                                    $surrender->notes
+                                        ? $surrender->notes
+                                            . "\n"
+                                        : ''
+                                )
+                                .
+                                $message
+                            ),
+                    ]);
+
+                    $metadata =
+                        array_merge(
+                            $report->metadata
+                                ?? [],
+                            [
+                                'surrender_details_requested' =>
+                                    true,
+
+                                'surrender_details_request' =>
+                                    $message,
+
+                                'surrender_details_requested_at' =>
+                                    now()
+                                        ->toIso8601String(),
+
+                                'surrender_details_requested_by_admin_id' =>
+                                    $admin->id,
+                            ]
+                        );
+
+                    $report->update([
+                        'metadata' =>
+                            $metadata,
+                    ]);
+
+                    $this->createStudentNotification([
+                        'student_id' =>
+                            $report->student_id,
+
+                        'type' =>
+                            'surrender_details_requested',
+
+                        'title' =>
+                            'More Found Item Details Needed',
+
+                        'message' =>
+                            $message,
+
+                        'action' =>
+                            'surrender_details_requested',
+
+                        'status' =>
+                            'pending',
+
+                        'recipient_id' =>
+                            $report->student_id,
+
+                        'recipient_role' =>
+                            'student',
+
+                        'subject_type' =>
+                            SurrenderRequest::class,
+
+                        'subject_id' =>
+                            $surrender->id,
+
+                        'data' => [
+                            'report_id' =>
+                                $report->id,
+
+                            'requested_details' =>
+                                $requestedDetails,
+
+                            'message' =>
+                                $message,
+                        ],
+
+                        'is_read' =>
+                            false,
+                    ]);
+
+                    $this->recordAuditLog(
+                        $admin,
+                        'surrender_details_requested',
+                        SurrenderRequest::class,
+                        $surrender->id,
+                        'Surrender Request',
+                        [
+                            'report_id' =>
+                                $report->id,
+                            'requested_details' =>
+                                $requestedDetails,
+                            'message' =>
+                                $message,
+                        ],
+                        $request->ip()
+                    );
+
+                    return response()->json([
+                        'status' => 'success',
+                        'message' =>
+                            'More details requested successfully.',
+                        'data' =>
+                            $surrender->fresh([
+                                'report.student',
+                                'report.images',
+                                'student',
+                            ]),
+                    ]);
+                }
+            );
+        } catch (\Throwable $exception) {
+            Log::error(
+                'Request surrender details failed',
+                [
+                    'surrender_id' =>
+                        $id,
+
+                    'message' =>
+                        $exception->getMessage(),
+                ]
+            );
+
+            return response()->json([
+                'status' => 'error',
+                'message' =>
+                    $exception->getMessage(),
+            ], 422);
+        }
     }
 
-    public function markSurrenderOverdue($id)
+    public function markSurrenderOverdue(Request $request, $id)
     {
         $admin = Auth::guard('admin')->user();
 
@@ -2029,17 +3222,144 @@ class AdminWorkflowController extends Controller
             ], 401);
         }
 
-        $surrender = SurrenderRequest::findOrFail($id);
+        try {
+            return DB::transaction(
+                function () use (
+                    $request,
+                    $id,
+                    $admin
+                ) {
+                    $resolved =
+                        $this->resolveSurrenderRequest(
+                            $id
+                        );
 
-        $surrender->update([
-            'status' => 'overdue',
-        ]);
+                    $surrender =
+                        SurrenderRequest::query()
+                            ->whereKey(
+                                $resolved->id
+                            )
+                            ->lockForUpdate()
+                            ->firstOrFail();
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Surrender request marked overdue.',
-            'data' => $surrender,
-        ]);
+                    $report =
+                        $surrender
+                            ->report()
+                            ->lockForUpdate()
+                            ->firstOrFail();
+
+                    if (
+                        $report->type !==
+                        Report::TYPE_FOUND ||
+                        $report->status !==
+                            Report::STATUS_PENDING_SURRENDER
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'This found item is no longer waiting for surrender.',
+                        ], 422);
+                    }
+
+                    if (
+                        $surrender->received_at ||
+                        $surrender->received_by_admin_id ||
+                        $surrender->status === 'received'
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'A received physical item cannot be marked overdue.',
+                        ], 409);
+                    }
+
+                    $surrender->update([
+                        'status' =>
+                            'overdue',
+                    ]);
+
+                    $this->createStudentNotification([
+                        'student_id' =>
+                            $report->student_id,
+
+                        'type' =>
+                            'surrender_overdue',
+
+                        'title' =>
+                            'Found Item Surrender Overdue',
+
+                        'message' =>
+                            "Your found item '{$report->title}' is overdue for surrender. Please bring the physical item to the USC office.",
+
+                        'action' =>
+                            'surrender_overdue',
+
+                        'status' =>
+                            'pending',
+
+                        'recipient_id' =>
+                            $report->student_id,
+
+                        'recipient_role' =>
+                            'student',
+
+                        'subject_type' =>
+                            SurrenderRequest::class,
+
+                        'subject_id' =>
+                            $surrender->id,
+
+                        'data' => [
+                            'report_id' =>
+                                $report->id,
+
+                            'deadline_at' =>
+                                $surrender
+                                    ->deadline_at,
+                        ],
+
+                        'is_read' =>
+                            false,
+                    ]);
+
+                    $this->recordAuditLog(
+                        $admin,
+                        'surrender_marked_overdue',
+                        SurrenderRequest::class,
+                        $surrender->id,
+                        'Surrender Request',
+                        [
+                            'report_id' =>
+                                $report->id,
+                            'deadline_at' =>
+                                $surrender
+                                    ->deadline_at,
+                        ],
+                        $request->ip()
+                    );
+
+                    return response()->json([
+                        'status' =>
+                            'success',
+
+                        'message' =>
+                            'Surrender request marked overdue.',
+
+                        'data' =>
+                            $surrender->fresh([
+                                'report',
+                                'student',
+                            ]),
+                    ]);
+                }
+            );
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'status' => 'error',
+                'message' =>
+                    $exception->getMessage(),
+            ], 422);
+        }
     }
 
     public function verifyItem(Request $request, $id)
@@ -2053,121 +3373,293 @@ class AdminWorkflowController extends Controller
             ], 401);
         }
 
-        try {
-            return DB::transaction(function () use ($request, $id, $admin) {
-                $verification = ItemVerification::query()
-                    ->where('id', $id)
-                    ->whereIn('status', [
-                        'pending',
-                        'needs_more_information',
-                    ])
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                $report = $verification
-                    ->report()
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                if ($report->type !== Report::TYPE_FOUND) {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => 'Only found items are verified in this workflow.',
-                    ], 422);
-                }
-
-                if ($report->status !== Report::STATUS_PENDING_VERIFICATION) {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => 'This found report is not ready for verification approval.',
-                    ], 422);
-                }
-
-                $notes = $request->input('notes');
-
-                $verification->update([
-                    'status' => 'verified',
-                    'verifier_admin_id' => $admin->id,
-                    'verified_at' => Carbon::now(),
-                    'notes' => $notes ?? $verification->notes,
-                    'checklist' => array_merge(
-                        $verification->checklist ?? [],
-                        [
-                            'verified_by_admin' => $admin->id,
-                        ]
-                    ),
-                ]);
-
-                $report->update([
-                    'status' => Report::STATUS_VERIFIED,
-                    'published_at' => Carbon::now(),
-                ]);
-
-                /*
-                |------------------------------------------------------------------
-                | NOW THE FOUND ITEM MAY APPEAR PUBLICLY
-                |------------------------------------------------------------------
-                */
-
-                VisiblePostedItem::updateOrCreate(
-                    ['report_id' => $report->id],
-                    [
-                        'post_type' => 'public',
-                        'is_visible' => true,
-                        'posted_at' => Carbon::now(),
-                        'posted_by_admin_id' => $admin->id,
-                    ]
-                );
-
-                Notification::create([
-                    'student_id' => $report->student_id,
-                    'type' => 'found_item_verified',
-                    'title' => 'Item Verified by USC',
-                    'message' => "USC has verified your found item '{$report->title}' and it is now visible in the student feed.",
-                    'action' => 'item_verified',
-                    'status' => 'pending',
-                    'recipient_id' => $report->student_id,
-                    'recipient_role' => 'student',
-                    'subject_type' => ItemVerification::class,
-                    'subject_id' => $verification->id,
-                    'data' => [
-                        'report_id' => $report->id,
-                    ],
-                    'is_read' => false,
-                ]);
-
-                $this->recordAuditLog(
-                    $admin,
-                    'verification_approved',
-                    ItemVerification::class,
-                    $verification->id,
-                    'Item Verification',
-                    [
-                        'report_id' => $report->id,
-                        'verifier_admin_id' => $admin->id,
-                        'verified_at' => $verification->verified_at?->toDateTimeString(),
-                    ],
-                    $request->ip()
-                );
-
-                return response()->json([
-                    'status' => 'success',
-                    'message' => 'Item verification approved. The found item is now visible in the student feed.',
-                    'data' => $verification->fresh([
-                        'report',
-                        'verifierAdmin',
-                    ]),
-                ]);
-            });
-        } catch (\Throwable $exception) {
-            Log::error('Verify item failed', [
-                'verification_id' => $id,
-                'message' => $exception->getMessage(),
+        $validated =
+            $request->validate([
+                'notes' =>
+                    'nullable|string|max:2000',
             ]);
+
+        try {
+            return DB::transaction(
+                function () use (
+                    $request,
+                    $id,
+                    $admin,
+                    $validated
+                ) {
+                    $verification =
+                        ItemVerification::query()
+                            ->where(
+                                'id',
+                                $id
+                            )
+                            ->whereIn(
+                                'status',
+                                [
+                                    'pending',
+                                    'needs_more_information',
+                                ]
+                            )
+                            ->lockForUpdate()
+                            ->firstOrFail();
+
+                    $report =
+                        $verification
+                            ->report()
+                            ->lockForUpdate()
+                            ->firstOrFail();
+
+                    if (
+                        $report->type !==
+                        Report::TYPE_FOUND
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'Only found items are verified in this workflow.',
+                        ], 422);
+                    }
+
+                    if (
+                        $report->status !==
+                        Report::STATUS_PENDING_VERIFICATION
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'This found report is not ready for verification approval.',
+                        ], 422);
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | PHYSICAL ITEM MUST HAVE BEEN RECEIVED FIRST
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $surrender =
+                        SurrenderRequest::query()
+                            ->where(
+                                'report_id',
+                                $report->id
+                            )
+                            ->first();
+
+                    if (
+                        !$surrender ||
+                        $surrender->status !== 'received' ||
+                        !$surrender->received_at
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'The physical found item must be received by USC before verification can be completed.',
+                        ], 422);
+                    }
+
+                    $notes =
+                        isset($validated['notes'])
+                            ? trim(
+                                (string)
+                                $validated['notes']
+                            )
+                            : null;
+
+                    $verification->update([
+                        'status' =>
+                            'verified',
+
+                        'verifier_admin_id' =>
+                            $admin->id,
+
+                        'verified_at' =>
+                            Carbon::now(),
+
+                        'notes' =>
+                            $notes !== ''
+                                ? $notes
+                                : $verification->notes,
+
+                        'checklist' =>
+                            array_merge(
+                                $verification
+                                    ->checklist
+                                    ?? [],
+                                [
+                                    'physical_item_received' =>
+                                        true,
+
+                                    'physical_item_received_at' =>
+                                        $surrender
+                                            ->received_at,
+
+                                    'verified_by_admin' =>
+                                        $admin->id,
+                                ]
+                            ),
+                    ]);
+
+                    $report->update([
+                        'status' =>
+                            Report::STATUS_VERIFIED,
+
+                        'published_at' =>
+                            Carbon::now(),
+
+                        'rejected_by_admin_id' =>
+                            null,
+
+                        'rejected_at' =>
+                            null,
+                    ]);
+
+                    ArchiveItem::where(
+                        'report_id',
+                        $report->id
+                    )->delete();
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | VERIFIED FOUND ITEM IS NOW ELIGIBLE FOR THE MOBILE FEED
+                    |--------------------------------------------------------------------------
+                    */
+
+                    VisiblePostedItem::updateOrCreate(
+                        [
+                            'report_id' =>
+                                $report->id,
+                        ],
+                        [
+                            'post_type' =>
+                                'public',
+
+                            'is_visible' =>
+                                true,
+
+                            'posted_at' =>
+                                Carbon::now(),
+
+                            'posted_by_admin_id' =>
+                                $admin->id,
+                        ]
+                    );
+
+                    // USC has verified and automatically published the found item.
+                    // Award the first installment now, never on student submission.
+                    $publicationAward = $this->awardFoundPublicationRecognitionPoints($report, $admin);
+
+                    $this->createStudentNotification([
+                        'student_id' =>
+                            $report->student_id,
+
+                        'type' =>
+                            'found_item_verified',
+
+                        'title' =>
+                            'Found Item Verified by USC',
+
+                        'message' =>
+                            "USC verified your found item '{$report->title}'. It is now visible in the student feed.",
+
+                        'action' =>
+                            'item_verified',
+
+                        'status' =>
+                            'pending',
+
+                        'recipient_id' =>
+                            $report->student_id,
+
+                        'recipient_role' =>
+                            'student',
+
+                        'subject_type' =>
+                            ItemVerification::class,
+
+                        'subject_id' =>
+                            $verification->id,
+
+                        'data' => [
+                            'report_id' =>
+                                $report->id,
+
+                            'verification_id' =>
+                                $verification->id,
+                        ],
+
+                        'is_read' =>
+                            false,
+                    ]);
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | AUTOMATIC LOST/FOUND MATCH SCAN
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $this->generatePotentialMatchesForReport(
+                        $report,
+                        $admin
+                    );
+
+                    $this->recordAuditLog(
+                        $admin,
+                        'verification_approved',
+                        ItemVerification::class,
+                        $verification->id,
+                        'Item Verification',
+                        [
+                            'report_id' =>
+                                $report->id,
+
+                            'verifier_admin_id' =>
+                                $admin->id,
+
+                            'verified_at' =>
+                                $verification
+                                    ->verified_at
+                                    ?->toDateTimeString(),
+
+                            'mobile_visible' =>
+                                true,
+                        ],
+                        $request->ip()
+                    );
+
+                    return response()->json([
+                        'status' =>
+                            'success',
+
+                        'message' =>
+                            'Item verification approved. The found item is now visible in the student feed.',
+
+                        'data' =>
+                            $verification
+                                ->fresh([
+                                    'report.student',
+                                    'report.images',
+                                    'report.visiblePost',
+                                    'verifierAdmin',
+                                ]),
+                    ]);
+                }
+            );
+        } catch (\Throwable $exception) {
+            Log::error(
+                'Verify item failed',
+                [
+                    'verification_id' =>
+                        $id,
+
+                    'message' =>
+                        $exception->getMessage(),
+                ]
+            );
 
             return response()->json([
                 'status' => 'error',
-                'message' => $exception->getMessage(),
+                'message' =>
+                    $exception->getMessage(),
             ], 422);
         }
     }
@@ -2183,88 +3675,189 @@ class AdminWorkflowController extends Controller
             ], 401);
         }
 
-        $validated = $request->validate([
-            'notes' => 'required|string|max:1000',
-        ]);
+        $validated =
+            $request->validate([
+                'notes' =>
+                    'required|string|max:1000',
+            ]);
 
         try {
-            return DB::transaction(function () use ($request, $id, $admin, $validated) {
-                $verification = ItemVerification::query()
-                    ->where('id', $id)
-                    ->whereIn('status', [
-                        'pending',
-                        'needs_more_information',
-                    ])
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                $report = $verification
-                    ->report()
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                $verification->update([
-                    'status' => 'archived',
-                    'verifier_admin_id' => $admin->id,
-                    'verified_at' => Carbon::now(),
-                    'notes' => $validated['notes'],
-                ]);
-
-                $report->update([
-                    'status' => Report::STATUS_REJECTED,
-                    'rejected_by_admin_id' => $admin->id,
-                    'rejected_at' => Carbon::now(),
-                    'published_at' => null,
-                ]);
-
-                VisiblePostedItem::where('report_id', $report->id)->delete();
-
-                $this->syncArchiveRecord(
-                    $report,
-                    'rejected',
-                    $validated['notes']
-                );
-
-                Notification::create([
-                    'student_id' => $report->student_id,
-                    'type' => 'found_item_verification_rejected',
-                    'title' => 'Item Verification Rejected',
-                    'message' => "USC rejected the verification of your found item '{$report->title}'.",
-                    'action' => 'item_verification_rejected',
-                    'status' => 'pending',
-                    'recipient_id' => $report->student_id,
-                    'recipient_role' => 'student',
-                    'subject_type' => ItemVerification::class,
-                    'subject_id' => $verification->id,
-                    'is_read' => false,
-                ]);
-
-                $this->recordAuditLog(
+            return DB::transaction(
+                function () use (
+                    $request,
+                    $id,
                     $admin,
-                    'verification_rejected',
-                    ItemVerification::class,
-                    $verification->id,
-                    'Item Verification',
-                    [
-                        'report_id' => $report->id,
-                        'rejection_notes' => $validated['notes'],
-                    ],
-                    $request->ip()
-                );
+                    $validated
+                ) {
+                    $verification =
+                        ItemVerification::query()
+                            ->where(
+                                'id',
+                                $id
+                            )
+                            ->whereIn(
+                                'status',
+                                [
+                                    'pending',
+                                    'needs_more_information',
+                                ]
+                            )
+                            ->lockForUpdate()
+                            ->firstOrFail();
 
-                return response()->json([
-                    'status' => 'success',
-                    'message' => 'Item verification rejected.',
-                    'data' => $verification->fresh([
-                        'report',
-                        'verifierAdmin',
-                    ]),
-                ]);
-            });
+                    $report =
+                        $verification
+                            ->report()
+                            ->lockForUpdate()
+                            ->firstOrFail();
+
+                    if (
+                        $report->type !==
+                        Report::TYPE_FOUND ||
+                        $report->status !==
+                            Report::STATUS_PENDING_VERIFICATION
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'This found report is not currently waiting for USC verification.',
+                        ], 422);
+                    }
+
+                    $verification->update([
+                        'status' =>
+                            'archived',
+
+                        'verifier_admin_id' =>
+                            $admin->id,
+
+                        'verified_at' =>
+                            Carbon::now(),
+
+                        'notes' =>
+                            trim(
+                                $validated[
+                                    'notes'
+                                ]
+                            ),
+                    ]);
+
+                    $report->update([
+                        'status' =>
+                            Report::STATUS_REJECTED,
+
+                        'rejected_by_admin_id' =>
+                            $admin->id,
+
+                        'rejected_at' =>
+                            Carbon::now(),
+
+                        'published_at' =>
+                            null,
+                    ]);
+
+                    VisiblePostedItem::where(
+                        'report_id',
+                        $report->id
+                    )->delete();
+
+                    $this->syncArchiveRecord(
+                        $report,
+                        'rejected',
+                        trim(
+                            $validated['notes']
+                        )
+                    );
+
+                    $this->createStudentNotification([
+                        'student_id' =>
+                            $report->student_id,
+
+                        'type' =>
+                            'found_item_verification_rejected',
+
+                        'title' =>
+                            'Found Item Verification Rejected',
+
+                        'message' =>
+                            "USC rejected the verification of your found item '{$report->title}'.",
+
+                        'action' =>
+                            'item_verification_rejected',
+
+                        'status' =>
+                            'pending',
+
+                        'recipient_id' =>
+                            $report->student_id,
+
+                        'recipient_role' =>
+                            'student',
+
+                        'subject_type' =>
+                            ItemVerification::class,
+
+                        'subject_id' =>
+                            $verification->id,
+
+                        'data' => [
+                            'report_id' =>
+                                $report->id,
+
+                            'notes' =>
+                                trim(
+                                    $validated[
+                                        'notes'
+                                    ]
+                                ),
+                        ],
+
+                        'is_read' =>
+                            false,
+                    ]);
+
+                    $this->recordAuditLog(
+                        $admin,
+                        'verification_rejected',
+                        ItemVerification::class,
+                        $verification->id,
+                        'Item Verification',
+                        [
+                            'report_id' =>
+                                $report->id,
+
+                            'rejection_notes' =>
+                                trim(
+                                    $validated[
+                                        'notes'
+                                    ]
+                                ),
+                        ],
+                        $request->ip()
+                    );
+
+                    return response()->json([
+                        'status' =>
+                            'success',
+
+                        'message' =>
+                            'Item verification rejected.',
+
+                        'data' =>
+                            $verification
+                                ->fresh([
+                                    'report.student',
+                                    'report.images',
+                                    'verifierAdmin',
+                                ]),
+                    ]);
+                }
+            );
         } catch (\Throwable $exception) {
             return response()->json([
                 'status' => 'error',
-                'message' => $exception->getMessage(),
+                'message' =>
+                    $exception->getMessage(),
             ], 422);
         }
     }
@@ -2280,74 +3873,177 @@ class AdminWorkflowController extends Controller
             ], 401);
         }
 
-        $validated = $request->validate([
-            'notes' => 'required|string|max:1000',
-        ]);
+        $validated =
+            $request->validate([
+                'notes' =>
+                    'required|string|max:1000',
+            ]);
 
         try {
-            return DB::transaction(function () use ($request, $id, $admin, $validated) {
-                $verification = ItemVerification::query()
-                    ->where('id', $id)
-                    ->whereIn('status', [
-                        'pending',
-                        'needs_more_information',
-                    ])
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                $report = $verification
-                    ->report()
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                $verification->update([
-                    'status' => 'needs_more_information',
-                    'notes' => $validated['notes'],
-                ]);
-
-                Notification::create([
-                    'student_id' => $report->student_id,
-                    'type' => 'verification_details_requested',
-                    'title' => 'Verification Details Needed',
-                    'message' => "USC requested more details for your found item '{$report->title}'.",
-                    'action' => 'verification_details_requested',
-                    'status' => 'pending',
-                    'recipient_id' => $report->student_id,
-                    'recipient_role' => 'student',
-                    'subject_type' => ItemVerification::class,
-                    'subject_id' => $verification->id,
-                    'data' => [
-                        'notes' => $validated['notes'],
-                    ],
-                    'is_read' => false,
-                ]);
-
-                $this->recordAuditLog(
+            return DB::transaction(
+                function () use (
+                    $request,
+                    $id,
                     $admin,
-                    'verification_details_requested',
-                    ItemVerification::class,
-                    $verification->id,
-                    'Item Verification',
-                    [
-                        'report_id' => $report->id,
-                        'notes' => $validated['notes'],
-                    ],
-                    $request->ip()
-                );
+                    $validated
+                ) {
+                    $verification =
+                        ItemVerification::query()
+                            ->where(
+                                'id',
+                                $id
+                            )
+                            ->whereIn(
+                                'status',
+                                [
+                                    'pending',
+                                    'needs_more_information',
+                                ]
+                            )
+                            ->lockForUpdate()
+                            ->firstOrFail();
 
-                return response()->json([
-                    'status' => 'success',
-                    'message' => 'Verification details requested.',
-                    'data' => $verification->fresh([
-                        'report',
-                        'verifierAdmin',
-                    ]),
-                ]);
-            });
+                    $report =
+                        $verification
+                            ->report()
+                            ->lockForUpdate()
+                            ->firstOrFail();
+
+                    if (
+                        $report->type !==
+                        Report::TYPE_FOUND ||
+                        $report->status !==
+                            Report::STATUS_PENDING_VERIFICATION
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'This found report is not currently waiting for verification details.',
+                        ], 422);
+                    }
+
+                    $notes =
+                        trim(
+                            $validated['notes']
+                        );
+
+                    $verification->update([
+                        'status' =>
+                            'needs_more_information',
+
+                        'notes' =>
+                            $notes,
+                    ]);
+
+                    $metadata =
+                        array_merge(
+                            $report->metadata
+                                ?? [],
+                            [
+                                'verification_details_requested' =>
+                                    true,
+
+                                'verification_details_request' =>
+                                    $notes,
+
+                                'verification_details_requested_at' =>
+                                    now()
+                                        ->toIso8601String(),
+
+                                'verification_details_requested_by_admin_id' =>
+                                    $admin->id,
+                            ]
+                        );
+
+                    $report->update([
+                        'metadata' =>
+                            $metadata,
+                    ]);
+
+                    $this->createStudentNotification([
+                        'student_id' =>
+                            $report->student_id,
+
+                        'type' =>
+                            'verification_details_requested',
+
+                        'title' =>
+                            'Verification Details Needed',
+
+                        'message' =>
+                            "USC requested more details for your found item '{$report->title}': {$notes}",
+
+                        'action' =>
+                            'verification_details_requested',
+
+                        'status' =>
+                            'pending',
+
+                        'recipient_id' =>
+                            $report->student_id,
+
+                        'recipient_role' =>
+                            'student',
+
+                        'subject_type' =>
+                            ItemVerification::class,
+
+                        'subject_id' =>
+                            $verification->id,
+
+                        'data' => [
+                            'report_id' =>
+                                $report->id,
+
+                            'verification_id' =>
+                                $verification->id,
+
+                            'notes' =>
+                                $notes,
+                        ],
+
+                        'is_read' =>
+                            false,
+                    ]);
+
+                    $this->recordAuditLog(
+                        $admin,
+                        'verification_details_requested',
+                        ItemVerification::class,
+                        $verification->id,
+                        'Item Verification',
+                        [
+                            'report_id' =>
+                                $report->id,
+
+                            'notes' =>
+                                $notes,
+                        ],
+                        $request->ip()
+                    );
+
+                    return response()->json([
+                        'status' =>
+                            'success',
+
+                        'message' =>
+                            'Verification details requested.',
+
+                        'data' =>
+                            $verification
+                                ->fresh([
+                                    'report.student',
+                                    'report.images',
+                                    'verifierAdmin',
+                                ]),
+                    ]);
+                }
+            );
         } catch (\Throwable $exception) {
             return response()->json([
                 'status' => 'error',
-                'message' => $exception->getMessage(),
+                'message' =>
+                    $exception->getMessage(),
             ], 422);
         }
     }
@@ -2391,7 +4087,7 @@ class AdminWorkflowController extends Controller
                     ], 422);
                 }
 
-                Notification::create([
+                $this->createStudentNotification([
                     'student_id' => $recipientStudentId,
                     'type' => 'claim_pickup_instructions',
                     'title' => 'Item Ready for Claiming',
@@ -2436,82 +4132,70 @@ class AdminWorkflowController extends Controller
         }
     }
 
+    /**
+     * Compatibility endpoint used by Item Verification's Complete button.
+     * A report cannot be marked returned simply by completing verification:
+     * USC must confirm the physical handover through Item Release. Delegate
+     * to the same finalization action so return rewards are credited once.
+     */
     public function completeVerificationTransaction(Request $request, $id)
     {
         $admin = Auth::guard('admin')->user();
-
         if (!$admin) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized.',
-            ], 401);
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized.'], 401);
         }
 
-        try {
-            return DB::transaction(function () use ($request, $id, $admin) {
-                $verification = ItemVerification::where('id', $id)
-                    ->whereIn('status', [
-                        'verified',
-                        'completed',
-                    ])
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                $report = $verification
-                    ->report()
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
-                $verification->update([
-                    'status' => 'completed',
-                    'notes' => trim(
-                        ($verification->notes ? $verification->notes . "\n" : '')
-                        . 'Transaction completed by admin.'
-                    ),
-                ]);
-
-                $report->update([
-                    'status' => Report::STATUS_COMPLETED_RETURN,
-                    'completed_at' => Carbon::now(),
-                    'published_at' => null,
-                ]);
-
-                VisiblePostedItem::where('report_id', $report->id)->delete();
-
-                $this->syncArchiveRecord(
-                    $report,
-                    'completed',
-                    'Claim transaction completed.'
-                );
-
-                $this->recordAuditLog(
-                    $admin,
-                    'verification_transaction_completed',
-                    ItemVerification::class,
-                    $verification->id,
-                    'Item Verification',
-                    [
-                        'report_id' => $report->id,
-                        'completed_at' => Carbon::now()->toDateTimeString(),
-                    ],
-                    $request->ip()
-                );
-
-                return response()->json([
-                    'status' => 'success',
-                    'message' => 'Transaction completed and archived.',
-                    'data' => $verification->fresh([
-                        'report',
-                        'verifierAdmin',
-                    ]),
-                ]);
-            });
-        } catch (\Throwable $exception) {
+        $verification = ItemVerification::query()->with('report')->findOrFail($id);
+        $report = $verification->report;
+        if (!$report || $report->type !== Report::TYPE_FOUND) {
             return response()->json([
                 'status' => 'error',
-                'message' => $exception->getMessage(),
+                'message' => 'Only verified Found items can be completed in this workflow.',
             ], 422);
         }
+
+        if ($report->status === Report::STATUS_COMPLETED_RETURN) {
+            // The physical return was already finalized by USC via Item Release.
+            $verification->update(['status' => 'completed']);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Return already completed. Verification marked complete.',
+                'data' => $verification->fresh(['report', 'verifierAdmin']),
+            ]);
+        }
+
+        if (!in_array($verification->status, ['verified', 'completed'], true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'The found item must be verified before completion.',
+            ], 422);
+        }
+
+        $release = ItemRelease::query()
+            ->where('report_id', $report->id)
+            ->where('status', ItemRelease::STATUS_APPROVED)
+            ->first();
+
+        if (!$release || !$release->hasCompletedChecklist()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Complete the approved Item Release checklist and confirm the physical handover before closing this transaction.',
+            ], 422);
+        }
+
+        // Reuse the established, locked release transaction: verified claim,
+        // physical return, archive, notifications and final reward installment.
+        $result = $this->completeItemRelease($request, $release->id);
+        if ($result->getStatusCode() >= 200 && $result->getStatusCode() < 300) {
+            $verification->update(['status' => 'completed']);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Physical return confirmed; transaction and verification completed.',
+                'data' => $verification->fresh(['report', 'verifierAdmin']),
+            ]);
+        }
+
+        return $result;
     }
 
     public function archiveVerification(Request $request, $id)
@@ -2571,162 +4255,627 @@ class AdminWorkflowController extends Controller
         }
     }
 
-    public function confirmPotentialMatch($id)
-    {
-        $admin = Auth::guard('admin')->user();
+    /*
+    |--------------------------------------------------------------------------
+    | GENERATE POTENTIAL MATCHES AFTER APPROVAL / VERIFICATION
+    |--------------------------------------------------------------------------
+    |
+    | The system creates PENDING match suggestions only.
+    | Students are not told a match is confirmed until USC reviews it.
+    |
+    */
 
-        if (!$admin) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized.',
-            ], 401);
-        }
+    private function generatePotentialMatchesForReport(
+        Report $report,
+        Admin $admin
+    ): int {
+        $results =
+            app(
+                PotentialMatchService::class
+            )->generateForReport(
+                $report
+            );
 
-        $match = PotentialMatch::with([
-            'lostReport',
-            'foundReport',
-        ])->findOrFail($id);
+        $createdCount = 0;
 
-        DB::transaction(function () use ($admin, $match) {
-            $match->update([
-                'status' => 'confirmed',
-                'reviewed_by_admin_id' => $admin->id,
-                'reviewed_at' => now(),
+        foreach ($results as $result) {
+            if (!$result['created']) {
+                continue;
+            }
+
+            $match =
+                $result['match'];
+
+            $createdCount++;
+
+            Notification::create([
+                'type' =>
+                    'potential_match',
+
+                'title' =>
+                    'Potential Match Needs Review',
+
+                'message' =>
+                    "The matching system found a possible Lost/Found pair with a similarity score of {$result['score']}%.",
+
+                'action' =>
+                    'potential_match',
+
+                'status' =>
+                    'pending',
+
+                'recipient_role' =>
+                    'admin',
+
+                'subject_type' =>
+                    PotentialMatch::class,
+
+                'subject_id' =>
+                    $match->id,
+
+                'data' => [
+                    'potential_match_id' =>
+                        $match->id,
+
+                    'lost_report_id' =>
+                        $match->lost_report_id,
+
+                    'found_report_id' =>
+                        $match->found_report_id,
+
+                    'score' =>
+                        $result['score'],
+                ],
+
+                'is_read' =>
+                    false,
             ]);
 
-            if (
-                $match->lostReport
-                && in_array(
-                    $match->lostReport->status,
-                    [
-                        Report::STATUS_APPROVED,
-                        Report::STATUS_POTENTIAL_MATCH_FOUND,
-                    ],
-                    true
-                )
-            ) {
-                $match->lostReport->update([
-                    'status' => Report::STATUS_POTENTIAL_MATCH_FOUND,
-                ]);
-            }
+            /*
+            |--------------------------------------------------------------------------
+            | NOTIFY THE CONCERNED LOST-ITEM STUDENT IMMEDIATELY
+            |--------------------------------------------------------------------------
+            |
+            | Revised SNSU flow:
+            | - System detects a possible match.
+            | - USC Admin is notified.
+            | - The concerned lost-item student is also notified.
+            |
+            | IMPORTANT:
+            | This does NOT confirm ownership. The student must still submit a
+            | claim request and USC must verify the ownership proof.
+            |
+            */
+
+            $lostReport =
+                Report::query()
+                    ->find(
+                        $match->lost_report_id
+                    );
 
             if (
-                $match->foundReport
-                && in_array(
-                    $match->foundReport->status,
-                    [
-                        Report::STATUS_VERIFIED,
-                        Report::STATUS_POTENTIAL_MATCH_FOUND,
-                    ],
-                    true
-                )
+                $lostReport &&
+                $lostReport->student_id
             ) {
-                $match->foundReport->update([
-                    'status' => Report::STATUS_POTENTIAL_MATCH_FOUND,
-                ]);
-            }
+                $this->createStudentNotification([
+                    'student_id' =>
+                        $lostReport->student_id,
 
-            if ($match->lostReport?->student_id) {
-                Notification::create([
-                    'student_id' => $match->lostReport->student_id,
-                    'recipient_id' => $match->lostReport->student_id,
-                    'recipient_role' => 'student',
-                    'type' => 'lost_found_match',
-                    'title' => 'Possible Match Found!',
-                    'message' => 'A found item may match your lost report. Please review the details and submit a claim if it is yours.',
-                    'action' => 'view_match',
-                    'status' => 'pending',
-                    'subject_type' => PotentialMatch::class,
-                    'subject_id' => $match->id,
+                    'type' =>
+                        'potential_match_detected',
+
+                    'title' =>
+                        'Possible Match Detected',
+
+                    'message' =>
+                        "A verified found item may match your lost-item report '{$lostReport->title}'. This does not confirm ownership. USC is reviewing the possible match, and you will still need to submit a claim with ownership proof if the item may be yours.",
+
+                    'action' =>
+                        'potential_match_detected',
+
+                    'status' =>
+                        'pending',
+
+                    'recipient_id' =>
+                        $lostReport->student_id,
+
+                    'recipient_role' =>
+                        'student',
+
+                    'subject_type' =>
+                        PotentialMatch::class,
+
+                    'subject_id' =>
+                        $match->id,
+
                     'data' => [
-                        'potential_match_id' => $match->id,
-                        'lost_report_id' => $match->lost_report_id,
-                        'found_report_id' => $match->found_report_id,
+                        'potential_match_id' =>
+                            $match->id,
+
+                        'lost_report_id' =>
+                            $match->lost_report_id,
+
+                        'found_report_id' =>
+                            $match->found_report_id,
+
+                        'score' =>
+                            $result['score'],
+
+                        'ownership_confirmed' =>
+                            false,
+
+                        'requires_claim' =>
+                            true,
                     ],
-                    'is_read' => false,
+
+                    'is_read' =>
+                        false,
                 ]);
             }
-        });
+        }
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Potential match confirmed and student notified.',
-            'data' => $match->fresh([
-                'lostReport',
-                'foundReport',
-            ]),
-        ]);
+        return $createdCount;
     }
 
-    public function rejectPotentialMatch($id)
-    {
-        $admin = Auth::guard('admin')->user();
+
+    public function confirmPotentialMatch(
+        Request $request,
+        $id
+    ) {
+        $admin =
+            Auth::guard(
+                'admin'
+            )->user();
 
         if (!$admin) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized.',
+                'status' =>
+                    'error',
+
+                'message' =>
+                    'Unauthorized.',
             ], 401);
         }
 
-        $match = PotentialMatch::with([
-            'lostReport',
-            'foundReport',
-        ])->findOrFail($id);
+        $match =
+            PotentialMatch::with([
+                'lostReport',
+                'foundReport',
+            ])->findOrFail(
+                $id
+            );
 
-        DB::transaction(function () use ($match) {
-            $match->update([
-                'status' => 'rejected',
+        if (
+            $match->status ===
+            'confirmed'
+        ) {
+            return response()->json([
+                'status' =>
+                    'success',
+
+                'message' =>
+                    'This potential match is already confirmed.',
+
+                'data' =>
+                    $match,
             ]);
+        }
 
-            if ($match->lostReport?->status === Report::STATUS_POTENTIAL_MATCH_FOUND) {
-                $match->lostReport->update([
-                    'status' => Report::STATUS_APPROVED,
-                ]);
-            }
+        if (
+            $match->status !==
+            'pending'
+        ) {
+            return response()->json([
+                'status' =>
+                    'error',
 
-            if ($match->foundReport?->status === Report::STATUS_POTENTIAL_MATCH_FOUND) {
-                $match->foundReport->update([
-                    'status' => Report::STATUS_VERIFIED,
+                'message' =>
+                    'Only pending potential matches can be confirmed.',
+            ], 422);
+        }
+
+        if (
+            !$match->lostReport ||
+            !$match->foundReport
+        ) {
+            return response()->json([
+                'status' =>
+                    'error',
+
+                'message' =>
+                    'The Lost or Found report for this match no longer exists.',
+            ], 422);
+        }
+
+        $service =
+            app(
+                PotentialMatchService::class
+            );
+
+        if (
+            !$service->isEligible(
+                $match->lostReport
+            ) ||
+            !$service->isEligible(
+                $match->foundReport
+            )
+        ) {
+            return response()->json([
+                'status' =>
+                    'error',
+
+                'message' =>
+                    'One of these reports is no longer eligible for matching.',
+            ], 422);
+        }
+
+        DB::transaction(
+            function () use (
+                $request,
+                $admin,
+                $match
+            ) {
+                $match->update([
+                    'status' =>
+                        'confirmed',
+
+                    'reviewed_by_admin_id' =>
+                        $admin->id,
+
+                    'reviewed_at' =>
+                        Carbon::now(),
                 ]);
+
+                $match
+                    ->lostReport
+                    ->update([
+                        'status' =>
+                            Report::STATUS_POTENTIAL_MATCH_FOUND,
+                    ]);
+
+                $match
+                    ->foundReport
+                    ->update([
+                        'status' =>
+                            Report::STATUS_POTENTIAL_MATCH_FOUND,
+                    ]);
+
+                /*
+                |--------------------------------------------------------------------------
+                | IMPORTANT:
+                | A confirmed potential match is NOT proof of ownership.
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    $match
+                        ->lostReport
+                        ->student_id
+                ) {
+                    $this->createStudentNotification([
+                        'student_id' =>
+                            $match
+                                ->lostReport
+                                ->student_id,
+
+                        'recipient_id' =>
+                            $match
+                                ->lostReport
+                                ->student_id,
+
+                        'recipient_role' =>
+                            'student',
+
+                        'type' =>
+                            'lost_found_match',
+
+                        'title' =>
+                            'Possible Match Found',
+
+                        'message' =>
+                            'USC confirmed a possible found-item match for your lost report. This is not ownership confirmation. Review the found item and submit a claim if you believe it is yours.',
+
+                        'action' =>
+                            'view_match',
+
+                        'status' =>
+                            'pending',
+
+                        'subject_type' =>
+                            PotentialMatch::class,
+
+                        'subject_id' =>
+                            $match->id,
+
+                        'data' => [
+                            'potential_match_id' =>
+                                $match->id,
+
+                            'lost_report_id' =>
+                                $match
+                                    ->lost_report_id,
+
+                            'found_report_id' =>
+                                $match
+                                    ->found_report_id,
+
+                            'requires_claim' =>
+                                true,
+                        ],
+
+                        'is_read' =>
+                            false,
+                    ]);
+                }
+
+                $this->recordAuditLog(
+                    $admin,
+                    'potential_match_confirmed',
+                    PotentialMatch::class,
+                    $match->id,
+                    'Potential Match',
+                    [
+                        'lost_report_id' =>
+                            $match
+                                ->lost_report_id,
+
+                        'found_report_id' =>
+                            $match
+                                ->found_report_id,
+
+                        'score' =>
+                            $match->score,
+                    ],
+                    $request->ip()
+                );
             }
-        });
+        );
 
         return response()->json([
-            'status' => 'success',
-            'message' => 'Potential match rejected. Both reports remain available for future matching.',
-            'data' => $match->fresh([
-                'lostReport',
-                'foundReport',
-            ]),
+            'status' =>
+                'success',
+
+            'message' =>
+                'Potential match confirmed. The lost-item owner has been notified to review it and submit a claim if appropriate.',
+
+            'data' =>
+                $match->fresh([
+                    'lostReport.images',
+                    'lostReport.student',
+                    'foundReport.images',
+                    'foundReport.student',
+                ]),
         ]);
     }
 
-    public function resetPotentialMatch($id)
-    {
-        $admin = Auth::guard('admin')->user();
+
+    public function rejectPotentialMatch(
+        Request $request,
+        $id
+    ) {
+        $admin =
+            Auth::guard(
+                'admin'
+            )->user();
 
         if (!$admin) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized.',
+                'status' =>
+                    'error',
+
+                'message' =>
+                    'Unauthorized.',
             ], 401);
         }
 
-        $match = PotentialMatch::findOrFail($id);
+        $match =
+            PotentialMatch::with([
+                'lostReport',
+                'foundReport',
+            ])->findOrFail(
+                $id
+            );
 
-        $match->update([
-            'status' => 'pending',
-            'reviewed_by_admin_id' => null,
-            'reviewed_at' => null,
-        ]);
+        if (
+            $match->status ===
+            'rejected'
+        ) {
+            return response()->json([
+                'status' =>
+                    'success',
+
+                'message' =>
+                    'This potential match is already rejected.',
+
+                'data' =>
+                    $match,
+            ]);
+        }
+
+        $service =
+            app(
+                PotentialMatchService::class
+            );
+
+        DB::transaction(
+            function () use (
+                $request,
+                $admin,
+                $match,
+                $service
+            ) {
+                $match->update([
+                    'status' =>
+                        'rejected',
+
+                    'reviewed_by_admin_id' =>
+                        $admin->id,
+
+                    'reviewed_at' =>
+                        Carbon::now(),
+                ]);
+
+                if ($match->lostReport) {
+                    $service
+                        ->restoreBaseStatusAfterReview(
+                            $match->lostReport,
+                            $match->id
+                        );
+                }
+
+                if ($match->foundReport) {
+                    $service
+                        ->restoreBaseStatusAfterReview(
+                            $match->foundReport,
+                            $match->id
+                        );
+                }
+
+                $this->recordAuditLog(
+                    $admin,
+                    'potential_match_rejected',
+                    PotentialMatch::class,
+                    $match->id,
+                    'Potential Match',
+                    [
+                        'lost_report_id' =>
+                            $match
+                                ->lost_report_id,
+
+                        'found_report_id' =>
+                            $match
+                                ->found_report_id,
+                    ],
+                    $request->ip()
+                );
+            }
+        );
 
         return response()->json([
-            'status' => 'success',
-            'message' => 'Potential match returned to pending review.',
-            'data' => $match->fresh(),
+            'status' =>
+                'success',
+
+            'message' =>
+                'Potential match rejected. The reports remain available for other valid matches.',
+
+            'data' =>
+                $match->fresh([
+                    'lostReport.images',
+                    'lostReport.student',
+                    'foundReport.images',
+                    'foundReport.student',
+                ]),
         ]);
     }
+
+
+    public function resetPotentialMatch(
+        Request $request,
+        $id
+    ) {
+        $admin =
+            Auth::guard(
+                'admin'
+            )->user();
+
+        if (!$admin) {
+            return response()->json([
+                'status' =>
+                    'error',
+
+                'message' =>
+                    'Unauthorized.',
+            ], 401);
+        }
+
+        $match =
+            PotentialMatch::with([
+                'lostReport',
+                'foundReport',
+            ])->findOrFail(
+                $id
+            );
+
+        $previousStatus =
+            $match->status;
+
+        $service =
+            app(
+                PotentialMatchService::class
+            );
+
+        DB::transaction(
+            function () use (
+                $request,
+                $admin,
+                $match,
+                $previousStatus,
+                $service
+            ) {
+                $match->update([
+                    'status' =>
+                        'pending',
+
+                    'reviewed_by_admin_id' =>
+                        null,
+
+                    'reviewed_at' =>
+                        null,
+                ]);
+
+                if (
+                    $previousStatus ===
+                    'confirmed'
+                ) {
+                    if ($match->lostReport) {
+                        $service
+                            ->restoreBaseStatusAfterReview(
+                                $match->lostReport,
+                                $match->id
+                            );
+                    }
+
+                    if ($match->foundReport) {
+                        $service
+                            ->restoreBaseStatusAfterReview(
+                                $match->foundReport,
+                                $match->id
+                            );
+                    }
+                }
+
+                $this->recordAuditLog(
+                    $admin,
+                    'potential_match_reset',
+                    PotentialMatch::class,
+                    $match->id,
+                    'Potential Match',
+                    [
+                        'previous_status' =>
+                            $previousStatus,
+                    ],
+                    $request->ip()
+                );
+            }
+        );
+
+        return response()->json([
+            'status' =>
+                'success',
+
+            'message' =>
+                'Potential match returned to pending USC review.',
+
+            'data' =>
+                $match->fresh([
+                    'lostReport.images',
+                    'lostReport.student',
+                    'foundReport.images',
+                    'foundReport.student',
+                ]),
+        ]);
+    }
+
 
     public function approveClaim(Request $request, $id)
     {
@@ -2777,29 +4926,100 @@ class AdminWorkflowController extends Controller
                     ], 422);
                 }
 
+                $otherApprovedClaim = ClaimReview::query()
+                    ->where('report_id', $report->id)
+                    ->where('id', '<>', $claim->id)
+                    ->where('review_status', 'approved')
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($otherApprovedClaim) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Another ownership claim for this item has already been approved.',
+                    ], 409);
+                }
+
                 $claim->update([
                     'review_status' => 'approved',
                     'reviewed_by_admin_id' => $admin->id,
                     'reviewed_at' => Carbon::now(),
                 ]);
 
+                /*
+                |------------------------------------------------------------------
+                | ONLY ONE CLAIMANT MAY RECEIVE THE PHYSICAL ITEM
+                |------------------------------------------------------------------
+                */
+
+                $competingClaims = ClaimReview::query()
+                    ->where('report_id', $report->id)
+                    ->where('id', '<>', $claim->id)
+                    ->whereIn('review_status', [
+                        'pending',
+                        'additional_information_required',
+                    ])
+                    ->lockForUpdate()
+                    ->get();
+
+                foreach ($competingClaims as $competingClaim) {
+                    $competingClaim->update([
+                        'review_status' => 'rejected',
+                        'notes' => 'Another ownership claim for this found item was approved by USC.',
+                        'reviewed_by_admin_id' => $admin->id,
+                        'reviewed_at' => Carbon::now(),
+                    ]);
+
+                    $this->createStudentNotification([
+                        'student_id' => $competingClaim->claimant_student_id,
+                        'type' => 'claim_rejected',
+                        'title' => 'Claim Closed',
+                        'message' => "Another ownership claim for '{$report->title}' was approved by USC, so this claim has been closed.",
+                        'action' => 'claim_rejected',
+                        'status' => 'pending',
+                        'recipient_id' => $competingClaim->claimant_student_id,
+                        'recipient_role' => 'student',
+                        'subject_type' => ClaimReview::class,
+                        'subject_id' => $competingClaim->id,
+                        'data' => [
+                            'report_id' => $report->id,
+                        ],
+                        'is_read' => false,
+                    ]);
+                }
+
                 $report->update([
                     'status' => Report::STATUS_READY_FOR_RELEASE,
                 ]);
 
-                $matchingLostReports = PotentialMatch::where('found_report_id', $report->id)
+                /*
+                |------------------------------------------------------------------
+                | IF THIS CLAIMANT OWNS A CONFIRMED MATCHED LOST REPORT,
+                | KEEP THAT LOST REPORT UNDER CLAIM REVIEW UNTIL RETURN COMPLETES.
+                |------------------------------------------------------------------
+                */
+
+                $confirmedMatches = PotentialMatch::query()
+                    ->where('found_report_id', $report->id)
+                    ->where('status', 'confirmed')
                     ->with('lostReport')
                     ->get();
 
-                foreach ($matchingLostReports as $match) {
-                    if ($match->lostReport && $match->lostReport->type === Report::TYPE_LOST) {
+                foreach ($confirmedMatches as $match) {
+                    if (
+                        $match->lostReport &&
+                        $match->lostReport->type === Report::TYPE_LOST &&
+                        (int) $match->lostReport->student_id ===
+                            (int) $claim->claimant_student_id
+                    ) {
                         $match->lostReport->update([
                             'status' => Report::STATUS_UNDER_CLAIM_REVIEW,
                         ]);
                     }
                 }
 
-                $release = ItemRelease::where('report_id', $report->id)
+                $release = ItemRelease::query()
+                    ->where('report_id', $report->id)
                     ->where('claimant_student_id', $claim->claimant_student_id)
                     ->whereIn('status', [
                         'pending',
@@ -2812,7 +5032,7 @@ class AdminWorkflowController extends Controller
                         'report_id' => $report->id,
                         'claimant_student_id' => $claim->claimant_student_id,
                         'approved_by_admin_id' => $admin->id,
-                        'release_code' => Str::uuid(),
+                        'release_code' => (string) Str::uuid(),
                         'status' => 'pending',
                         'checklist' => [
                             'claim_approved' => true,
@@ -2825,11 +5045,11 @@ class AdminWorkflowController extends Controller
                     ]);
                 }
 
-                Notification::create([
+                $this->createStudentNotification([
                     'student_id' => $claim->claimant_student_id,
                     'type' => 'claim_approved',
-                    'title' => 'Claim Approved',
-                    'message' => "USC approved your ownership claim for '{$report->title}'. The item is ready for release at the USC office.",
+                    'title' => 'Ownership Claim Approved',
+                    'message' => "USC approved your ownership claim for '{$report->title}'. Please proceed to the USC office for the physical release process.",
                     'action' => 'claim_approved',
                     'status' => 'pending',
                     'recipient_id' => $claim->claimant_student_id,
@@ -2838,7 +5058,9 @@ class AdminWorkflowController extends Controller
                     'subject_id' => $claim->id,
                     'data' => [
                         'report_id' => $report->id,
+                        'claim_id' => $claim->id,
                         'release_id' => $release->id,
+                        'release_code' => $release->release_code,
                     ],
                     'is_read' => false,
                 ]);
@@ -2853,18 +5075,21 @@ class AdminWorkflowController extends Controller
                         'report_id' => $report->id,
                         'claimant_student_id' => $claim->claimant_student_id,
                         'release_id' => $release->id,
+                        'competing_claims_closed' => $competingClaims->count(),
                     ],
                     $request->ip()
                 );
 
                 return response()->json([
                     'status' => 'success',
-                    'message' => 'Claim approved successfully. The item is ready for release.',
+                    'message' => 'Claim approved. The item has moved to the Item Release workflow.',
                     'data' => $claim->fresh([
-                        'report',
+                        'report.images',
+                        'report.categoryRelation',
                         'claimantStudent',
                         'reviewedByAdmin',
                     ]),
+                    'release' => $release,
                 ]);
             });
         } catch (\Throwable $exception) {
@@ -2874,6 +5099,7 @@ class AdminWorkflowController extends Controller
             ], 422);
         }
     }
+
 
     public function rejectClaim(Request $request, $id)
     {
@@ -2906,27 +5132,57 @@ class AdminWorkflowController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
+                if ($report->type !== Report::TYPE_FOUND) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Only found-item ownership claims can be rejected here.',
+                    ], 422);
+                }
+
                 $claim->update([
                     'review_status' => 'rejected',
-                    'notes' => $validated['notes'],
+                    'notes' => trim($validated['notes']),
                     'reviewed_by_admin_id' => $admin->id,
                     'reviewed_at' => Carbon::now(),
                 ]);
 
+                /*
+                |------------------------------------------------------------------
+                | KEEP UNDER_CLAIM_REVIEW IF ANOTHER ACTIVE CLAIM STILL EXISTS
+                |------------------------------------------------------------------
+                */
+
+                $anotherActiveClaimExists = ClaimReview::query()
+                    ->where('report_id', $report->id)
+                    ->where('id', '<>', $claim->id)
+                    ->whereIn('review_status', [
+                        'pending',
+                        'additional_information_required',
+                        'approved',
+                    ])
+                    ->exists();
+
                 if (
-                    $report->type === Report::TYPE_FOUND
-                    && $report->status === Report::STATUS_UNDER_CLAIM_REVIEW
+                    $report->status === Report::STATUS_UNDER_CLAIM_REVIEW &&
+                    !$anotherActiveClaimExists
                 ) {
+                    $confirmedMatchExists = PotentialMatch::query()
+                        ->where('found_report_id', $report->id)
+                        ->where('status', 'confirmed')
+                        ->exists();
+
                     $report->update([
-                        'status' => Report::STATUS_VERIFIED,
+                        'status' => $confirmedMatchExists
+                            ? Report::STATUS_POTENTIAL_MATCH_FOUND
+                            : Report::STATUS_VERIFIED,
                     ]);
                 }
 
-                Notification::create([
+                $this->createStudentNotification([
                     'student_id' => $claim->claimant_student_id,
                     'type' => 'claim_rejected',
-                    'title' => 'Claim Rejected',
-                    'message' => "USC rejected your claim for '{$report->title}'.",
+                    'title' => 'Ownership Claim Rejected',
+                    'message' => "USC rejected your ownership claim for '{$report->title}'.",
                     'action' => 'claim_rejected',
                     'status' => 'pending',
                     'recipient_id' => $claim->claimant_student_id,
@@ -2934,7 +5190,8 @@ class AdminWorkflowController extends Controller
                     'subject_type' => ClaimReview::class,
                     'subject_id' => $claim->id,
                     'data' => [
-                        'notes' => $validated['notes'],
+                        'report_id' => $report->id,
+                        'notes' => trim($validated['notes']),
                     ],
                     'is_read' => false,
                 ]);
@@ -2948,7 +5205,7 @@ class AdminWorkflowController extends Controller
                     [
                         'report_id' => $claim->report_id,
                         'claimant_student_id' => $claim->claimant_student_id,
-                        'notes' => $validated['notes'],
+                        'notes' => trim($validated['notes']),
                     ],
                     $request->ip()
                 );
@@ -2957,7 +5214,8 @@ class AdminWorkflowController extends Controller
                     'status' => 'success',
                     'message' => 'Claim rejected successfully.',
                     'data' => $claim->fresh([
-                        'report',
+                        'report.images',
+                        'report.categoryRelation',
                         'claimantStudent',
                         'reviewedByAdmin',
                     ]),
@@ -2970,6 +5228,7 @@ class AdminWorkflowController extends Controller
             ], 422);
         }
     }
+
 
     public function requestClaimInformation(Request $request, $id)
     {
@@ -2997,18 +5256,50 @@ class AdminWorkflowController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
+                $report = $claim
+                    ->report()
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if (
+                    $report->type !== Report::TYPE_FOUND ||
+                    $report->status === Report::STATUS_READY_FOR_RELEASE ||
+                    in_array(
+                        $report->status,
+                        [
+                            Report::STATUS_COMPLETED_RETURN,
+                            Report::STATUS_ARCHIVED,
+                            Report::STATUS_REJECTED,
+                        ],
+                        true
+                    )
+                ) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'This claim can no longer request additional ownership proof.',
+                    ], 422);
+                }
+
+                $notes = trim($validated['notes']);
+
                 $claim->update([
                     'review_status' => 'additional_information_required',
-                    'notes' => $validated['notes'],
+                    'notes' => $notes,
                     'reviewed_by_admin_id' => $admin->id,
                     'reviewed_at' => Carbon::now(),
                 ]);
 
-                Notification::create([
+                if ($report->status !== Report::STATUS_UNDER_CLAIM_REVIEW) {
+                    $report->update([
+                        'status' => Report::STATUS_UNDER_CLAIM_REVIEW,
+                    ]);
+                }
+
+                $this->createStudentNotification([
                     'student_id' => $claim->claimant_student_id,
                     'type' => 'claim_information_requested',
-                    'title' => 'More Claim Information Needed',
-                    'message' => "USC requested more proof for your claim on '{$claim->report?->title}'.",
+                    'title' => 'More Ownership Proof Needed',
+                    'message' => "USC requested additional proof for your claim on '{$report->title}': {$notes}",
                     'action' => 'claim_information_requested',
                     'status' => 'pending',
                     'recipient_id' => $claim->claimant_student_id,
@@ -3016,7 +5307,9 @@ class AdminWorkflowController extends Controller
                     'subject_type' => ClaimReview::class,
                     'subject_id' => $claim->id,
                     'data' => [
-                        'notes' => $validated['notes'],
+                        'report_id' => $report->id,
+                        'claim_id' => $claim->id,
+                        'notes' => $notes,
                     ],
                     'is_read' => false,
                 ]);
@@ -3030,16 +5323,17 @@ class AdminWorkflowController extends Controller
                     [
                         'report_id' => $claim->report_id,
                         'claimant_student_id' => $claim->claimant_student_id,
-                        'notes' => $validated['notes'],
+                        'notes' => $notes,
                     ],
                     $request->ip()
                 );
 
                 return response()->json([
                     'status' => 'success',
-                    'message' => 'Claim information requested.',
+                    'message' => 'Additional claim information requested from the claimant.',
                     'data' => $claim->fresh([
-                        'report',
+                        'report.images',
+                        'report.categoryRelation',
                         'claimantStudent',
                         'reviewedByAdmin',
                     ]),
@@ -3053,9 +5347,11 @@ class AdminWorkflowController extends Controller
         }
     }
 
+
     public function completeItemRelease(Request $request, $id)
     {
-        $admin = Auth::guard('admin')->user();
+        $admin =
+            Auth::guard('admin')->user();
 
         if (!$admin) {
             return response()->json([
@@ -3065,233 +5361,887 @@ class AdminWorkflowController extends Controller
         }
 
         try {
-            return DB::transaction(function () use ($request, $id, $admin) {
-                $release = ItemRelease::query()
-                    ->where('id', $id)
-                    ->whereIn('status', [
-                        'pending',
-                        'approved',
-                    ])
-                    ->lockForUpdate()
-                    ->firstOrFail();
+            return DB::transaction(
+                function () use (
+                    $request,
+                    $id,
+                    $admin
+                ) {
+                    /*
+                    |--------------------------------------------------------------------------
+                    | RELEASE MUST BE FULLY APPROVED FIRST
+                    |--------------------------------------------------------------------------
+                    */
 
-                $requiredChecklist = [
-                    'claim_approved',
-                    'claimant_identity_checked',
-                    'ownership_proof_confirmed',
-                    'physical_item_condition_checked',
-                    'claimant_acknowledgment_completed',
-                ];
+                    $release =
+                        ItemRelease::query()
+                            ->where(
+                                'id',
+                                $id
+                            )
+                            ->where(
+                                'status',
+                                ItemRelease::STATUS_APPROVED
+                            )
+                            ->lockForUpdate()
+                            ->firstOrFail();
 
-                $checklist = $release->checklist ?? [];
-
-                foreach ($requiredChecklist as $key) {
-                    if (!($checklist[$key] ?? false)) {
+                    if (
+                        !$release
+                            ->hasCompletedChecklist()
+                    ) {
                         return response()->json([
                             'status' => 'error',
-                            'message' => 'All release checklist items must be completed before return completion.',
+                            'message' =>
+                                'All release checklist items must be completed before the item can be returned.',
                         ], 422);
                     }
-                }
 
-                $claim = ClaimReview::where('report_id', $release->report_id)
-                    ->where('claimant_student_id', $release->claimant_student_id)
-                    ->where('review_status', 'approved')
-                    ->lockForUpdate()
-                    ->firstOrFail();
+                    /*
+                    |--------------------------------------------------------------------------
+                    | APPROVED CLAIM
+                    |--------------------------------------------------------------------------
+                    */
 
-                $report = $release
-                    ->report()
-                    ->lockForUpdate()
-                    ->firstOrFail();
+                    $claim =
+                        ClaimReview::query()
+                            ->where(
+                                'report_id',
+                                $release->report_id
+                            )
+                            ->where(
+                                'claimant_student_id',
+                                $release->claimant_student_id
+                            )
+                            ->where(
+                                'review_status',
+                                ClaimReview::STATUS_APPROVED
+                            )
+                            ->lockForUpdate()
+                            ->firstOrFail();
 
-                $finder = $report->student;
+                    /*
+                    |--------------------------------------------------------------------------
+                    | FOUND REPORT MUST BE READY FOR RELEASE
+                    |--------------------------------------------------------------------------
+                    */
 
-                $release->update([
-                    'status' => 'released',
-                    'approved_by_admin_id' => $admin->id,
-                    'released_at' => Carbon::now(),
-                ]);
+                    $report =
+                        $release
+                            ->report()
+                            ->lockForUpdate()
+                            ->firstOrFail();
 
-                $claim->update([
-                    'review_status' => 'completed',
-                ]);
-
-                $report->update([
-                    'status' => Report::STATUS_COMPLETED_RETURN,
-                    'completed_at' => Carbon::now(),
-                    'published_at' => null,
-                ]);
-
-                VisiblePostedItem::where('report_id', $report->id)->delete();
-
-                /*
-                |------------------------------------------------------------------
-                | RECOGNITION POINTS
-                |------------------------------------------------------------------
-                | Award category points only after successful completed return.
-                | Any old early-award transactions are deducted from the final award
-                | so legacy data does not receive duplicate points.
-                */
-
-                $pointRule = PointRule::query()
-                    ->where(function ($query) use ($report) {
-                        if ($report->category_id) {
-                            $query->where('category_id', $report->category_id);
-                        } else {
-                            $query
-                                ->where('category_name', $report->category)
-                                ->orWhere('item_category', $report->category);
-                        }
-                    })
-                    ->latest('id')
-                    ->first();
-
-                $legacyPublishedAwardPoints = $finder
-                    ? (int) PointTransaction::where('student_id', $finder->id)
-                        ->where('reference_type', SurrenderRequest::class)
-                        ->whereIn(
-                            'reference_id',
-                            SurrenderRequest::where('report_id', $report->id)->select('id')
-                        )
-                        ->where('type', 'found_item_published')
-                        ->sum('points')
-                    : 0;
-
-                $baseReturnPoints = $pointRule
-                    ? (int) $pointRule->base_points
-                    : 5;
-
-                $remainingReturnPoints = max(
-                    0,
-                    $baseReturnPoints - $legacyPublishedAwardPoints
-                );
-
-                if ($finder && $remainingReturnPoints > 0) {
-                    $existingTransaction = PointTransaction::where('reference_type', ItemRelease::class)
-                        ->where('reference_id', $release->id)
-                        ->where('student_id', $finder->id)
-                        ->where('type', 'return_completion')
-                        ->exists();
-
-                    if (!$existingTransaction) {
-                        PointTransaction::create([
-                            'student_id' => $finder->id,
-                            'amount' => round($remainingReturnPoints / self::POINTS_PER_PESO, 2),
-                            'points' => $remainingReturnPoints,
-                            'type' => 'return_completion',
-                            'direction' => 'credit',
-                            'description' => 'Recognition points awarded after successful completed return.',
-                            'reference_type' => ItemRelease::class,
-                            'reference_id' => $release->id,
-                            'created_by_admin_id' => $admin->id,
-                            'processed_by_admin_id' => $admin->id,
-                        ]);
+                    if (
+                        $report->type !==
+                            Report::TYPE_FOUND ||
+                        $report->status !==
+                            Report::STATUS_READY_FOR_RELEASE
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'This found item is not in the Ready for Release stage.',
+                        ], 422);
                     }
 
-                    $totalPoints = (int) PointTransaction::where('student_id', $finder->id)->sum('points');
+                    $finder =
+                        $report->student;
 
-                    StudentRecognitionRecord::updateOrCreate(
-                        ['student_id' => $finder->id],
-                        [
-                            'recognition_points' => $totalPoints,
-                            'peso_value' => round($totalPoints / self::POINTS_PER_PESO, 2),
-                            'reward_count' => (int) ($finder->reward_count ?? 0),
-                            'report_count' => $finder->reports()->count(),
-                        ]
+                    $completedAt =
+                        Carbon::now();
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | PHYSICAL HANDOVER
+                    |--------------------------------------------------------------------------
+                    |
+                    | Claim status sequence:
+                    |
+                    | approved -> item_released -> completed
+                    |
+                    | The two final transitions happen in the same protected database
+                    | transaction because "Complete Item Return" represents the USC
+                    | administrator confirming the physical handover and completing
+                    | the transaction.
+                    |
+                    */
+
+                    $release->markAsReleased(
+                        $admin->id
                     );
-                }
 
-                $matchingLostReports = PotentialMatch::where('found_report_id', $report->id)
-                    ->with('lostReport')
-                    ->get();
+                    $claim->markItemReleased(
+                        $admin->id
+                    );
 
-                foreach ($matchingLostReports as $match) {
-                    if ($match->lostReport && $match->lostReport->type === Report::TYPE_LOST) {
-                        $match->lostReport->update([
-                            'status' => Report::STATUS_COMPLETED_RETURN,
-                            'completed_at' => Carbon::now(),
-                            'published_at' => null,
+                    /*
+                    |--------------------------------------------------------------------------
+                    | FOUND REPORT = COMPLETED RETURN
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $report->update([
+                        'status' =>
+                            Report::STATUS_COMPLETED_RETURN,
+
+                        'completed_at' =>
+                            $completedAt,
+
+                        'archived_at' =>
+                            $completedAt,
+
+                        'published_at' =>
+                            null,
+                    ]);
+
+                    VisiblePostedItem::where(
+                        'report_id',
+                        $report->id
+                    )->delete();
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | COMPLETE ONLY THE CLAIMANT'S CONFIRMED MATCHED LOST REPORT
+                    |--------------------------------------------------------------------------
+                    |
+                    | Do not complete every Lost report that happened to be suggested
+                    | against this Found item. Only a confirmed potential match that
+                    | belongs to the approved claimant may be completed.
+                    |
+                    */
+
+                    $completedLostReportIds = [];
+
+                    $confirmedMatches =
+                        PotentialMatch::query()
+                            ->where(
+                                'found_report_id',
+                                $report->id
+                            )
+                            ->where(
+                                'status',
+                                'confirmed'
+                            )
+                            ->with(
+                                'lostReport'
+                            )
+                            ->get();
+
+                    foreach (
+                        $confirmedMatches
+                        as $match
+                    ) {
+                        $lostReport =
+                            $match->lostReport;
+
+                        if (
+                            !$lostReport ||
+                            $lostReport->type !==
+                                Report::TYPE_LOST ||
+                            (int)
+                            $lostReport->student_id !==
+                                (int)
+                                $claim->claimant_student_id
+                        ) {
+                            continue;
+                        }
+
+                        $lostReport->update([
+                            'status' =>
+                                Report::STATUS_COMPLETED_RETURN,
+
+                            'completed_at' =>
+                                $completedAt,
+
+                            'archived_at' =>
+                                $completedAt,
+
+                            'published_at' =>
+                                null,
                         ]);
 
-                        VisiblePostedItem::where('report_id', $match->lostReport->id)->delete();
+                        VisiblePostedItem::where(
+                            'report_id',
+                            $lostReport->id
+                        )->delete();
+
+                        $this->syncArchiveRecord(
+                            $lostReport,
+                            'completed',
+                            'Lost report completed after the verified matching found item was returned to its owner.'
+                        );
+
+                        $completedLostReportIds[] =
+                            $lostReport->id;
                     }
-                }
 
-                $this->syncArchiveRecord(
-                    $report,
-                    'completed',
-                    'Item successfully returned to verified claimant.'
-                );
+                    /*
+                    |--------------------------------------------------------------------------
+                    | TRANSFER THE FOUND REPORT TO THE ADMIN ARCHIVE
+                    |--------------------------------------------------------------------------
+                    |
+                    | The source report keeps the official completed_return status for
+                    | workflow history, while ArchiveItem stores the archived record.
+                    |
+                    */
 
-                Notification::create([
-                    'student_id' => $finder?->id,
-                    'type' => 'return_completed',
-                    'title' => 'Item Return Completed',
-                    'message' => "USC completed the return of your found item '{$report->title}'. You received {$remainingReturnPoints} recognition point(s).",
-                    'action' => 'return_completed',
-                    'status' => 'pending',
-                    'recipient_id' => $finder?->id,
-                    'recipient_role' => 'student',
-                    'subject_type' => ItemRelease::class,
-                    'subject_id' => $release->id,
-                    'data' => [
-                        'points_awarded' => $remainingReturnPoints,
-                        'report_id' => $report->id,
-                    ],
-                    'is_read' => false,
-                ]);
+                    $this->syncArchiveRecord(
+                        $report,
+                        'completed',
+                        'Item successfully returned to the verified claimant.'
+                    );
 
-                if ($claim->claimant_student_id) {
-                    Notification::create([
-                        'student_id' => $claim->claimant_student_id,
-                        'type' => 'claim_return_completed',
-                        'title' => 'Item Return Completed',
-                        'message' => "USC completed your item release for '{$report->title}'.",
-                        'action' => 'claim_return_completed',
-                        'status' => 'pending',
-                        'recipient_id' => $claim->claimant_student_id,
-                        'recipient_role' => 'student',
-                        'subject_type' => ItemRelease::class,
-                        'subject_id' => $release->id,
-                        'is_read' => false,
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CLAIM TRANSACTION COMPLETE
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $claim->complete(
+                        $admin->id
+                    );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | FINAL CATEGORY-BASED RECOGNITION POINTS
+                    |--------------------------------------------------------------------------
+                    |
+                    | First installment was credited at verified publication.
+                    | This action credits only the remainder of that category reward.
+                    |
+                    */
+
+                    $recognitionAward =
+                        $this->awardCompletedReturnRecognitionPoints(
+                            $finder,
+                            $report,
+                            $release,
+                            $admin
+                        );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | NOTIFICATIONS
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if ($finder?->id) {
+                        $this->createStudentNotification([
+                            'student_id' =>
+                                $finder->id,
+
+                            'type' =>
+                                'return_completed',
+
+                            'title' =>
+                                'Successful Item Return',
+
+                            'message' =>
+                                "USC completed the return of your found item '{$report->title}' to its verified owner.",
+
+                            'action' =>
+                                'return_completed',
+
+                            'status' =>
+                                'pending',
+
+                            'recipient_id' =>
+                                $finder->id,
+
+                            'recipient_role' =>
+                                'student',
+
+                            'subject_type' =>
+                                ItemRelease::class,
+
+                            'subject_id' =>
+                                $release->id,
+
+                            'data' => [
+                                'report_id' =>
+                                    $report->id,
+
+                                'release_id' =>
+                                    $release->id,
+
+                                'recognition_points_pending' =>
+                                    false,
+
+                                'points_awarded' =>
+                                    $recognitionAward['awarded'],
+
+                                'recognition_points_balance' =>
+                                    $recognitionAward['balance'],
+                            ],
+
+                            'is_read' =>
+                                false,
+                        ]);
+                    }
+
+                    if (
+                        $claim
+                            ->claimant_student_id
+                    ) {
+                        $this->createStudentNotification([
+                            'student_id' =>
+                                $claim
+                                    ->claimant_student_id,
+
+                            'type' =>
+                                'claim_return_completed',
+
+                            'title' =>
+                                'Item Return Completed',
+
+                            'message' =>
+                                "USC completed your item release for '{$report->title}'. The return transaction is now complete.",
+
+                            'action' =>
+                                'claim_return_completed',
+
+                            'status' =>
+                                'pending',
+
+                            'recipient_id' =>
+                                $claim
+                                    ->claimant_student_id,
+
+                            'recipient_role' =>
+                                'student',
+
+                            'subject_type' =>
+                                ItemRelease::class,
+
+                            'subject_id' =>
+                                $release->id,
+
+                            'data' => [
+                                'report_id' =>
+                                    $report->id,
+
+                                'claim_id' =>
+                                    $claim->id,
+
+                                'release_id' =>
+                                    $release->id,
+
+                                'matched_lost_report_ids' =>
+                                    $completedLostReportIds,
+                            ],
+
+                            'is_read' =>
+                                false,
+                        ]);
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | AUDIT LOG
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $this->recordAuditLog(
+                        $admin,
+                        'release_completed',
+                        ItemRelease::class,
+                        $release->id,
+                        'Item Release',
+                        [
+                            'report_id' =>
+                                $report->id,
+
+                            'claim_id' =>
+                                $claim->id,
+
+                            'claimant_student_id' =>
+                                $claim
+                                    ->claimant_student_id,
+
+                            'finder_student_id' =>
+                                $finder?->id,
+
+                            'released_at' =>
+                                $release
+                                    ->fresh()
+                                    ->released_at
+                                    ?->toDateTimeString(),
+
+                            'claim_status_sequence' => [
+                                ClaimReview::STATUS_ITEM_RELEASED,
+                                ClaimReview::STATUS_COMPLETED,
+                            ],
+
+                            'completed_lost_report_ids' =>
+                                $completedLostReportIds,
+
+                            'recognition_points_awarded' =>
+                                $recognitionAward['awarded'],
+
+                            'recognition_points_balance' =>
+                                $recognitionAward['balance'],
+                        ],
+                        $request->ip()
+                    );
+
+                    return response()->json([
+                        'status' =>
+                            'success',
+
+                        'message' =>
+                            'Item return completed successfully. The reports were removed from active listings and transferred to the archive.',
+
+                        'data' =>
+                            $release->fresh([
+                                'report.student',
+                                'report.images',
+                                'report.categoryRelation',
+                                'claimantStudent',
+                                'approvedByAdmin',
+                            ]),
+
+                        'claim_status' =>
+                            ClaimReview::STATUS_COMPLETED,
+
+                        'report_status' =>
+                            Report::STATUS_COMPLETED_RETURN,
+
+                        'completed_lost_report_ids' =>
+                            $completedLostReportIds,
+
+                        'recognition_points_awarded' =>
+                            $recognitionAward['awarded'],
+
+                        'recognition_points_balance' =>
+                            $recognitionAward['balance'],
                     ]);
                 }
-
-                $this->recordAuditLog(
-                    $admin,
-                    'release_completed',
-                    ItemRelease::class,
-                    $release->id,
-                    'Item Release',
-                    [
-                        'report_id' => $report->id,
-                        'claim_id' => $claim->id,
-                        'claimant_student_id' => $claim->claimant_student_id,
-                        'finder_student_id' => $finder?->id,
-                        'released_at' => $release->released_at?->toDateTimeString(),
-                        'points_awarded' => $remainingReturnPoints,
-                    ],
-                    $request->ip()
-                );
-
-                return response()->json([
-                    'status' => 'success',
-                    'message' => 'Item release completed successfully.',
-                    'data' => $release->fresh([
-                        'report',
-                        'claimantStudent',
-                        'approvedByAdmin',
-                    ]),
-                ]);
-            });
+            );
         } catch (\Throwable $exception) {
+            Log::error(
+                'Complete item release failed',
+                [
+                    'release_id' =>
+                        $id,
+
+                    'message' =>
+                        $exception
+                            ->getMessage(),
+                ]
+            );
+
             return response()->json([
-                'status' => 'error',
-                'message' => $exception->getMessage(),
+                'status' =>
+                    'error',
+
+                'message' =>
+                    $exception
+                        ->getMessage(),
             ], 422);
         }
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESOLVE PREDEFINED RETURN POINTS FOR AN ITEM CATEGORY
+    |--------------------------------------------------------------------------
+    |
+    | Admin Point Rules are the only source of truth for Base Points.
+    | No static fallback points apply to new reward transactions.
+    |
+    */
+
+    /**
+     * Admin-only first installment, called inside a transaction with the
+     * found Report locked FOR UPDATE. The unique reference_key also protects
+     * against duplicate awards across retries and concurrent requests.
+     *
+     * The Base Points value is snapshotted in notes at publication. Later
+     * changes to Admin Point Rules affect only reports not yet rewarded.
+     */
+    private function awardFoundPublicationRecognitionPoints(Report $report, Admin $admin): array
+    {
+        if (
+            $report->type !== Report::TYPE_FOUND ||
+            $report->status !== Report::STATUS_VERIFIED ||
+            !$report->published_at ||
+            !VisiblePostedItem::query()
+                ->where('report_id', $report->id)
+                ->where('is_visible', true)
+                ->exists()
+        ) {
+            return ['awarded' => 0, 'balance' => null, 'reason' => 'not_published'];
+        }
+
+        $finder = $report->student;
+        if (!$finder) {
+            return ['awarded' => 0, 'balance' => null, 'reason' => 'no_finder'];
+        }
+
+        // Synchronize every ledger mutation against the same student row.
+        Student::query()->whereKey($finder->id)->lockForUpdate()->firstOrFail();
+        $referenceKey = 'findit:found:published:' . $report->id;
+
+        $existing = PointTransaction::query()
+            ->where('reference_key', $referenceKey)
+            ->orWhere(function ($query) use ($finder, $report) {
+                // Recognize an installment issued by the previous controller.
+                $query->where('student_id', $finder->id)
+                    ->where('type', 'found_publication')
+                    ->where('reference_type', Report::class)
+                    ->where('reference_id', $report->id);
+            })
+            ->first();
+
+        if ($existing) {
+            return [
+                'awarded' => 0,
+                'balance' => $this->currentRecognitionBalance($finder->id),
+                'reason' => 'already_awarded',
+            ];
+        }
+
+        $total = $this->resolveCompletedReturnPoints($report);
+        if ($total === null) {
+            // A missing/inactive category rule must not be replaced by an
+            // invented default value such as 5, 10, or 100 points.
+            return [
+                'awarded' => 0,
+                'balance' => $this->currentRecognitionBalance($finder->id),
+                'reason' => 'no_active_point_rule',
+            ];
+        }
+
+        // Whole-number policy: 15 Base Points => 7 at publication + 8 on return.
+        $firstInstallment = intdiv($total, 2);
+        $time = now();
+        DB::table('point_transactions')->insert([
+            'student_id' => $finder->id,
+            'type' => 'found_publication',
+            'direction' => 'credit',
+            'points' => $firstInstallment,
+            'amount' => round($firstInstallment / self::POINTS_PER_PESO, 2),
+            'description' => 'First half of admin category Base Points after USC verified and published the found item.',
+            'notes' => 'configured_total=' . $total . '; category_id=' . (int) $report->category_id,
+            'reference_key' => $referenceKey,
+            'reference_type' => Report::class,
+            'reference_id' => $report->id,
+            'created_by_admin_id' => $admin->id,
+            'processed_by_admin_id' => $admin->id,
+            'created_at' => $time,
+            'updated_at' => $time,
+        ]);
+
+        $balance = $this->syncFinderRecognitionBalance($finder);
+        if ($firstInstallment > 0) {
+            $this->createStudentNotification([
+                'student_id' => $finder->id,
+                'type' => 'recognition_points_awarded',
+                'title' => 'Found Item Published — First Reward',
+                'message' => "You earned {$firstInstallment} recognition points for the verified publication of '{$report->title}'. The remaining points are awarded after USC confirms its return to the owner.",
+                'action' => 'recognition_points_awarded',
+                'status' => 'pending',
+                'recipient_id' => $finder->id,
+                'recipient_role' => 'student',
+                'subject_type' => Report::class,
+                'subject_id' => $report->id,
+                'data' => [
+                    'report_id' => $report->id,
+                    'award_type' => 'found_publication',
+                    'points_awarded' => $firstInstallment,
+                    'configured_category_reward' => $total,
+                    'remaining_reward_points' => $total - $firstInstallment,
+                    'recognition_points_balance' => $balance,
+                ],
+                'is_read' => false,
+            ]);
+        }
+
+        return [
+            'awarded' => $firstInstallment,
+            'balance' => $balance,
+            'configured_category_reward' => $total,
+            'remaining_reward_points' => $total - $firstInstallment,
+        ];
+    }
+
+    /** Signed point ledger (credits positive; approved fine conversions negative). */
+    private function currentRecognitionBalance(int $studentId): int
+    {
+        return max(0, (int) PointTransaction::query()
+            ->where('student_id', $studentId)->sum('points'));
+    }
+
+    private function syncFinderRecognitionBalance(Student $finder): int
+    {
+        $balance = $this->currentRecognitionBalance($finder->id);
+        StudentRecognitionRecord::updateOrCreate(
+            ['student_id' => $finder->id],
+            [
+                'recognition_points' => $balance,
+                'peso_value' => round($balance / self::POINTS_PER_PESO, 2),
+                'reward_count' => (int) ($finder->reward_count ?? 0),
+                'report_count' => $finder->reports()->count(),
+            ]
+        );
+        return $balance;
+    }
+
+    /**
+     * Lookup ONLY the matching, active admin category rule. Returns null if
+     * there is no configured rule; zero is a valid admin-defined Base Points.
+     */
+    private function resolveCompletedReturnPoints(Report $report): ?int
+    {
+        if (!Schema::hasTable('point_rules')) {
+            return null;
+        }
+
+        $newQuery = function () {
+            $query = PointRule::query();
+            if (Schema::hasColumn('point_rules', 'is_active')) {
+                $query->where('is_active', true);
+            } elseif (Schema::hasColumn('point_rules', 'active')) {
+                $query->where('active', true);
+            }
+            return $query;
+        };
+
+        $pointRule = null;
+        if ($report->category_id && Schema::hasColumn('point_rules', 'category_id')) {
+            $pointRule = $newQuery()
+                ->where('category_id', $report->category_id)
+                ->latest('id')->first();
+        }
+
+        // Older reports may store only the category name.
+        $categoryName = trim((string) ($report->category ?: $report->categoryRelation?->name ?: ''));
+        if (!$pointRule && $categoryName !== '') {
+            foreach (['category_name', 'item_category'] as $column) {
+                if (!Schema::hasColumn('point_rules', $column)) {
+                    continue;
+                }
+                $pointRule = $newQuery()
+                    ->whereRaw('LOWER(' . $column . ') = ?', [Str::lower($categoryName)])
+                    ->latest('id')->first();
+                if ($pointRule) {
+                    break;
+                }
+            }
+        }
+
+        return $pointRule ? max(0, (int) $pointRule->base_points) : null;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AWARD COMPLETED-RETURN RECOGNITION POINTS
+    |--------------------------------------------------------------------------
+    */
+
+    private function awardCompletedReturnRecognitionPoints(
+        ?Student $finder,
+        Report $report,
+        ItemRelease $release,
+        Admin $admin
+    ): array {
+        if (!$finder || $report->type !== Report::TYPE_FOUND ||
+            $report->status !== Report::STATUS_COMPLETED_RETURN) {
+            return ['awarded' => 0, 'balance' => 0, 'reason' => 'not_completed'];
+        }
+
+        Student::query()->whereKey($finder->id)->lockForUpdate()->firstOrFail();
+
+        // The unique key is based on the FOUND REPORT, not the release ID.
+        // Even if someone creates a second release row, no double payment occurs.
+        $referenceKey = 'findit:found:returned:' . $report->id;
+        $existing = PointTransaction::query()
+            ->where('reference_key', $referenceKey)
+            ->orWhere(function ($query) use ($finder, $release) {
+                $query->where('student_id', $finder->id)
+                    ->where('type', 'return_completion')
+                    ->where('reference_type', ItemRelease::class)
+                    ->where('reference_id', $release->id);
+            })
+            ->first();
+
+        if ($existing) {
+            return [
+                'awarded' => 0,
+                'balance' => $this->currentRecognitionBalance($finder->id),
+                'reason' => 'already_awarded',
+            ];
+        }
+
+        $publication = PointTransaction::query()
+            ->where('reference_key', 'findit:found:published:' . $report->id)
+            ->orWhere(function ($query) use ($finder, $report) {
+                $query->where('student_id', $finder->id)
+                    ->where('type', 'found_publication')
+                    ->where('reference_type', Report::class)
+                    ->where('reference_id', $report->id);
+            })
+            ->first();
+
+        // No retrospective / free-standing final payouts. Reports published
+        // before this two-stage workflow remain untouched for manual review.
+        if (!$publication ||
+            !preg_match('/configured_total=(\d+)/', (string) $publication->notes, $matches)) {
+            return [
+                'awarded' => 0,
+                'balance' => $this->currentRecognitionBalance($finder->id),
+                'reason' => 'publication_snapshot_missing',
+            ];
+        }
+
+        $total = max(0, (int) $matches[1]);
+        $first = max(0, (int) $publication->points);
+        $remaining = max(0, $total - $first);
+        $time = now();
+
+        // Record even a zero remaining installment to lock the stage forever.
+        DB::table('point_transactions')->insert([
+            'student_id' => $finder->id,
+            'type' => 'return_completion',
+            'direction' => 'credit',
+            'points' => $remaining,
+            'amount' => round($remaining / self::POINTS_PER_PESO, 2),
+            'description' => 'Remaining admin category Base Points after USC confirmed the item returned to its owner.',
+            'notes' => 'configured_total=' . $total . '; publication_points=' . $first . '; report_id=' . $report->id,
+            'reference_key' => $referenceKey,
+            'reference_type' => ItemRelease::class,
+            'reference_id' => $release->id,
+            'created_by_admin_id' => $admin->id,
+            'processed_by_admin_id' => $admin->id,
+            'created_at' => $time,
+            'updated_at' => $time,
+        ]);
+
+        $balance = $this->syncFinderRecognitionBalance($finder);
+        if ($remaining > 0) {
+            $this->createStudentNotification([
+                'student_id' => $finder->id,
+                'type' => 'recognition_points_awarded',
+                'title' => 'Item Returned — Final Reward',
+                'message' => "USC confirmed the return of '{$report->title}'. You received your final {$remaining} points (total category reward: {$total}).",
+                'action' => 'recognition_points_awarded',
+                'status' => 'pending',
+                'recipient_id' => $finder->id,
+                'recipient_role' => 'student',
+                'subject_type' => ItemRelease::class,
+                'subject_id' => $release->id,
+                'data' => [
+                    'report_id' => $report->id,
+                    'release_id' => $release->id,
+                    'award_type' => 'return_completion',
+                    'points_awarded' => $remaining,
+                    'configured_category_reward' => $total,
+                    'recognition_points_balance' => $balance,
+                ],
+                'is_read' => false,
+            ]);
+        }
+
+        return [
+            'awarded' => $remaining,
+            'balance' => $balance,
+            'configured_category_reward' => $total,
+        ];
+    }
+
+
+    private function createStudentNotification(
+        array $payload
+    ) {
+        $notification =
+            Notification::create(
+                $payload
+            );
+
+        $studentId =
+            (int)
+            (
+                $payload[
+                    'student_id'
+                ]
+                ??
+                $payload[
+                    'recipient_id'
+                ]
+                ??
+                0
+            );
+
+        if ($studentId > 0) {
+            try {
+                app(
+                    PushNotificationService::class
+                )->sendToStudent(
+                    $studentId,
+
+                    (string)
+                    (
+                        $payload[
+                            'title'
+                        ]
+                        ??
+                        'FindIt'
+                    ),
+
+                    (string)
+                    (
+                        $payload[
+                            'message'
+                        ]
+                        ??
+                        ''
+                    ),
+
+                    array_merge(
+                        is_array(
+                            $payload[
+                                'data'
+                            ]
+                            ??
+                            null
+                        )
+                            ? $payload[
+                                'data'
+                            ]
+                            : [],
+                        [
+                            'notification_id' =>
+                                $notification->id,
+
+                            'type' =>
+                                $payload[
+                                    'type'
+                                ]
+                                ??
+                                null,
+
+                            'action' =>
+                                $payload[
+                                    'action'
+                                ]
+                                ??
+                                null,
+                        ]
+                    )
+                );
+            } catch (
+                \Throwable $exception
+            ) {
+                report(
+                    $exception
+                );
+            }
+        }
+
+        return $notification;
+    }
+
 
     private function recordAuditLog(
         $admin,
@@ -3353,7 +6303,8 @@ class AdminWorkflowController extends Controller
 
     public function storeEventFineConversion(Request $request)
     {
-        $admin = Auth::guard('admin')->user();
+        $admin =
+            Auth::guard('admin')->user();
 
         if (!$admin) {
             return response()->json([
@@ -3362,50 +6313,366 @@ class AdminWorkflowController extends Controller
             ], 401);
         }
 
-        $validated = $request->validate([
-            'student_id' => 'required|exists:students,id',
-            'requested_points' => 'required|integer|min:0',
-            'review_notes' => 'sometimes|nullable|string|max:1000',
-        ]);
+        $validated =
+            $request->validate([
+                'student_id' =>
+                    'required|exists:students,id',
 
-        $student = Student::findOrFail($validated['student_id']);
-        $totalOriginalAmount = (float) EventFine::where('student_id', $student->id)->sum('original_amount');
-        $totalRemainingAmount = (float) EventFine::where('student_id', $student->id)->sum('remaining_amount');
-        $availablePoints = (int) $student->pointTransactions()->sum('points');
-        $requestedPoints = min((int) $validated['requested_points'], $availablePoints);
-        $pesoValueConverted = round(
-            min((float) $totalRemainingAmount, $requestedPoints / self::POINTS_PER_PESO),
-            2
+                'requested_points' =>
+                    'required|integer|min:1',
+
+                'review_notes' =>
+                    'sometimes|nullable|string|max:1000',
+            ]);
+
+        $student =
+            Student::findOrFail(
+                $validated['student_id']
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | ONLY ONE PENDING CONVERSION PER STUDENT
+        |--------------------------------------------------------------------------
+        */
+
+        $pendingConversion =
+            EventFineConversion::query()
+                ->where(
+                    'student_id',
+                    $student->id
+                )
+                ->where(
+                    'status',
+                    'pending'
+                )
+                ->latest('id')
+                ->first();
+
+        if ($pendingConversion) {
+            return response()->json([
+                'status' => 'error',
+
+                'message' =>
+                    'This student already has a pending event-fine conversion request.',
+
+                'data' =>
+                    $pendingConversion,
+            ], 409);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | OUTSTANDING FINES
+        |--------------------------------------------------------------------------
+        */
+
+        $activeFines =
+            EventFine::query()
+                ->where(
+                    'student_id',
+                    $student->id
+                )
+                ->whereNotIn(
+                    'status',
+                    [
+                        'paid',
+                        'rejected',
+                    ]
+                )
+                ->get();
+
+        $totalOriginalAmount =
+            (float)
+            $activeFines->sum(
+                fn ($fine) =>
+                    (float)
+                    (
+                        $fine->original_amount
+                        ??
+                        $fine->amount
+                        ??
+                        0
+                    )
+            );
+
+        $totalRemainingAmount =
+            round(
+                (float)
+                $activeFines->sum(
+                    fn ($fine) =>
+                        (float)
+                        (
+                            $fine->remaining_amount
+                            ?? 0
+                        )
+                ),
+                2
+            );
+
+        if ($totalRemainingAmount <= 0) {
+            return response()->json([
+                'status' => 'error',
+                'message' =>
+                    'This student has no outstanding USC event fine to convert.',
+            ], 422);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | CURRENT AVAILABLE RECOGNITION POINTS
+        |--------------------------------------------------------------------------
+        |
+        | Recognition credits are positive.
+        | Approved event-fine conversions are negative debit transactions.
+        |
+        */
+
+        $availablePoints =
+            max(
+                0,
+                (int)
+                PointTransaction::query()
+                    ->where(
+                        'student_id',
+                        $student->id
+                    )
+                    ->sum('points')
+            );
+
+        if ($availablePoints <= 0) {
+            return response()->json([
+                'status' => 'error',
+                'message' =>
+                    'This student does not have available recognition points.',
+            ], 422);
+        }
+
+        $requestedPoints =
+            min(
+                (int)
+                $validated['requested_points'],
+                $availablePoints
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | 100 POINTS = PHP 1.00
+        |--------------------------------------------------------------------------
+        |
+        | Preserve the conversion rate already used by this project.
+        |
+        */
+
+        $maxPointsNeededForFine =
+            (int)
+            ceil(
+                $totalRemainingAmount
+                *
+                self::POINTS_PER_PESO
+            );
+
+        $convertedPoints =
+            min(
+                $requestedPoints,
+                $maxPointsNeededForFine
+            );
+
+        if ($convertedPoints <= 0) {
+            return response()->json([
+                'status' => 'error',
+                'message' =>
+                    'No recognition points can be applied to this fine balance.',
+            ], 422);
+        }
+
+        $pesoValueConverted =
+            round(
+                min(
+                    $totalRemainingAmount,
+                    $convertedPoints
+                    /
+                    self::POINTS_PER_PESO
+                ),
+                2
+            );
+
+        $remainingBalance =
+            round(
+                max(
+                    0,
+                    $totalRemainingAmount
+                    -
+                    $pesoValueConverted
+                ),
+                2
+            );
+
+        $conversion =
+            EventFineConversion::create([
+                'student_id' =>
+                    $student->id,
+
+                /*
+                |--------------------------------------------------------------------------
+                | NULL means this request applies across the student's active fines.
+                |--------------------------------------------------------------------------
+                */
+
+                'event_fine_id' =>
+                    null,
+
+                'total_original_amount' =>
+                    $totalOriginalAmount,
+
+                'converted_points' =>
+                    $convertedPoints,
+
+                'peso_value_converted' =>
+                    $pesoValueConverted,
+
+                'remaining_balance' =>
+                    $remainingBalance,
+
+                'status' =>
+                    'pending',
+
+                'requested_points' =>
+                    $requestedPoints,
+
+                'conversion_rate' =>
+                    (float)
+                    self::POINTS_PER_PESO,
+
+                'credit_amount' =>
+                    $pesoValueConverted,
+
+                'review_notes' =>
+                    $validated[
+                        'review_notes'
+                    ]
+                    ?? null,
+
+                'reviewed_by_admin_id' =>
+                    null,
+
+                'reviewed_at' =>
+                    null,
+            ]);
+
+        $this->recordAuditLog(
+            $admin,
+            'event_fine_conversion_created',
+            EventFineConversion::class,
+            $conversion->id,
+            'Event Fine Conversion',
+            [
+                'student_id' =>
+                    $student->id,
+
+                'requested_points' =>
+                    $requestedPoints,
+
+                'converted_points' =>
+                    $convertedPoints,
+
+                'credit_amount' =>
+                    $pesoValueConverted,
+
+                'fine_balance_before' =>
+                    $totalRemainingAmount,
+
+                'fine_balance_after_if_approved' =>
+                    $remainingBalance,
+
+                'available_points_before' =>
+                    $availablePoints,
+
+                'conversion_rate' =>
+                    self::POINTS_PER_PESO,
+            ],
+            $request->ip()
         );
-        $convertedPoints = (int) round($pesoValueConverted * self::POINTS_PER_PESO);
-        $remainingBalance = max(0, $totalRemainingAmount - $pesoValueConverted);
-
-        $conversion = EventFineConversion::create([
-            'student_id' => $student->id,
-            'event_fine_id' => null,
-            'total_original_amount' => $totalOriginalAmount,
-            'converted_points' => $convertedPoints,
-            'peso_value_converted' => $pesoValueConverted,
-            'remaining_balance' => $remainingBalance,
-            'status' => 'pending',
-            'requested_points' => $requestedPoints,
-            'conversion_rate' => (float) self::POINTS_PER_PESO,
-            'credit_amount' => $pesoValueConverted,
-            'review_notes' => $validated['review_notes'] ?? null,
-            'reviewed_by_admin_id' => null,
-            'reviewed_at' => null,
-        ]);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Fine balance conversion request created.',
-            'data' => $conversion,
-        ]);
+
+            'message' =>
+                'Fine balance conversion request created and is waiting for USC approval.',
+
+            'data' => [
+                'conversion' =>
+                    $conversion,
+
+                'summary' => [
+                    'total_recognition_points_earned' =>
+                        (int)
+                        PointTransaction::query()
+                            ->where(
+                                'student_id',
+                                $student->id
+                            )
+                            ->where(
+                                'direction',
+                                'credit'
+                            )
+                            ->where(
+                                'points',
+                                '>',
+                                0
+                            )
+                            ->sum('points'),
+
+                    'points_already_used' =>
+                        (int)
+                        PointTransaction::query()
+                            ->where(
+                                'student_id',
+                                $student->id
+                            )
+                            ->where(
+                                'direction',
+                                'debit'
+                            )
+                            ->get()
+                            ->sum(
+                                fn ($transaction) =>
+                                    abs(
+                                        (int)
+                                        $transaction->points
+                                    )
+                            ),
+
+                    'remaining_available_points' =>
+                        $availablePoints,
+
+                    'event_fine_amount' =>
+                        $totalRemainingAmount,
+
+                    'points_requested' =>
+                        $requestedPoints,
+
+                    'points_to_convert' =>
+                        $convertedPoints,
+
+                    'fine_credit' =>
+                        $pesoValueConverted,
+
+                    'remaining_fine_if_approved' =>
+                        $remainingBalance,
+
+                    'conversion_rate' =>
+                        self::POINTS_PER_PESO,
+                ],
+            ],
+        ], 201);
     }
+
 
     public function approveEventFineConversion($id)
     {
-        $admin = Auth::guard('admin')->user();
+        $admin =
+            Auth::guard('admin')->user();
 
         if (!$admin) {
             return response()->json([
@@ -3414,105 +6681,705 @@ class AdminWorkflowController extends Controller
             ], 401);
         }
 
-        $conversion = EventFineConversion::find($id);
+        /*
+        |--------------------------------------------------------------------------
+        | Compatibility:
+        | ID may be the conversion ID, or an older frontend may send student ID.
+        |--------------------------------------------------------------------------
+        */
 
-        if (!$conversion && $student = Student::find($id)) {
-            $conversion = EventFineConversion::where('student_id', $student->id)
-                ->latest()
+        $conversion =
+            EventFineConversion::query()
+                ->whereKey($id)
+                ->where(
+                    'status',
+                    'pending'
+                )
                 ->first();
+
+        if (!$conversion) {
+            $conversion =
+                EventFineConversion::query()
+                    ->where(
+                        'student_id',
+                        $id
+                    )
+                    ->where(
+                        'status',
+                        'pending'
+                    )
+                    ->latest('id')
+                    ->first();
         }
 
         if (!$conversion) {
-            $fine = EventFine::findOrFail($id);
+            return response()->json([
+                'status' => 'error',
+                'message' =>
+                    'No pending event-fine conversion request was found.',
+            ], 404);
+        }
 
-            $fine->update([
-                'status' => (float) $fine->remaining_amount <= 0
-                    ? 'paid'
-                    : 'approved',
-            ]);
+        try {
+            return DB::transaction(
+                function () use (
+                    $admin,
+                    $conversion
+                ) {
+                    $conversion =
+                        EventFineConversion::query()
+                            ->whereKey(
+                                $conversion->id
+                            )
+                            ->where(
+                                'status',
+                                'pending'
+                            )
+                            ->lockForUpdate()
+                            ->firstOrFail();
+
+                    $student =
+                        $conversion
+                            ->student()
+                            ->lockForUpdate()
+                            ->firstOrFail();
+
+                    $activeFines =
+                        EventFine::query()
+                            ->where(
+                                'student_id',
+                                $student->id
+                            )
+                            ->whereNotIn(
+                                'status',
+                                [
+                                    'paid',
+                                    'rejected',
+                                ]
+                            )
+                            ->orderBy('id')
+                            ->lockForUpdate()
+                            ->get();
+
+                    $currentFineBalance =
+                        round(
+                            (float)
+                            $activeFines->sum(
+                                fn ($fine) =>
+                                    (float)
+                                    (
+                                        $fine
+                                            ->remaining_amount
+                                        ?? 0
+                                    )
+                            ),
+                            2
+                        );
+
+                    if ($currentFineBalance <= 0) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'The student no longer has an outstanding event fine.',
+                        ], 422);
+                    }
+
+                    $availablePoints =
+                        max(
+                            0,
+                            (int)
+                            PointTransaction::query()
+                                ->where(
+                                    'student_id',
+                                    $student->id
+                                )
+                                ->sum('points')
+                        );
+
+                    $pointsToUse =
+                        (int)
+                        $conversion
+                            ->converted_points;
+
+                    if (
+                        $pointsToUse <= 0 ||
+                        $availablePoints <
+                            $pointsToUse
+                    ) {
+                        return response()->json([
+                            'status' => 'error',
+
+                            'message' =>
+                                'The student no longer has enough available recognition points for this conversion. Reject this request and create a new one.',
+                        ], 409);
+                    }
+
+                    $creditAmount =
+                        round(
+                            min(
+                                $currentFineBalance,
+                                $pointsToUse
+                                /
+                                self::POINTS_PER_PESO
+                            ),
+                            2
+                        );
+
+                    if ($creditAmount <= 0) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'The calculated fine credit is zero.',
+                        ], 422);
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | APPLY CREDIT TO ACTIVE FINES, OLDEST FIRST
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $remainingToApply =
+                        $creditAmount;
+
+                    $affectedFines = [];
+
+                    foreach (
+                        $activeFines
+                        as $fine
+                    ) {
+                        if (
+                            $remainingToApply <= 0
+                        ) {
+                            break;
+                        }
+
+                        $fineRemaining =
+                            max(
+                                0,
+                                (float)
+                                (
+                                    $fine
+                                        ->remaining_amount
+                                    ?? 0
+                                )
+                            );
+
+                        if ($fineRemaining <= 0) {
+                            continue;
+                        }
+
+                        $deduction =
+                            round(
+                                min(
+                                    $fineRemaining,
+                                    $remainingToApply
+                                ),
+                                2
+                            );
+
+                        if ($deduction <= 0) {
+                            continue;
+                        }
+
+                        $oldPaid =
+                            (float)
+                            (
+                                $fine->paid_amount
+                                ?? $fine->paid
+                                ?? 0
+                            );
+
+                        $newPaid =
+                            round(
+                                $oldPaid
+                                +
+                                $deduction,
+                                2
+                            );
+
+                        $newRemaining =
+                            round(
+                                max(
+                                    0,
+                                    $fineRemaining
+                                    -
+                                    $deduction
+                                ),
+                                2
+                            );
+
+                        $newStatus =
+                            $newRemaining <= 0
+                                ? 'paid'
+                                : 'partially paid';
+
+                        $fine->update([
+                            'paid_amount' =>
+                                $newPaid,
+
+                            'paid' =>
+                                $newPaid,
+
+                            'remaining_amount' =>
+                                $newRemaining,
+
+                            'status' =>
+                                $newStatus,
+                        ]);
+
+                        $affectedFines[] = [
+                            'event_fine_id' =>
+                                $fine->id,
+
+                            'credit_applied' =>
+                                $deduction,
+
+                            'remaining_amount' =>
+                                $newRemaining,
+
+                            'status' =>
+                                $newStatus,
+                        ];
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | ARCHIVE FULLY PAID FINE
+                        |--------------------------------------------------------------------------
+                        */
+
+                        if ($newRemaining <= 0) {
+                            EventFineArchive::updateOrCreate(
+                                [
+                                    'event_fine_id' =>
+                                        $fine->id,
+                                ],
+                                [
+                                    'student_id' =>
+                                        $fine
+                                            ->student_id,
+
+                                    'student_name' =>
+                                        $fine
+                                            ->student_name,
+
+                                    'school_id' =>
+                                        $fine
+                                            ->school_id,
+
+                                    'event_name' =>
+                                        $fine
+                                            ->event_name,
+
+                                    'original_amount' =>
+                                        $fine
+                                            ->original_amount,
+
+                                    'amount_to_pay' =>
+                                        $fine
+                                            ->amount_to_pay,
+
+                                    'paid_amount' =>
+                                        $newPaid,
+
+                                    'remaining_amount' =>
+                                        0,
+
+                                    'status' =>
+                                        'paid',
+
+                                    'reason' =>
+                                        $fine->reason,
+
+                                    'paid_at' =>
+                                        now(),
+                                ]
+                            );
+                        }
+
+                        $remainingToApply =
+                            round(
+                                $remainingToApply
+                                -
+                                $deduction,
+                                2
+                            );
+                    }
+
+                    $actualCreditApplied =
+                        round(
+                            $creditAmount
+                            -
+                            max(
+                                0,
+                                $remainingToApply
+                            ),
+                            2
+                        );
+
+                    $actualPointsUsed =
+                        (int)
+                        round(
+                            $actualCreditApplied
+                            *
+                            self::POINTS_PER_PESO
+                        );
+
+                    if ($actualPointsUsed <= 0) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'No fine balance was reduced.',
+                        ], 422);
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | DEDUCT POINTS
+                    |--------------------------------------------------------------------------
+                    |
+                    | IMPORTANT:
+                    | Debit points are stored as NEGATIVE values so all existing
+                    | balance calculations using SUM(points) stay correct.
+                    |
+                    */
+
+                    $existingDebit =
+                        PointTransaction::query()
+                            ->where(
+                                'student_id',
+                                $student->id
+                            )
+                            ->where(
+                                'type',
+                                'event_fine_conversion'
+                            )
+                            ->where(
+                                'reference_type',
+                                EventFineConversion::class
+                            )
+                            ->where(
+                                'reference_id',
+                                $conversion->id
+                            )
+                            ->exists();
+
+                    if ($existingDebit) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' =>
+                                'Recognition points were already deducted for this conversion.',
+                        ], 409);
+                    }
+
+                    PointTransaction::create([
+                        'student_id' =>
+                            $student->id,
+
+                        'type' =>
+                            'event_fine_conversion',
+
+                        'direction' =>
+                            'debit',
+
+                        'points' =>
+                            -$actualPointsUsed,
+
+                        'amount' =>
+                            $actualCreditApplied,
+
+                        'description' =>
+                            'Recognition points converted into USC event-fine credit.',
+
+                        'notes' =>
+                            'Approved by USC administrator.',
+
+                        'reference_type' =>
+                            EventFineConversion::class,
+
+                        'reference_id' =>
+                            $conversion->id,
+
+                        'processed_by_admin_id' =>
+                            $admin->id,
+
+                        'created_by_admin_id' =>
+                            $admin->id,
+                    ]);
+
+                    $remainingPoints =
+                        max(
+                            0,
+                            (int)
+                            PointTransaction::query()
+                                ->where(
+                                    'student_id',
+                                    $student->id
+                                )
+                                ->sum('points')
+                        );
+
+                    $remainingFineBalance =
+                        round(
+                            (float)
+                            EventFine::query()
+                                ->where(
+                                    'student_id',
+                                    $student->id
+                                )
+                                ->whereNotIn(
+                                    'status',
+                                    [
+                                        'paid',
+                                        'rejected',
+                                    ]
+                                )
+                                ->sum(
+                                    'remaining_amount'
+                                ),
+                            2
+                        );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | UPDATE STUDENT RECOGNITION SUMMARY
+                    |--------------------------------------------------------------------------
+                    */
+
+                    StudentRecognitionRecord::updateOrCreate(
+                        [
+                            'student_id' =>
+                                $student->id,
+                        ],
+                        [
+                            'recognition_points' =>
+                                $remainingPoints,
+
+                            'peso_value' =>
+                                round(
+                                    $remainingPoints
+                                    /
+                                    self::POINTS_PER_PESO,
+                                    2
+                                ),
+
+                            'reward_count' =>
+                                (int)
+                                (
+                                    $student
+                                        ->reward_count
+                                    ?? 0
+                                ),
+
+                            'report_count' =>
+                                $student
+                                    ->reports()
+                                    ->count(),
+                        ]
+                    );
+
+                    $conversion->update([
+                        'converted_points' =>
+                            $actualPointsUsed,
+
+                        'peso_value_converted' =>
+                            $actualCreditApplied,
+
+                        'credit_amount' =>
+                            $actualCreditApplied,
+
+                        'remaining_balance' =>
+                            $remainingFineBalance,
+
+                        'status' =>
+                            'approved',
+
+                        'reviewed_by_admin_id' =>
+                            $admin->id,
+
+                        'reviewed_at' =>
+                            now(),
+
+                        'review_notes' =>
+                            $conversion
+                                ->review_notes
+                            ??
+                            'Approved by USC administrator.',
+                    ]);
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | STUDENT NOTIFICATION
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $this->createStudentNotification([
+                        'student_id' =>
+                            $student->id,
+
+                        'type' =>
+                            'event_fine_conversion_approved',
+
+                        'title' =>
+                            'Event Fine Conversion Approved',
+
+                        'message' =>
+                            "{$actualPointsUsed} recognition point(s) were converted into PHP "
+                            .
+                            number_format(
+                                $actualCreditApplied,
+                                2
+                            )
+                            .
+                            " of USC event-fine credit. You have {$remainingPoints} recognition point(s) remaining.",
+
+                        'action' =>
+                            'event_fine_conversion_approved',
+
+                        'status' =>
+                            'pending',
+
+                        'recipient_id' =>
+                            $student->id,
+
+                        'recipient_role' =>
+                            'student',
+
+                        'subject_type' =>
+                            EventFineConversion::class,
+
+                        'subject_id' =>
+                            $conversion->id,
+
+                        'data' => [
+                            'conversion_id' =>
+                                $conversion->id,
+
+                            'points_used' =>
+                                $actualPointsUsed,
+
+                            'fine_credit' =>
+                                $actualCreditApplied,
+
+                            'remaining_points' =>
+                                $remainingPoints,
+
+                            'remaining_fine_balance' =>
+                                $remainingFineBalance,
+
+                            'conversion_rate' =>
+                                self::POINTS_PER_PESO,
+
+                            'approved_by_admin_id' =>
+                                $admin->id,
+
+                            'approved_at' =>
+                                now()
+                                    ->toIso8601String(),
+                        ],
+
+                        'is_read' =>
+                            false,
+                    ]);
+
+                    $this->recordAuditLog(
+                        $admin,
+                        'event_fine_conversion_approved',
+                        EventFineConversion::class,
+                        $conversion->id,
+                        'Event Fine Conversion',
+                        [
+                            'student_id' =>
+                                $student->id,
+
+                            'points_used' =>
+                                $actualPointsUsed,
+
+                            'fine_credit' =>
+                                $actualCreditApplied,
+
+                            'remaining_points' =>
+                                $remainingPoints,
+
+                            'remaining_fine_balance' =>
+                                $remainingFineBalance,
+
+                            'conversion_rate' =>
+                                self::POINTS_PER_PESO,
+
+                            'affected_fines' =>
+                                $affectedFines,
+                        ],
+                        request()->ip()
+                    );
+
+                    return response()->json([
+                        'status' => 'success',
+
+                        'message' =>
+                            'Event fine conversion approved successfully.',
+
+                        'data' => [
+                            'conversion' =>
+                                $conversion->fresh(),
+
+                            'summary' => [
+                                'points_used' =>
+                                    $actualPointsUsed,
+
+                                'fine_credit' =>
+                                    $actualCreditApplied,
+
+                                'remaining_available_points' =>
+                                    $remainingPoints,
+
+                                'remaining_fine_balance' =>
+                                    $remainingFineBalance,
+
+                                'conversion_rate' =>
+                                    self::POINTS_PER_PESO,
+
+                                'approved_by_admin_id' =>
+                                    $admin->id,
+
+                                'approved_at' =>
+                                    now()
+                                        ->toIso8601String(),
+                            ],
+
+                            'affected_fines' =>
+                                $affectedFines,
+                        ],
+                    ]);
+                }
+            );
+        } catch (\Throwable $exception) {
+            Log::error(
+                'Approve event fine conversion failed',
+                [
+                    'conversion_id' =>
+                        $conversion->id
+                        ?? $id,
+
+                    'message' =>
+                        $exception
+                            ->getMessage(),
+                ]
+            );
 
             return response()->json([
-                'status' => 'success',
-                'message' => 'Event fine conversion approved.',
-                'data' => $fine,
-            ]);
+                'status' => 'error',
+                'message' =>
+                    $exception->getMessage(),
+            ], 422);
         }
-
-        $student = $conversion->student()->firstOrFail();
-        $remainingToApply = (float) $conversion->peso_value_converted;
-
-        $activeFines = EventFine::where('student_id', $student->id)
-            ->whereNotIn('status', [
-                'paid',
-                'rejected',
-            ])
-            ->orderBy('id')
-            ->get();
-
-        foreach ($activeFines as $fine) {
-            if ($remainingToApply <= 0) {
-                break;
-            }
-
-            $deduction = min(
-                (float) ($fine->remaining_amount ?? 0),
-                $remainingToApply
-            );
-
-            if ($deduction <= 0) {
-                continue;
-            }
-
-            $newRemaining = max(
-                0,
-                (float) ($fine->remaining_amount ?? 0) - $deduction
-            );
-
-            $fine->update([
-                'paid_amount' => (float) ($fine->paid_amount ?? 0) + $deduction,
-                'paid' => (float) ($fine->paid ?? 0) + $deduction,
-                'remaining_amount' => $newRemaining,
-                'status' => $newRemaining <= 0 ? 'paid' : 'approved',
-            ]);
-
-            $remainingToApply = round(
-                $remainingToApply - $deduction,
-                2
-            );
-        }
-
-        $student->pointTransactions()->create([
-            'type' => 'event_fine_conversion',
-            'direction' => 'debit',
-            'points' => (int) $conversion->converted_points,
-            'amount' => (float) $conversion->peso_value_converted,
-            'description' => 'Student recognition points applied to outstanding fine balance.',
-            'notes' => 'Admin approval for total fine balance conversion.',
-            'processed_by_admin_id' => $admin->id,
-            'created_by_admin_id' => $admin->id,
-        ]);
-
-        $conversion->update([
-            'status' => 'approved',
-            'remaining_balance' => max(
-                0,
-                (float) $conversion->remaining_balance - (float) $conversion->peso_value_converted
-            ),
-            'reviewed_by_admin_id' => $admin->id,
-            'reviewed_at' => now(),
-            'review_notes' => $conversion->review_notes ?? 'Approved by admin.',
-        ]);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Event fine conversion approved.',
-            'data' => $conversion->fresh(),
-        ]);
     }
+
 
     public function rejectEventFineConversion($id)
     {
-        $admin = Auth::guard('admin')->user();
+        $admin =
+            Auth::guard('admin')->user();
 
         if (!$admin) {
             return response()->json([
@@ -3521,40 +7388,156 @@ class AdminWorkflowController extends Controller
             ], 401);
         }
 
-        $conversion = EventFineConversion::find($id);
-
-        if (!$conversion && $student = Student::find($id)) {
-            $conversion = EventFineConversion::where('student_id', $student->id)
-                ->latest()
+        $conversion =
+            EventFineConversion::query()
+                ->whereKey($id)
+                ->where(
+                    'status',
+                    'pending'
+                )
                 ->first();
+
+        if (!$conversion) {
+            $conversion =
+                EventFineConversion::query()
+                    ->where(
+                        'student_id',
+                        $id
+                    )
+                    ->where(
+                        'status',
+                        'pending'
+                    )
+                    ->latest('id')
+                    ->first();
         }
 
         if (!$conversion) {
-            $fine = EventFine::findOrFail($id);
-            $fine->update([
-                'status' => 'rejected',
-            ]);
-
             return response()->json([
-                'status' => 'success',
-                'message' => 'Event fine conversion rejected.',
-                'data' => $fine,
-            ]);
+                'status' => 'error',
+                'message' =>
+                    'No pending event-fine conversion request was found.',
+            ], 404);
         }
 
         $conversion->update([
-            'status' => 'rejected',
-            'reviewed_by_admin_id' => $admin->id,
-            'reviewed_at' => now(),
-            'review_notes' => $conversion->review_notes ?? 'Rejected by admin.',
+            'status' =>
+                'rejected',
+
+            'reviewed_by_admin_id' =>
+                $admin->id,
+
+            'reviewed_at' =>
+                now(),
+
+            'review_notes' =>
+                $conversion
+                    ->review_notes
+                ??
+                'Rejected by USC administrator.',
         ]);
+
+        $student =
+            $conversion
+                ->student()
+                ->first();
+
+        if ($student) {
+            $this->createStudentNotification([
+                'student_id' =>
+                    $student->id,
+
+                'type' =>
+                    'event_fine_conversion_rejected',
+
+                'title' =>
+                    'Event Fine Conversion Rejected',
+
+                'message' =>
+                    'USC rejected the recognition-point conversion request. No recognition points were deducted.',
+
+                'action' =>
+                    'event_fine_conversion_rejected',
+
+                'status' =>
+                    'pending',
+
+                'recipient_id' =>
+                    $student->id,
+
+                'recipient_role' =>
+                    'student',
+
+                'subject_type' =>
+                    EventFineConversion::class,
+
+                'subject_id' =>
+                    $conversion->id,
+
+                'data' => [
+                    'conversion_id' =>
+                        $conversion->id,
+
+                    'requested_points' =>
+                        (int)
+                        (
+                            $conversion
+                                ->requested_points
+                            ?? 0
+                        ),
+
+                    'points_deducted' =>
+                        0,
+
+                    'reviewed_by_admin_id' =>
+                        $admin->id,
+
+                    'reviewed_at' =>
+                        now()
+                            ->toIso8601String(),
+                ],
+
+                'is_read' =>
+                    false,
+            ]);
+        }
+
+        $this->recordAuditLog(
+            $admin,
+            'event_fine_conversion_rejected',
+            EventFineConversion::class,
+            $conversion->id,
+            'Event Fine Conversion',
+            [
+                'student_id' =>
+                    $conversion
+                        ->student_id,
+
+                'requested_points' =>
+                    (int)
+                    (
+                        $conversion
+                            ->requested_points
+                        ?? 0
+                    ),
+
+                'points_deducted' =>
+                    0,
+            ],
+            request()->ip()
+        );
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Event fine conversion rejected.',
-            'data' => $conversion->fresh(),
+
+            'message' =>
+                'Event fine conversion rejected. No recognition points were deducted.',
+
+            'data' =>
+                $conversion->fresh(),
         ]);
     }
+
 
     public function recordEventFinePayment(Request $request, $id)
     {

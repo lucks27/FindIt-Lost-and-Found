@@ -1,5 +1,5 @@
 <template>
-    <main class="admin-page-body">
+    <main class="admin-page-body pending-surrender-page">
         <!-- Page heading -->
         <header class="page-header">
             <div class="page-heading-copy">
@@ -8,7 +8,7 @@
                 </p>
 
                 <h1>
-                    Found-Item Surrender Queue
+                    Found Item Surrender Queue
                 </h1>
 
                 <p class="page-copy">
@@ -224,11 +224,17 @@
                                     Time Found
                                 </dt>
 
+                                <dd :class="{ 'time-unavailable': isTimeFoundMissing(item) }">
+                                    {{ formatTimeFound(item) }}
+                                </dd>
+                            </div>
+
+                            <div>
+                                <dt>
+                                    Date
+                                </dt>
                                 <dd>
-                                    {{
-                                        item.report?.time_found ||
-                                        '—'
-                                    }}
+                                    {{ formatDateFound(item) || 'Not recorded' }}
                                 </dd>
                             </div>
                         </dl>
@@ -717,32 +723,24 @@ img,
 
                                     <div>
                                         <dt>
-                                            Date Found
+                                            Time Found
                                         </dt>
 
-                                        <dd>
-                                            {{
-                                                formatDate(
-                                                    selectedSurrender
-                                                        .report
-                                                        ?.date_occurred
-                                                )
-                                            }}
+                                        <dd :class="{ 'time-unavailable': isTimeFoundMissing(selectedSurrender) }">
+                                            {{ formatTimeFound(selectedSurrender) }}
+                                            <small v-if="isTimeFoundMissing(selectedSurrender)" class="time-found-note">
+                                                The actual found time is missing from this report's data.
+                                                Use Request Details to ask the student to confirm it.
+                                            </small>
                                         </dd>
                                     </div>
 
                                     <div>
                                         <dt>
-                                            Time Found
+                                            Date
                                         </dt>
-
                                         <dd>
-                                            {{
-                                                selectedSurrender
-                                                    .report
-                                                    ?.time_found ||
-                                                '—'
-                                            }}
+                                            {{ formatDateFound(selectedSurrender) || 'Not recorded' }}
                                         </dd>
                                     </div>
 
@@ -1520,13 +1518,11 @@ const filteredSurrenders =
             filtered =
                 filtered.filter(
                     item =>
-                        Number(
-                            item.report
-                                ?.category_id
-                        ) ===
-                        Number(
-                            selectedCategory.value
-                        )
+                    (
+                        Number(item.report?.category_id) === Number(selectedCategory.value) ||
+                        String(item.report?.category || parsedMetadata(item.report?.metadata).category || '').trim().toLowerCase() ===
+                        String(categories.value.find(c => String(c.id) === String(selectedCategory.value))?.name || '').trim().toLowerCase()
+                    )
                 )
         }
 
@@ -1771,6 +1767,247 @@ function formatDateTime(
 }
 
 /* =====================================================
+   FOUND DATE AND TIME HELPERS
+
+   Show the found date and the student's recorded
+   time as separate fields. Never substitute report submission timestamps.
+===================================================== */
+
+const MISSING_TIME_LABEL = 'Not recorded'
+
+function parsedMetadata(value) {
+    // Laravel may serialize metadata as an object or a JSON string.
+    // Double-encoded JSON has also appeared in older responses.
+    for (let attempt = 0; attempt < 2; attempt++) {
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            return value
+        }
+
+        if (typeof value !== 'string') break
+
+        try {
+            value = JSON.parse(value)
+        } catch {
+            break
+        }
+    }
+
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? value
+        : {}
+}
+
+function findTimeFoundValue(item) {
+    const report = item?.report || item?.found_report || item?.item?.report || {}
+    const metadata = parsedMetadata(report.metadata)
+    const rootMetadata = parsedMetadata(item?.metadata)
+
+    // Mobile versions previously sent metadata[event_time]. New versions
+    // also send time_found. Read both, without using submission timestamps.
+    const candidates = [
+        report.time_found,
+        report.event_time,
+        report.found_time,
+        report.timeFound,
+        report.foundTime,
+        report.time_occurred,
+        report.occurred_time,
+        report.date_time_found,
+        report.found_datetime,
+        report.found_at,
+        metadata.time_found,
+        metadata.event_time,
+        metadata.found_time,
+        metadata.timeFound,
+        metadata.foundTime,
+        metadata.time_occurred,
+        metadata.date_time_found,
+        metadata.found_at,
+        metadata['metadata[event_time]'],
+        metadata['metadata.event_time'],
+        metadata.report_details?.event_time,
+        metadata.details?.event_time,
+        report['metadata[event_time]'],
+        report['metadata.event_time'],
+        item?.time_found,
+        item?.event_time,
+        item?.found_time,
+        item?.timeFound,
+        item?.foundTime,
+        item?.found_at,
+        rootMetadata.time_found,
+        rootMetadata.event_time,
+        rootMetadata.found_time,
+        rootMetadata.timeFound,
+        rootMetadata['metadata[event_time]'],
+        item?.['metadata[event_time]']
+    ]
+
+    return candidates.find((value) => {
+        if (typeof value !== 'string' && typeof value !== 'number') {
+            return false
+        }
+
+        const text = String(value).trim().toLowerCase()
+        return text !== '' &&
+            !['null', 'undefined', 'n/a', 'na', '-', '—', 'not recorded', 'not provided'].includes(text)
+    }) ?? null
+}
+
+function formatClockTime(hour, minute) {
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23 ||
+        !Number.isInteger(minute) || minute < 0 || minute > 59) {
+        return MISSING_TIME_LABEL
+    }
+
+    const displayHour = hour % 12 || 12
+    const period = hour >= 12 ? 'PM' : 'AM'
+    return `${displayHour}:${String(minute).padStart(2, '0')} ${period}`
+}
+
+function formatTimeFound(item) {
+    const value = findTimeFoundValue(item)
+    if (value === null) return MISSING_TIME_LABEL
+
+    const raw = String(value).trim()
+
+    // MySQL TIME, HH:mm:ss, HH:mm, and twelve-hour time, e.g. 2:35 PM.
+    const clock = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?\s*(AM|PM)?$/i)
+
+    if (clock) {
+        let hour = Number(clock[1])
+        const minute = Number(clock[2])
+        const seconds = clock[3] == null ? 0 : Number(clock[3])
+        const period = clock[4]?.toUpperCase()
+
+        if (seconds > 59) return MISSING_TIME_LABEL
+
+        if (period) {
+            if (hour < 1 || hour > 12) return MISSING_TIME_LABEL
+            hour = (hour % 12) + (period === 'PM' ? 12 : 0)
+        }
+
+        return formatClockTime(hour, minute)
+    }
+
+    // Full datetime: keep its recorded local clock when no timezone
+    // is supplied; convert explicitly offset-aware values to Manila.
+    const datetime = raw.match(
+        /^\d{4}-\d{2}-\d{2}[T ](\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?\s*(Z|[+-]\d{2}:?\d{2})?$/i
+    )
+
+    if (datetime) {
+        if (!datetime[3]) {
+            return formatClockTime(Number(datetime[1]), Number(datetime[2]))
+        }
+
+        const normalized = raw.replace(' ', 'T').replace(/([+-]\d{2})(\d{2})$/, '$1:$2')
+        const date = new Date(normalized)
+
+        if (!Number.isNaN(date.getTime())) {
+            return date.toLocaleTimeString('en-PH', {
+                timeZone: 'Asia/Manila',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            })
+        }
+        return MISSING_TIME_LABEL
+    }
+
+    // A date alone is not a time. Do not invent midnight or use created_at.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        return MISSING_TIME_LABEL
+    }
+
+    // Preserve other supplied text rather than guessing its meaning.
+    return raw
+}
+
+function isTimeFoundMissing(item) {
+    return formatTimeFound(item) === MISSING_TIME_LABEL
+}
+
+/*
+ * Format the date on which the student found the item.
+ * Prefer date_occurred for the Date field. Never use
+ * the report submission timestamp (created_at).
+ */
+function findDateFoundValue(item) {
+    const report = item?.report || item?.found_report || {}
+    const metadata = parsedMetadata(report.metadata)
+    const rootMetadata = parsedMetadata(item?.metadata)
+
+    const candidates = [
+        report.date_occurred,
+        report.date_found,
+        report.found_date,
+        metadata.date_occurred,
+        metadata.date_found,
+        metadata.found_date,
+        item?.date_occurred,
+        item?.date_found,
+        item?.found_date,
+        rootMetadata.date_occurred,
+        rootMetadata.date_found,
+        // Full found-at values may include both date and time.
+        report.date_time_found,
+        report.found_datetime,
+        report.found_at,
+        metadata.date_time_found,
+        metadata.found_at,
+        item?.found_at
+    ]
+
+    return candidates.find((value) =>
+        value !== null &&
+        value !== undefined &&
+        String(value).trim() !== ''
+    ) ?? null
+}
+
+function formatDateFound(item) {
+    const value = findDateFoundValue(item)
+    if (value === null) return null
+
+    const raw = String(value).trim()
+
+    // Laravel date casts often serialize as UTC midnight. Read the
+    // calendar date as supplied so it does not shift by timezone.
+    const datePart = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/)
+    if (datePart) {
+        const year = Number(datePart[1])
+        const month = Number(datePart[2])
+        const day = Number(datePart[3])
+        const date = new Date(Date.UTC(year, month - 1, day))
+
+        if (date.getUTCFullYear() === year &&
+            date.getUTCMonth() === month - 1 &&
+            date.getUTCDate() === day) {
+            return date.toLocaleDateString('en-US', {
+                timeZone: 'UTC',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            })
+        }
+
+        return null
+    }
+
+    // For an explicit non-ISO datetime, use the Philippine calendar date.
+    const date = new Date(raw)
+    if (Number.isNaN(date.getTime())) return null
+
+    return date.toLocaleDateString('en-US', {
+        timeZone: 'Asia/Manila',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+    })
+}
+
+/* =====================================================
    LOAD SURRENDERS
 ===================================================== */
 
@@ -1799,6 +2036,21 @@ async function loadSurrenders() {
         )
 
         surrenders.value = records
+
+        // If time is still missing, inspect the saved report's time fields.
+        // No private student data or full metadata is printed.
+        const missingTimeIds = records
+            .filter(item => isTimeFoundMissing(item))
+            .map(item => item?.report?.id ?? item?.report_id)
+            .filter(id => id !== null && id !== undefined)
+
+        if (missingTimeIds.length) {
+            console.warn(
+                'Found time is absent from the surrender API for report IDs:',
+                missingTimeIds,
+                'Check the reports table: time_found and metadata.event_time.'
+            )
+        }
 
         console.log(
             'TOTAL SURRENDERS:',
@@ -5284,7 +5536,7 @@ onMounted(() => {
         0 0 0 3px rgba(78, 157, 114, 0.14) !important;
 }
 
-.category-field > span,
+.category-field>span,
 .sort-label {
     color: #4f6658 !important;
     font-size: 11px !important;
@@ -5381,12 +5633,10 @@ onMounted(() => {
     height: 4px;
 
     background:
-        linear-gradient(
-            90deg,
+        linear-gradient(90deg,
             var(--ps-green-700),
             var(--ps-green-500),
-            var(--ps-gold)
-        );
+            var(--ps-gold));
 }
 
 .report-card:hover {
@@ -5487,7 +5737,7 @@ onMounted(() => {
     background: #f8fbf9 !important;
 }
 
-.card-meta > div {
+.card-meta>div {
     grid-template-columns: 78px minmax(0, 1fr) !important;
 
     gap: 10px !important;
@@ -5496,7 +5746,7 @@ onMounted(() => {
     border-bottom: 1px solid #e7efe9;
 }
 
-.card-meta > div:last-child {
+.card-meta>div:last-child {
     border-bottom: 0;
 }
 
@@ -5628,11 +5878,9 @@ onMounted(() => {
     border-radius: 18px !important;
 
     background:
-        linear-gradient(
-            180deg,
+        linear-gradient(180deg,
             #276647 0%,
-            #1f5a3e 100%
-        ) !important;
+            #1f5a3e 100%) !important;
 
     box-shadow:
         0 30px 90px rgba(0, 0, 0, 0.48),
@@ -5647,12 +5895,10 @@ onMounted(() => {
         1px solid rgba(255, 255, 255, 0.12) !important;
 
     background:
-        linear-gradient(
-            135deg,
+        linear-gradient(135deg,
             #246b49 0%,
             #155033 55%,
-            #103c29 100%
-        ) !important;
+            #103c29 100%) !important;
 }
 
 .modal-header h2 {
@@ -5812,8 +6058,8 @@ onMounted(() => {
     font-weight: 800 !important;
 }
 
-.info-list > div,
-.timeline-summary > div {
+.info-list>div,
+.timeline-summary>div {
     grid-template-columns:
         120px minmax(0, 1fr) !important;
 
@@ -5983,11 +6229,9 @@ onMounted(() => {
         1px solid rgba(255, 255, 255, 0.10) !important;
 
     background:
-        linear-gradient(
-            135deg,
+        linear-gradient(135deg,
             #155033,
-            #103c29
-        ) !important;
+            #103c29) !important;
 }
 
 .modal-action {
@@ -6069,11 +6313,1264 @@ onMounted(() => {
         grid-template-columns: 1fr !important;
     }
 
-    .info-list > div,
-    .timeline-summary > div {
+    .info-list>div,
+    .timeline-summary>div {
         grid-template-columns: 1fr !important;
         gap: 3px !important;
     }
 }
 
+
+
+
+/* =========================================================
+   PENDING SURRENDER - DEEP GREEN PROFESSIONAL V3
+   Same visual direction as the approved Item Release design:
+   layered forest green, emerald cards, cream-white text,
+   restrained gold accents, and no white/light main surfaces.
+   ========================================================= */
+
+.pending-surrender-page {
+    --ps3-green-950: #082a1d;
+    --ps3-green-925: #0a3122;
+    --ps3-green-900: #0d3827;
+    --ps3-green-850: #12452f;
+    --ps3-green-800: #174f37;
+    --ps3-green-750: #1d5e41;
+    --ps3-green-700: #256b4b;
+    --ps3-green-650: #2f7d59;
+    --ps3-green-600: #3a8d63;
+    --ps3-line: rgba(214, 232, 219, 0.14);
+    --ps3-line-strong: rgba(225, 200, 117, 0.34);
+    --ps3-text: #f3f6ee;
+    --ps3-text-soft: #c7d5cb;
+    --ps3-text-muted: #9fb3a6;
+    --ps3-gold: #dfc56f;
+    --ps3-gold-soft: #ecd994;
+    --ps3-danger: #cf5a54;
+
+    min-height: calc(100vh - 60px) !important;
+    padding: 22px !important;
+
+    background:
+        radial-gradient(circle at 12% 0%,
+            rgba(74, 145, 99, 0.20),
+            transparent 28%),
+        linear-gradient(180deg,
+            #123f2c 0%,
+            #0d3425 54%,
+            #092c1f 100%) !important;
+
+    color: var(--ps3-text) !important;
+
+    font-family:
+        "Segoe UI",
+        Inter,
+        Roboto,
+        Arial,
+        sans-serif !important;
+
+    font-size: 15px !important;
+    line-height: 1.55 !important;
+
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* =========================================================
+   PAGE HEADER
+   ========================================================= */
+
+.pending-surrender-page .page-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+
+    gap: 20px !important;
+
+    margin-bottom: 18px !important;
+    padding: 20px 22px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 16px !important;
+
+    background:
+        linear-gradient(145deg,
+            #1f6748 0%,
+            #174f37 58%,
+            #123f2d 100%) !important;
+
+    box-shadow:
+        0 15px 32px rgba(0, 0, 0, 0.18) !important;
+}
+
+.pending-surrender-page .page-kicker,
+.pending-surrender-page .modal-kicker {
+    color: var(--ps3-gold-soft) !important;
+
+    font-size: 11px !important;
+    font-weight: 850 !important;
+    letter-spacing: 0.14em !important;
+    text-transform: uppercase !important;
+}
+
+.pending-surrender-page .page-header h1 {
+    margin: 0 !important;
+
+    color: #ffffff !important;
+
+    font-size: clamp(1.8rem, 2.3vw, 2.35rem) !important;
+    font-weight: 850 !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.02em !important;
+}
+
+.pending-surrender-page .page-copy {
+    max-width: 760px !important;
+    margin-top: 8px !important;
+
+    color: #d2ddd5 !important;
+
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    line-height: 1.65 !important;
+}
+
+.pending-surrender-page .queue-count {
+    min-width: 105px !important;
+    padding: 14px 16px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 13px !important;
+
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.08),
+            rgba(255, 255, 255, 0.045)) !important;
+
+    box-shadow: none !important;
+}
+
+.pending-surrender-page .queue-count strong {
+    color: var(--ps3-gold-soft) !important;
+
+    font-size: 1.5rem !important;
+    font-weight: 850 !important;
+}
+
+.pending-surrender-page .queue-count span {
+    color: #c2d0c6 !important;
+
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+}
+
+/* =========================================================
+   FILTER TOOLBAR
+   ========================================================= */
+
+.pending-surrender-page .filter-toolbar {
+    grid-template-columns:
+        minmax(320px, 1.6fr) minmax(230px, 0.8fr) minmax(230px, 0.8fr) !important;
+
+    gap: 13px !important;
+
+    margin-bottom: 20px !important;
+    padding: 15px 16px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 15px !important;
+
+    background:
+        linear-gradient(145deg,
+            #19593e,
+            #134832) !important;
+
+    box-shadow:
+        0 12px 26px rgba(0, 0, 0, 0.15) !important;
+}
+
+.pending-surrender-page .search-field,
+.pending-surrender-page .category-field,
+.pending-surrender-page .sort-control {
+    min-width: 0 !important;
+}
+
+.pending-surrender-page .category-field>span,
+.pending-surrender-page .sort-label {
+    color: #c6d5cb !important;
+
+    font-size: 11px !important;
+    font-weight: 800 !important;
+}
+
+.pending-surrender-page .search-field input,
+.pending-surrender-page .category-field select {
+    height: 46px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
+    border-radius: 9px !important;
+
+    background-color: #0f3a29 !important;
+    color: #ffffff !important;
+
+    -webkit-text-fill-color: #ffffff !important;
+
+    font-size: 13px !important;
+    font-weight: 650 !important;
+}
+
+.pending-surrender-page .search-field input {
+    padding: 0 13px !important;
+}
+
+.pending-surrender-page .search-field input::placeholder {
+    color: #9fb3a6 !important;
+    opacity: 1 !important;
+}
+
+.pending-surrender-page .category-field select {
+    padding-left: 12px !important;
+
+    background-image:
+        linear-gradient(45deg,
+            transparent 50%,
+            #c6d5cb 50%),
+        linear-gradient(135deg,
+            #c6d5cb 50%,
+            transparent 50%) !important;
+}
+
+.pending-surrender-page .category-field select option {
+    background: #0f3a29 !important;
+    color: #ffffff !important;
+}
+
+.pending-surrender-page .search-field input:hover,
+.pending-surrender-page .category-field select:hover {
+    border-color: rgba(225, 200, 117, 0.40) !important;
+}
+
+.pending-surrender-page .search-field input:focus,
+.pending-surrender-page .category-field select:focus {
+    border-color: var(--ps3-gold) !important;
+
+    box-shadow:
+        0 0 0 3px rgba(225, 200, 117, 0.12) !important;
+}
+
+.pending-surrender-page .sort-buttons {
+    gap: 7px !important;
+}
+
+.pending-surrender-page .sort-button {
+    height: 46px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 9px !important;
+
+    background: #0f3a29 !important;
+    color: #c7d5cb !important;
+
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+}
+
+.pending-surrender-page .sort-button:hover {
+    border-color: rgba(225, 200, 117, 0.26) !important;
+
+    background: rgba(225, 200, 117, 0.07) !important;
+    color: var(--ps3-gold-soft) !important;
+}
+
+.pending-surrender-page .sort-button.active {
+    border-color: rgba(225, 200, 117, 0.35) !important;
+
+    background:
+        linear-gradient(135deg,
+            #3f9363 0%,
+            #246b49 100%) !important;
+
+    color: #ffffff !important;
+
+    box-shadow:
+        0 6px 14px rgba(0, 0, 0, 0.16) !important;
+}
+
+/* =========================================================
+   ALERT / EMPTY STATE
+   ========================================================= */
+
+.pending-surrender-page .inline-alert {
+    font-size: 12.5px !important;
+    line-height: 1.5 !important;
+}
+
+.pending-surrender-page .error-alert {
+    border-color: rgba(239, 131, 125, 0.34) !important;
+
+    background: rgba(112, 42, 38, 0.38) !important;
+    color: #ffd8d5 !important;
+}
+
+.pending-surrender-page .empty-state-card {
+    width: min(720px, 100%) !important;
+    min-height: 330px !important;
+
+    margin: 46px auto 0 !important;
+    padding: 44px 52px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 18px !important;
+
+    background:
+        linear-gradient(145deg,
+            #1b6043 0%,
+            #154f37 62%,
+            #123f2d 100%) !important;
+
+    text-align: center !important;
+
+    box-shadow:
+        0 18px 40px rgba(0, 0, 0, 0.18) !important;
+}
+
+.pending-surrender-page .empty-state-card h2 {
+    margin: 0 0 10px !important;
+
+    color: #ffffff !important;
+
+    font-size: 1.5rem !important;
+    font-weight: 850 !important;
+}
+
+.pending-surrender-page .empty-state-card p {
+    max-width: 520px !important;
+    margin: 0 auto !important;
+
+    color: #c6d5cb !important;
+
+    font-size: 14px !important;
+    line-height: 1.7 !important;
+}
+
+/* =========================================================
+   SURRENDER CARDS
+   ========================================================= */
+
+.pending-surrender-page .surrender-grid {
+    grid-template-columns:
+        repeat(auto-fill, minmax(280px, 1fr)) !important;
+
+    gap: 18px !important;
+}
+
+.pending-surrender-page .report-card {
+    position: relative !important;
+
+    overflow: hidden !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 15px !important;
+
+    background:
+        linear-gradient(145deg,
+            #1d6547 0%,
+            #174f38 62%,
+            #13442f 100%) !important;
+
+    box-shadow:
+        0 12px 28px rgba(0, 0, 0, 0.16) !important;
+
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease !important;
+}
+
+.pending-surrender-page .report-card::before {
+    content: "";
+    position: absolute;
+    z-index: 2;
+    inset: 0 0 auto 0;
+    height: 3px;
+
+    background:
+        linear-gradient(90deg,
+            #65aa7d 0%,
+            #3e9163 68%,
+            #dfc56f 100%) !important;
+}
+
+.pending-surrender-page .report-card:hover {
+    transform: translateY(-3px) !important;
+
+    border-color: rgba(225, 200, 117, 0.28) !important;
+
+    box-shadow:
+        0 18px 38px rgba(0, 0, 0, 0.20) !important;
+}
+
+.pending-surrender-page .card-image-button {
+    height: 170px !important;
+
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+
+    background: #103927 !important;
+}
+
+.pending-surrender-page .image-view-chip {
+    right: 10px !important;
+    bottom: 10px !important;
+
+    height: 30px !important;
+    padding: 0 10px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-radius: 8px !important;
+
+    background: rgba(8, 42, 29, 0.90) !important;
+    color: #ffffff !important;
+
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+}
+
+.pending-surrender-page .card-content {
+    padding: 16px !important;
+}
+
+.pending-surrender-page .report-type-badge,
+.pending-surrender-page .status-badge {
+    min-height: 27px !important;
+    padding: 0 10px !important;
+
+    font-size: 9.5px !important;
+    font-weight: 850 !important;
+}
+
+/* Found / pending badges */
+.pending-surrender-page .report-type-badge.found {
+    border: 1px solid rgba(142, 214, 163, 0.28) !important;
+
+    background: rgba(91, 178, 119, 0.13) !important;
+    color: #c9f0d4 !important;
+}
+
+.pending-surrender-page .report-type-badge.lost {
+    border: 1px solid rgba(239, 131, 125, 0.28) !important;
+
+    background: rgba(150, 54, 49, 0.20) !important;
+    color: #ffd0cd !important;
+}
+
+.pending-surrender-page .status-badge.pending,
+.pending-surrender-page .status-badge.overdue,
+.pending-surrender-page .status-badge.pending_surrender,
+.pending-surrender-page .status-badge.details_requested,
+.pending-surrender-page .status-badge.additional_details_requested {
+    border: 1px solid rgba(234, 216, 155, 0.30) !important;
+
+    background: rgba(225, 200, 117, 0.13) !important;
+    color: #f3dfa0 !important;
+}
+
+.pending-surrender-page .status-badge.received {
+    border: 1px solid rgba(142, 214, 163, 0.28) !important;
+
+    background: rgba(91, 178, 119, 0.13) !important;
+    color: #c9f0d4 !important;
+}
+
+.pending-surrender-page .status-badge.rejected {
+    border: 1px solid rgba(239, 131, 125, 0.30) !important;
+
+    background: rgba(150, 54, 49, 0.22) !important;
+    color: #ffd0cd !important;
+}
+
+.pending-surrender-page .card-title {
+    margin: 4px 0 6px !important;
+
+    color: #ffffff !important;
+
+    font-size: 16.5px !important;
+    font-weight: 850 !important;
+    line-height: 1.35 !important;
+}
+
+.pending-surrender-page .card-student {
+    margin-bottom: 12px !important;
+
+    color: #c7d5cb !important;
+
+    font-size: 12.5px !important;
+    font-weight: 650 !important;
+}
+
+.pending-surrender-page .card-meta {
+    gap: 0 !important;
+    margin-bottom: 13px !important;
+
+    padding: 10px 11px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 11px !important;
+
+    background: rgba(6, 39, 25, 0.28) !important;
+}
+
+.pending-surrender-page .card-meta>div {
+    grid-template-columns:
+        84px minmax(0, 1fr) !important;
+
+    gap: 10px !important;
+    padding: 6px 0 !important;
+
+    border-bottom:
+        1px solid rgba(255, 255, 255, 0.07) !important;
+}
+
+.pending-surrender-page .card-meta>div:last-child {
+    border-bottom: 0 !important;
+}
+
+.pending-surrender-page .card-meta dt {
+    color: #aabcae !important;
+
+    font-size: 10.5px !important;
+    font-weight: 750 !important;
+}
+
+.pending-surrender-page .card-meta dd {
+    color: #eef5ef !important;
+
+    font-size: 12px !important;
+    font-weight: 700 !important;
+}
+
+.pending-surrender-page .card-actions {
+    gap: 8px !important;
+    margin-top: 12px !important;
+}
+
+.pending-surrender-page .action-btn {
+    height: 42px !important;
+
+    border-radius: 9px !important;
+
+    font-size: 11.5px !important;
+    font-weight: 850 !important;
+}
+
+/* Buttons */
+.pending-surrender-page .approve-btn {
+    border-color: rgba(225, 200, 117, 0.30) !important;
+
+    background:
+        linear-gradient(135deg,
+            #3f9363,
+            #246b49) !important;
+
+    color: #ffffff !important;
+}
+
+.pending-surrender-page .approve-btn:hover:not(:disabled) {
+    background:
+        linear-gradient(135deg,
+            #49a16d,
+            #2f7d59) !important;
+}
+
+.pending-surrender-page .reject-btn {
+    border-color: var(--ps3-danger) !important;
+
+    background: var(--ps3-danger) !important;
+    color: #ffffff !important;
+}
+
+.pending-surrender-page .reject-btn:hover:not(:disabled) {
+    background: #bb4742 !important;
+}
+
+.pending-surrender-page .neutral-btn {
+    border: 1px solid rgba(225, 200, 117, 0.28) !important;
+
+    background: rgba(225, 200, 117, 0.10) !important;
+    color: var(--ps3-gold-soft) !important;
+}
+
+.pending-surrender-page .neutral-btn:hover:not(:disabled),
+.pending-surrender-page .neutral-btn.request-active {
+    border-color: rgba(225, 200, 117, 0.42) !important;
+
+    background: rgba(225, 200, 117, 0.16) !important;
+
+    color: #fff0b8 !important;
+}
+
+/* =========================================================
+   PAGINATION
+   ========================================================= */
+
+.pending-surrender-page .pagination-bar {
+    margin-top: 18px !important;
+    padding: 12px 14px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    border-radius: 11px !important;
+
+    background:
+        rgba(7, 47, 29, 0.26) !important;
+}
+
+.pending-surrender-page .pagination-info,
+.pending-surrender-page .pagination-info strong,
+.pending-surrender-page .page-status {
+    color: #c7d5cb !important;
+}
+
+.pending-surrender-page .page-button {
+    height: 34px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.11) !important;
+    border-radius: 8px !important;
+
+    background: #174f37 !important;
+    color: #ffffff !important;
+
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+}
+
+.pending-surrender-page .page-button:hover:not(:disabled) {
+    border-color: rgba(225, 200, 117, 0.30) !important;
+
+    background: #1d6547 !important;
+}
+
+/* =========================================================
+   LARGE DETAIL MODAL
+   ========================================================= */
+
+.pending-surrender-page .modal-overlay {
+    padding: 18px !important;
+
+    background: rgba(4, 20, 13, 0.80) !important;
+
+    backdrop-filter: blur(7px) !important;
+}
+
+.pending-surrender-page .modal-content {
+    width: min(1240px, 94vw) !important;
+    max-width: 1240px !important;
+    max-height: 92vh !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-radius: 18px !important;
+
+    background:
+        linear-gradient(180deg,
+            #1f6748 0%,
+            #174f38 100%) !important;
+
+    color: var(--ps3-text) !important;
+
+    box-shadow:
+        0 30px 90px rgba(0, 0, 0, 0.48) !important;
+}
+
+.pending-surrender-page .modal-header {
+    min-height: 82px !important;
+
+    padding: 16px 20px !important;
+
+    border-bottom:
+        1px solid rgba(255, 255, 255, 0.10) !important;
+
+    background:
+        linear-gradient(135deg,
+            #2f7d59 0%,
+            #195338 58%,
+            #103c29 100%) !important;
+}
+
+.pending-surrender-page .modal-header h2 {
+    max-width: 660px !important;
+
+    color: #ffffff !important;
+
+    font-size: 21px !important;
+    font-weight: 850 !important;
+}
+
+.pending-surrender-page .modal-close {
+    width: 38px !important;
+    height: 38px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-radius: 10px !important;
+
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #ffffff !important;
+}
+
+.pending-surrender-page .modal-close:hover {
+    background: rgba(255, 255, 255, 0.14) !important;
+}
+
+.pending-surrender-page .modal-scroll {
+    padding: 18px 20px 22px !important;
+
+    background:
+        linear-gradient(180deg,
+            #1d6043 0%,
+            #174f38 100%) !important;
+}
+
+/* =========================================================
+   MODAL OVERVIEW / MEDIA
+   ========================================================= */
+
+.pending-surrender-page .modal-overview {
+    grid-template-columns:
+        300px minmax(0, 1fr) !important;
+
+    gap: 18px !important;
+    margin-bottom: 16px !important;
+}
+
+.pending-surrender-page .modal-image-container {
+    height: 240px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 12px !important;
+
+    background: #103927 !important;
+}
+
+.pending-surrender-page .thumbnail {
+    width: 54px !important;
+    height: 54px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 8px !important;
+
+    background: #103927 !important;
+}
+
+.pending-surrender-page .thumbnail.active {
+    border-color: var(--ps3-gold) !important;
+}
+
+.pending-surrender-page .overview-details {
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr)) !important;
+
+    gap: 10px !important;
+}
+
+.pending-surrender-page .summary-field {
+    min-height: 78px !important;
+
+    padding: 12px 13px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 10px !important;
+
+    background: rgba(255, 255, 255, 0.045) !important;
+}
+
+.pending-surrender-page .summary-field span {
+    color: #b4c5ba !important;
+
+    font-size: 10.5px !important;
+    font-weight: 750 !important;
+}
+
+.pending-surrender-page .summary-field strong {
+    margin-top: 5px !important;
+
+    color: #ffffff !important;
+
+    font-size: 13px !important;
+    font-weight: 750 !important;
+    line-height: 1.45 !important;
+}
+
+/* =========================================================
+   DETAIL PANELS
+   ========================================================= */
+
+.pending-surrender-page .detail-grid {
+    gap: 14px !important;
+    margin-bottom: 14px !important;
+}
+
+.pending-surrender-page .detail-panel {
+    padding: 15px 16px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 12px !important;
+
+    background: rgba(7, 48, 30, 0.27) !important;
+}
+
+.pending-surrender-page .detail-panel-heading {
+    margin-bottom: 11px !important;
+    padding-bottom: 9px !important;
+
+    border-bottom:
+        1px solid rgba(255, 255, 255, 0.07) !important;
+}
+
+.pending-surrender-page .detail-panel-heading h3 {
+    color: #ffffff !important;
+
+    font-size: 13px !important;
+    font-weight: 850 !important;
+}
+
+.pending-surrender-page .detail-panel-heading small {
+    color: #c4b8ad !important;
+
+    font-size: 10px !important;
+}
+
+.pending-surrender-page .detail-icon {
+    width: 31px !important;
+    height: 31px !important;
+
+    border-radius: 8px !important;
+
+    background: rgba(225, 200, 117, 0.10) !important;
+    color: var(--ps3-gold-soft) !important;
+}
+
+.pending-surrender-page .info-list>div,
+.pending-surrender-page .timeline-summary>div {
+    grid-template-columns:
+        120px minmax(0, 1fr) !important;
+
+    gap: 12px !important;
+    padding: 8px 0 !important;
+
+    border-top-color:
+        rgba(255, 255, 255, 0.07) !important;
+}
+
+.pending-surrender-page .info-list dt,
+.pending-surrender-page .timeline-summary dt {
+    color: #b4c5ba !important;
+
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+}
+
+.pending-surrender-page .info-list dd,
+.pending-surrender-page .timeline-summary dd {
+    color: #ffffff !important;
+
+    font-size: 12.5px !important;
+    font-weight: 650 !important;
+    line-height: 1.5 !important;
+}
+
+.pending-surrender-page .detail-text {
+    color: #eef5ef !important;
+
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+}
+
+/* Private identifying information */
+.pending-surrender-page .private-section {
+    border-color: rgba(239, 131, 125, 0.28) !important;
+
+    background: rgba(112, 42, 38, 0.22) !important;
+}
+
+.pending-surrender-page .private-section h3 {
+    color: #ffd0cd !important;
+}
+
+.pending-surrender-page .private-section small {
+    color: #e6b7b4 !important;
+}
+
+.pending-surrender-page .private-icon {
+    background: rgba(239, 131, 125, 0.10) !important;
+    color: #ffaaa5 !important;
+}
+
+/* =========================================================
+   REQUEST DETAILS PANEL
+   ========================================================= */
+
+.pending-surrender-page .request-details-panel {
+    margin-top: 14px !important;
+    padding: 15px !important;
+
+    border: 1px solid rgba(225, 200, 117, 0.26) !important;
+    border-radius: 12px !important;
+
+    background: rgba(225, 200, 117, 0.065) !important;
+}
+
+.pending-surrender-page .request-details-header h3 {
+    color: #ffffff !important;
+
+    font-size: 13px !important;
+    font-weight: 850 !important;
+}
+
+.pending-surrender-page .request-details-header p {
+    color: #c6d5cb !important;
+
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+}
+
+.pending-surrender-page .request-panel-close {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: #ffffff !important;
+}
+
+.pending-surrender-page .request-options {
+    gap: 9px !important;
+}
+
+.pending-surrender-page .request-option {
+    min-height: 68px !important;
+
+    padding: 11px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 9px !important;
+
+    background: rgba(255, 255, 255, 0.035) !important;
+}
+
+.pending-surrender-page .request-option:hover {
+    border-color: rgba(225, 200, 117, 0.20) !important;
+}
+
+.pending-surrender-page .request-option.selected {
+    border-color: rgba(225, 200, 117, 0.36) !important;
+
+    background: rgba(225, 200, 117, 0.09) !important;
+}
+
+.pending-surrender-page .custom-checkbox {
+    width: 20px !important;
+    height: 20px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+
+    background: rgba(4, 32, 20, 0.28) !important;
+}
+
+.pending-surrender-page .request-option.selected .custom-checkbox {
+    border-color: var(--ps3-gold) !important;
+
+    background: var(--ps3-gold) !important;
+    color: #17301d !important;
+}
+
+.pending-surrender-page .request-option-text strong {
+    color: #ffffff !important;
+
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+}
+
+.pending-surrender-page .request-option-text small {
+    color: #aebfb4 !important;
+
+    font-size: 10px !important;
+    line-height: 1.45 !important;
+}
+
+.pending-surrender-page .request-note-label {
+    color: #d8e3db !important;
+
+    font-size: 11px !important;
+}
+
+.pending-surrender-page .request-note-field textarea {
+    min-height: 100px !important;
+
+    padding: 10px 11px !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 9px !important;
+
+    background: #0f3a29 !important;
+    color: #ffffff !important;
+
+    font-size: 12.5px !important;
+    line-height: 1.55 !important;
+}
+
+.pending-surrender-page .request-note-field textarea::placeholder {
+    color: #9fb3a6 !important;
+}
+
+.pending-surrender-page .request-note-field textarea:focus {
+    border-color: var(--ps3-gold) !important;
+
+    box-shadow:
+        0 0 0 3px rgba(225, 200, 117, 0.12) !important;
+}
+
+.pending-surrender-page .note-counter {
+    color: #aebfb4 !important;
+}
+
+.pending-surrender-page .request-error {
+    color: #ffaaa5 !important;
+}
+
+.pending-surrender-page .request-cancel-btn {
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
+
+    background: #1a5b3f !important;
+    color: #ffffff !important;
+}
+
+.pending-surrender-page .request-cancel-btn:hover:not(:disabled) {
+    background: #256b4b !important;
+}
+
+.pending-surrender-page .request-send-btn {
+    border: 1px solid rgba(225, 200, 117, 0.30) !important;
+
+    background: var(--ps3-gold) !important;
+    color: #3d3214 !important;
+}
+
+.pending-surrender-page .request-send-btn:hover:not(:disabled) {
+    background: #cfb357 !important;
+}
+
+/* =========================================================
+   MODAL ACTIONS
+   ========================================================= */
+
+.pending-surrender-page .modal-actions {
+    min-height: 72px !important;
+
+    padding: 13px 20px !important;
+
+    border-top:
+        1px solid rgba(255, 255, 255, 0.10) !important;
+
+    background:
+        linear-gradient(135deg,
+            #123f2d,
+            #0d3425) !important;
+}
+
+.pending-surrender-page .modal-action {
+    min-width: 145px !important;
+    min-height: 42px !important;
+
+    font-size: 11.5px !important;
+    font-weight: 850 !important;
+}
+
+/* =========================================================
+   IMAGE PREVIEW
+   ========================================================= */
+
+.pending-surrender-page .image-preview-overlay {
+    background: rgba(2, 12, 7, 0.89) !important;
+
+    backdrop-filter: blur(5px) !important;
+}
+
+.pending-surrender-page .image-preview-image {
+    max-width: min(92vw, 1200px) !important;
+    max-height: 90vh !important;
+
+    border-radius: 14px !important;
+
+    background: #103927 !important;
+
+    box-shadow:
+        0 24px 70px rgba(0, 0, 0, 0.48) !important;
+}
+
+.pending-surrender-page .image-preview-close,
+.pending-surrender-page .image-preview-nav {
+    border-color: rgba(255, 255, 255, 0.18) !important;
+
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #ffffff !important;
+}
+
+/* =========================================================
+   SKELETONS
+   ========================================================= */
+
+.pending-surrender-page .skeleton-card {
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+
+    background:
+        linear-gradient(145deg,
+            #1d6547,
+            #174f38) !important;
+}
+
+.pending-surrender-page .skeleton {
+    background:
+        linear-gradient(90deg,
+            rgba(255, 255, 255, 0.05) 25%,
+            rgba(255, 255, 255, 0.12) 50%,
+            rgba(255, 255, 255, 0.05) 75%) !important;
+
+    background-size: 200% 100% !important;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1100px) {
+    .pending-surrender-page .filter-toolbar {
+        grid-template-columns:
+            minmax(260px, 1fr) minmax(210px, 0.75fr) !important;
+    }
+
+    .pending-surrender-page .sort-control {
+        grid-column: 1 / -1 !important;
+    }
+
+    .pending-surrender-page .modal-overview {
+        grid-template-columns:
+            260px minmax(0, 1fr) !important;
+    }
+}
+
+@media (max-width: 820px) {
+    .pending-surrender-page {
+        padding: 16px !important;
+    }
+
+    .pending-surrender-page .page-header {
+        align-items: flex-start !important;
+    }
+
+    .pending-surrender-page .filter-toolbar {
+        grid-template-columns: 1fr !important;
+    }
+
+    .pending-surrender-page .category-field,
+    .pending-surrender-page .sort-control {
+        grid-column: auto !important;
+    }
+
+    .pending-surrender-page .modal-content {
+        width: 96vw !important;
+    }
+
+    .pending-surrender-page .modal-overview {
+        grid-template-columns:
+            220px minmax(0, 1fr) !important;
+    }
+
+    .pending-surrender-page .detail-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+@media (max-width: 620px) {
+    .pending-surrender-page .page-header {
+        flex-direction: column !important;
+    }
+
+    .pending-surrender-page .queue-count {
+        width: 100% !important;
+    }
+
+    .pending-surrender-page .surrender-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .pending-surrender-page .modal-overlay {
+        padding: 9px !important;
+    }
+
+    .pending-surrender-page .modal-overview,
+    .pending-surrender-page .overview-details,
+    .pending-surrender-page .request-options {
+        grid-template-columns: 1fr !important;
+    }
+
+    .pending-surrender-page .modal-image-container {
+        height: 220px !important;
+    }
+
+    .pending-surrender-page .modal-actions {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+    }
+
+    .pending-surrender-page .modal-action {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .pending-surrender-page .pagination-bar {
+        align-items: stretch !important;
+        flex-direction: column !important;
+    }
+
+    .pending-surrender-page .pagination-controls {
+        justify-content: center !important;
+        flex-wrap: wrap !important;
+    }
+}
+
+@media (max-width: 460px) {
+    .pending-surrender-page .page-header h1 {
+        font-size: 1.45rem !important;
+    }
+
+    .pending-surrender-page .card-image-button {
+        height: 155px !important;
+    }
+
+    .pending-surrender-page .info-list>div,
+    .pending-surrender-page .timeline-summary>div {
+        grid-template-columns: 1fr !important;
+
+        gap: 3px !important;
+    }
+
+    .pending-surrender-page .request-form-actions {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* =========================================================
+   TIME FOUND STATUS
+   ========================================================= */
+
+.pending-surrender-page .card-meta dd.time-unavailable,
+.pending-surrender-page .info-list dd.time-unavailable {
+    color: #eed8a6 !important;
+}
+
+.pending-surrender-page .time-found-note {
+    display: block;
+    margin-top: 4px;
+    color: #b8cabc !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    line-height: 1.55 !important;
+}
 </style>

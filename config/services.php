@@ -35,4 +35,18 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Google Sign-In
+    |--------------------------------------------------------------------------
+    |
+    | This must use the Google Web OAuth Client ID.
+    | Do not use the Android Client ID here.
+    |
+    */
+
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+    ],
+
 ];
