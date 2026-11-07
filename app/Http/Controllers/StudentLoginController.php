@@ -1,12 +1,9 @@
 <?php
-
 namespace App\Http\Controllers;
-
 use App\Models\Student;
 use Google\Client as GoogleClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-
 class StudentLoginController extends Controller
 {
     /**
@@ -22,7 +19,6 @@ class StudentLoginController extends Controller
     {
         return 'required|min:6|regex:/^(?=.*[A-Z])(?=.*\d)(?=.*[!_.-]).{6,}$/';
     }
-
     /**
      * Show student login page.
      */
@@ -30,7 +26,6 @@ class StudentLoginController extends Controller
     {
         return view('welcome');
     }
-
     /**
      * Mobile / API student login.
      */
@@ -42,11 +37,9 @@ class StudentLoginController extends Controller
         |--------------------------------------------------------------------------
         */
         $email = strtolower(trim((string) $request->input('email', '')));
-
         $request->merge([
             'email' => $email,
         ]);
-
         /*
         |--------------------------------------------------------------------------
         | VALIDATE REQUEST
@@ -62,21 +55,18 @@ class StudentLoginController extends Controller
                 'string',
             ],
         ]);
-
         /*
         |--------------------------------------------------------------------------
         | FIND STUDENT
         |--------------------------------------------------------------------------
         */
         $student = Student::whereRaw('LOWER(email) = ?', [$email])->first();
-
         if (!$student) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'This email is not registered. Please use your university email.',
             ], 401);
         }
-
         /*
         |--------------------------------------------------------------------------
         | CHECK UNIVERSITY EMAIL
@@ -88,7 +78,6 @@ class StudentLoginController extends Controller
                 'message' => 'Only SSCT emails are allowed.',
             ], 401);
         }
-
         /*
         |--------------------------------------------------------------------------
         | VERIFY PASSWORD
@@ -100,7 +89,6 @@ class StudentLoginController extends Controller
                 'message' => 'Invalid password.',
             ], 401);
         }
-
         /*
         |--------------------------------------------------------------------------
         | DELETE OLD MOBILE TOKENS - OPTIONAL
@@ -113,7 +101,6 @@ class StudentLoginController extends Controller
         $student->tokens()
             ->where('name', 'student-token')
             ->delete();
-
         /*
         |--------------------------------------------------------------------------
         | CREATE SANCTUM TOKEN
@@ -122,7 +109,6 @@ class StudentLoginController extends Controller
         $token = $student
             ->createToken('student-token')
             ->plainTextToken;
-
         /*
         |--------------------------------------------------------------------------
         | LOGIN RESPONSE
@@ -153,58 +139,30 @@ class StudentLoginController extends Controller
             ],
         ], 200);
     }
-
     /**
-     * Google student login.
-     *
-     * Security flow:
-     * - React Native sends the Google ID token.
-     * - Laravel verifies the signed token with Google.
-     * - Verified @gmail.com and @ssct.edu.ph Google accounts are accepted.
-     * - The Google email address must already exist in the students table.
+     * Native Android Google sign-in for existing SSCT students.
+     * The client sends a Google ID token, never a client-side email assertion.
      */
     public function googleLogin(Request $request)
     {
-        /*
-        |--------------------------------------------------------------------------
-        | VALIDATE REQUEST
-        |--------------------------------------------------------------------------
-        */
         $validated = $request->validate([
-            'id_token' => [
-                'required',
-                'string',
-            ],
+            'id_token' => ['required', 'string'],
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | GOOGLE WEB CLIENT ID
-        |--------------------------------------------------------------------------
-        */
+        // Must match the WEB OAuth client used by GoogleSignin.configure().
         $googleClientId = trim((string) config('services.google.client_id', ''));
-
         if ($googleClientId === '') {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Google login is not configured on the server. GOOGLE_CLIENT_ID is missing.',
+                'message' => 'Google login is not configured on the server.',
             ], 500);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | VERIFY GOOGLE ID TOKEN
-        |--------------------------------------------------------------------------
-        */
         try {
-            $googleClient = new GoogleClient([
-                'client_id' => $googleClientId,
-            ]);
-
+            $googleClient = new GoogleClient(['client_id' => $googleClientId]);
             $payload = $googleClient->verifyIdToken($validated['id_token']);
         } catch (\Throwable $error) {
             report($error);
-
             return response()->json([
                 'status' => 'error',
                 'message' => 'Unable to verify the Google account. Please try again.',
@@ -218,100 +176,54 @@ class StudentLoginController extends Controller
             ], 401);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | VERIFIED GOOGLE IDENTITY
-        |--------------------------------------------------------------------------
-        */
         $email = strtolower(trim((string) ($payload['email'] ?? '')));
-        $name = trim((string) ($payload['name'] ?? ''));
+        $hostedDomain = strtolower(trim((string) ($payload['hd'] ?? '')));
         $emailVerified = filter_var(
             $payload['email_verified'] ?? false,
             FILTER_VALIDATE_BOOLEAN
         );
 
-        if ($email === '' || !$emailVerified) {
+        // Never trust only the email suffix: hd establishes Workspace membership.
+        if (
+            !$emailVerified ||
+            !str_ends_with($email, '@ssct.edu.ph') ||
+            $hostedDomain !== 'ssct.edu.ph' ||
+            empty($payload['sub']) ||
+            (string) ($payload['aud'] ?? '') !== $googleClientId
+        ) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Google did not return a verified email address.',
-            ], 401);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | ALLOWED GOOGLE EMAIL DOMAINS
-        |--------------------------------------------------------------------------
-        */
-        $isPersonalGmail = str_ends_with($email, '@gmail.com');
-        $isSsctGoogleAccount = str_ends_with($email, '@ssct.edu.ph');
-
-        if (!$isPersonalGmail && !$isSsctGoogleAccount) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Only personal Gmail accounts (@gmail.com) and SSCT school Google accounts (@ssct.edu.ph) are allowed for Google login.',
+                'message' => 'Sign in using a verified SSCT Google Workspace account (@ssct.edu.ph).',
             ], 403);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | FIND EXISTING STUDENT
-        |--------------------------------------------------------------------------
-        */
+        // Google Sign-In does not create student records automatically.
         $student = Student::whereRaw('LOWER(email) = ?', [$email])->first();
-
         if (!$student) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'No FindIt student account is registered with this Google email address. Please ask the administrator to register or link this email first.',
-            ], 404);
+                'message' => 'This SSCT Google account is not registered in FindIt. Contact the administrator.',
+            ], 403);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | UPDATE NAME IF GOOGLE PROVIDED ONE
-        |--------------------------------------------------------------------------
-        */
-        if ($name !== '') {
-            $nameParts = preg_split('/\s+/', $name, -1, PREG_SPLIT_NO_EMPTY);
-
-            if (!empty($nameParts)) {
-                $firstName = $nameParts[0];
-                $lastName = count($nameParts) > 1
-                    ? implode(' ', array_slice($nameParts, 1))
-                    : $student->last_name;
-
-                $student->update([
-                    'first_name' => trim((string) $firstName),
-                    'last_name' => trim((string) $lastName),
-                ]);
-
-                $student->refresh();
-            }
+        // Respect existing account restrictions if these fields are present.
+        $accountStatus = strtolower(trim((string) (
+            $student->account_status ?? $student->status ?? ''
+        )));
+        if (in_array($accountStatus, [
+            'inactive', 'disabled', 'deactivated', 'suspended',
+            'blocked', 'banned', 'pending', 'pending_approval', 'pending_verification',
+        ], true) || in_array($student->is_active, [false, 0, '0'], true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'This student account is not active. Contact the administrator.',
+            ], 403);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | REMOVE OLD GOOGLE TOKENS
-        |--------------------------------------------------------------------------
-        */
-        $student->tokens()
-            ->where('name', 'student-google-token')
-            ->delete();
+        // Preserve official names in the database; do not overwrite them from Google.
+        $student->tokens()->where('name', 'student-google-token')->delete();
+        $token = $student->createToken('student-google-token')->plainTextToken;
 
-        /*
-        |--------------------------------------------------------------------------
-        | CREATE SANCTUM TOKEN
-        |--------------------------------------------------------------------------
-        */
-        $token = $student
-            ->createToken('student-google-token')
-            ->plainTextToken;
-
-        /*
-        |--------------------------------------------------------------------------
-        | RESPONSE
-        |--------------------------------------------------------------------------
-        */
         return response()->json([
             'status' => 'success',
             'message' => 'Google login successful!',
@@ -338,24 +250,20 @@ class StudentLoginController extends Controller
             ],
         ], 200);
     }
-
     /**
      * Logout current mobile student.
      */
     public function logout(Request $request)
     {
         $student = $request->user();
-
         if ($student && $student->currentAccessToken()) {
             $student->currentAccessToken()->delete();
         }
-
         return response()->json([
             'status' => 'success',
             'message' => 'Logged out successfully.',
         ], 200);
     }
-
     /**
      * Student registration.
      */
@@ -369,7 +277,6 @@ class StudentLoginController extends Controller
         $request->merge([
             'email' => strtolower(trim((string) $request->input('email', ''))),
         ]);
-
         /*
         |--------------------------------------------------------------------------
         | VALIDATION
@@ -429,14 +336,12 @@ class StudentLoginController extends Controller
                 'password.regex' => 'Password must be at least 6 characters and include at least one uppercase letter, one number, and one of these symbols: !, _, -, .',
             ]
         );
-
         /*
         |--------------------------------------------------------------------------
         | NORMALIZE EMAIL
         |--------------------------------------------------------------------------
         */
         $validatedData['email'] = strtolower(trim((string) $validatedData['email']));
-
         /*
         |--------------------------------------------------------------------------
         | CHECK UNIVERSITY EMAIL
@@ -448,7 +353,6 @@ class StudentLoginController extends Controller
                 'message' => 'Only SSCT emails are allowed.',
             ], 422);
         }
-
         /*
         |--------------------------------------------------------------------------
         | CREATE STUDENT
@@ -469,7 +373,6 @@ class StudentLoginController extends Controller
             'password' => Hash::make($validatedData['password']),
             'profile_photo' => '/assets/logo.png',
         ]);
-
         /*
         |--------------------------------------------------------------------------
         | CREATE API TOKEN
@@ -481,7 +384,6 @@ class StudentLoginController extends Controller
         $token = $student
             ->createToken('student-token')
             ->plainTextToken;
-
         /*
         |--------------------------------------------------------------------------
         | RESPONSE
